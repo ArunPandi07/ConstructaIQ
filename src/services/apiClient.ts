@@ -126,18 +126,23 @@ class ApiClient {
 // ── Custom error class ────────────────────────────────────────
 
 export class ApiError extends Error {
+  readonly statusCode: number
+  readonly body?: unknown
+
   constructor(
     message: string,
-    public readonly statusCode: number,
-    public readonly body?: unknown,
+    statusCode: number,
+    body?: unknown,
   ) {
     super(message)
     this.name = 'ApiError'
+    this.statusCode = statusCode
+    this.body = body
   }
 
-  get isNotFound()     { return this.statusCode === 404 }
-  get isUnauthorized() { return this.statusCode === 401 }
-  get isServerError()  { return this.statusCode >= 500 }
+  isNotFound()     { return this.statusCode === 404 }
+  isUnauthorized() { return this.statusCode === 401 }
+  isServerError()  { return this.statusCode >= 500 }
 }
 
 // ── Singleton export ──────────────────────────────────────────

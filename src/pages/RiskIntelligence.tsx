@@ -1,83 +1,77 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { ShieldAlert, ChevronDown, ChevronUp, ArrowDown, TrendingUp, Info, Zap, ArrowRight } from 'lucide-react'
-import Badge from '../components/Badge'
-import { RiskCardSkeleton, CardSkeleton, ErrorState, Skeleton } from '../components/Skeleton'
-import { useRiskIntelligence } from '../hooks/usePageData'
-import { useAppContext } from '../context/AppContext'
-import type { RiskFactor } from '../types'
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { ShieldAlert, ChevronDown, ChevronUp, ArrowDown, TrendingUp, Info, Zap, ArrowRight } from "lucide-react";
+import Badge from "../components/Badge";
+import { RiskCardSkeleton, CardSkeleton, ErrorState, Skeleton } from "../components/Skeleton";
+import { useRiskIntelligence } from "../hooks/usePageData";
+import { useAppContext } from "../context/AppContext";
+import type { RiskFactor } from "../types";
 
-const heatColors = [
-  '#dcfce7','#bbf7d0','#fef9c3','#fef08a',
-  '#fed7aa','#fdba74','#fca5a5','#f87171','#ef4444',
-]
-const getHeatColor  = (v: number) => heatColors[Math.min(v - 1, heatColors.length - 1)]
-const getHeatText   = (v: number) => v >= 7 ? (v >= 8 ? '#7f1d1d' : '#991b1b') : '#14532d'
-const catBadge = (c: string) => ({'Regulatory':'red','Supply Chain':'orange','Workforce':'yellow','Design':'purple'} as any)[c] ?? 'blue'
+const heatColors = ["#0d2818","#163a26","#1a4f1a","#854f0b","#7a3a0d","#8a2020","#7f1d1d","#6b1515","#4a0f0f"];
+const getHeatColor = (v: number) => heatColors[Math.min(v - 1, heatColors.length - 1)];
+const getHeatText  = (v: number) => v >= 7 ? "rgba(255,200,200,0.9)" : "rgba(150,230,150,0.7)";
+const catBadge = (c: string) => (({ Regulatory: "red", "Supply Chain": "orange", Workforce: "yellow", Design: "purple" } as any)[c] ?? "blue");
 const riskStyle = (s: number) =>
-  s >= 80 ? { color: '#dc2626', bg: '#fef2f2', border: '#fecaca' }
-  : s >= 60 ? { color: '#ea580c', bg: '#fff7ed', border: '#fed7aa' }
-  : s >= 40 ? { color: '#ca8a04', bg: '#fefce8', border: '#fde68a' }
-  : { color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0' }
+  s >= 80 ? { color: "var(--red-primary)",    bg: "var(--red-bg)",    border: "var(--red-border)"    } :
+  s >= 60 ? { color: "var(--orange-primary)", bg: "var(--orange-bg)", border: "var(--orange-border)" } :
+  s >= 40 ? { color: "#eab308",               bg: "rgba(234,179,8,0.1)", border: "rgba(234,179,8,0.2)" } :
+            { color: "var(--green-primary)",  bg: "var(--green-bg)",  border: "var(--green-border)"  };
 
 export default function RiskIntelligence() {
-  const navigate = useNavigate()
-  const { activeProjectId } = useAppContext()
-  const { data, loading, error, refetch } = useRiskIntelligence(activeProjectId)
-  const [expandedRisk, setExpandedRisk] = useState<number | null>(0)
-
-  if (error) return <ErrorState message={error} onRetry={refetch} />
-
-  const ss = data ? riskStyle(data.overallScore) : riskStyle(82)
+  const navigate = useNavigate();
+  const { activeProjectId } = useAppContext();
+  const { data, loading, error, refetch } = useRiskIntelligence(activeProjectId);
+  const [expandedRisk, setExpandedRisk] = useState<number | null>(0);
+  if (error) return <ErrorState message={error} onRetry={refetch} />;
+  const ss = data ? riskStyle(data.overallScore) : riskStyle(82);
 
   return (
-    <div className="space-y-6 animate-fade-in-up">
-      <div className="flex items-start justify-between">
+    <div className="space-y-5 animate-fade-in-up">
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
         <div>
-          <h2 className="text-lg font-bold" style={{ color: '#0f172a' }}>Risk Intelligence</h2>
-          <p className="text-sm mt-0.5" style={{ color: '#64748b' }}>AI-powered risk identification, quantification, and reasoning</p>
+          <h2 style={{ fontSize: "1rem", fontWeight: 700, color: "var(--text-primary)" }}>Risk Intelligence</h2>
+          <p style={{ fontSize: "0.78rem", color: "var(--text-secondary)", marginTop: 3 }}>AI-powered risk identification, quantification, and reasoning</p>
         </div>
-        {loading
-          ? <Skeleton style={{ width: 100, height: 24 }} rounded="full" />
-          : data && <Badge variant="red" dot pulse>{data.overallScore}/100 Critical</Badge>}
+        {loading ? <Skeleton style={{ width: 110, height: 24 }} rounded="full" /> : data && (
+          <Badge variant="red" dot pulse>{data.overallScore}/100 Critical</Badge>
+        )}
       </div>
 
       {/* Top row */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+
         {/* Score gauge */}
         {loading ? <CardSkeleton lines={4} /> : data && (
-          <div className="glass-card p-6 flex flex-col items-center text-center" style={{ borderColor: ss.border }}>
-            <div className="text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: '#94a3b8' }}>
-              Overall Project Risk Score
-            </div>
-            <div className="relative mb-4">
-              <svg width={120} height={120} className="transform -rotate-90">
-                <circle cx={60} cy={60} r={48} fill="none" stroke="#e2e8f0" strokeWidth={10} />
+          <div className="glass-card p-5 flex flex-col items-center text-center" style={{ borderColor: ss.border }}>
+            <div className="section-label" style={{ marginBottom: 14 }}>Overall Project Risk Score</div>
+            <div style={{ position: "relative", marginBottom: 12 }}>
+              <svg width={120} height={120} style={{ transform: "rotate(-90deg)" }}>
+                <circle cx={60} cy={60} r={48} fill="none" stroke="var(--bg3)" strokeWidth={10} />
                 <circle cx={60} cy={60} r={48} fill="none" stroke={ss.color} strokeWidth={10} strokeLinecap="round"
                   strokeDasharray={`${2 * Math.PI * 48 * (data.overallScore / 100)} ${2 * Math.PI * 48}`}
-                  style={{ filter: `drop-shadow(0 0 6px ${ss.color}60)` }} />
+                  style={{ filter: `drop-shadow(0 0 8px ${ss.color}50)` }} />
               </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-3xl font-black" style={{ color: ss.color }}>{data.overallScore}</span>
-                <span className="text-xs" style={{ color: '#94a3b8' }}>/100</span>
+              <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+                <span style={{ fontSize: "1.9rem", fontWeight: 800, color: ss.color, letterSpacing: "-1px" }}>{data.overallScore}</span>
+                <span style={{ fontSize: "0.68rem", color: "var(--text-muted)" }}>/100</span>
               </div>
             </div>
-            <div className="text-sm font-bold mb-1" style={{ color: ss.color }}>Critical Risk Level</div>
-            <p className="text-xs mb-4" style={{ color: '#64748b' }}>Trend: ↑ Increasing — Action required</p>
-            <div className="grid grid-cols-3 gap-2 w-full mb-4">
-              {[{ l:'Critical',n:7,c:'#dc2626',b:'#fef2f2',bd:'#fecaca' },
-                { l:'High',n:12,c:'#ea580c',b:'#fff7ed',bd:'#fed7aa' },
-                { l:'Medium',n:24,c:'#ca8a04',b:'#fefce8',bd:'#fde68a' }].map(x => (
-                <div key={x.l} className="p-2 rounded-lg text-center" style={{ background: x.b, border: `1px solid ${x.bd}` }}>
-                  <div className="text-lg font-bold" style={{ color: x.c }}>{x.n}</div>
-                  <div style={{ color: x.c, fontSize: '0.6rem' }}>{x.l}</div>
+            <div style={{ fontSize: "0.82rem", fontWeight: 700, color: ss.color, marginBottom: 4 }}>Critical Risk Level</div>
+            <p style={{ fontSize: "0.72rem", color: "var(--text-secondary)", marginBottom: 14 }}>Trend: ↑ Increasing — Action required</p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, width: "100%", marginBottom: 14 }}>
+              {[{ l:"Critical",n:7,c:"var(--red-primary)",b:"var(--red-bg)",bd:"var(--red-border)" },
+                { l:"High",n:12,c:"var(--orange-primary)",b:"var(--orange-bg)",bd:"var(--orange-border)" },
+                { l:"Medium",n:24,c:"#eab308",b:"rgba(234,179,8,0.1)",bd:"rgba(234,179,8,0.2)" }].map(x => (
+                <div key={x.l} style={{ background: x.b, border: `1px solid ${x.bd}`, borderRadius: 8, padding: "8px 4px", textAlign: "center" }}>
+                  <div style={{ fontSize: "1.1rem", fontWeight: 700, color: x.c }}>{x.n}</div>
+                  <div style={{ fontSize: "0.6rem", color: x.c, marginTop: 1 }}>{x.l}</div>
                 </div>
               ))}
             </div>
-            <button onClick={() => navigate('/recovery')}
-              className="w-full py-2 rounded-lg text-xs font-semibold text-white hover:opacity-90"
-              style={{ background: 'linear-gradient(135deg,#2563eb,#4f46e5)' }}>
-              View Recovery Plans <ArrowRight size={11} className="inline ml-1" />
+            <button onClick={() => navigate("/recovery")}
+              style={{ width: "100%", padding: "8px", borderRadius: 8, background: "var(--amber)", color: "#000", border: "none", fontSize: "0.76rem", fontWeight: 600, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>
+              View Recovery Plans <ArrowRight size={12} />
             </button>
           </div>
         )}
@@ -85,72 +79,67 @@ export default function RiskIntelligence() {
         {/* Heatmap */}
         {loading ? <CardSkeleton lines={5} /> : data && (
           <div className="glass-card p-5">
-            <div className="mb-4">
-              <h3 className="text-sm font-bold" style={{ color: '#0f172a' }}>Risk Heatmap</h3>
-              <p className="text-xs mt-0.5" style={{ color: '#94a3b8' }}>Probability × Impact matrix</p>
+            <div style={{ marginBottom: 12 }}>
+              <h3 style={{ fontSize: "0.86rem", fontWeight: 600, color: "var(--text-primary)" }}>Risk Heatmap</h3>
+              <p style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginTop: 2 }}>Probability × Impact matrix</p>
             </div>
-            <div className="flex gap-1">
-              <div className="flex flex-col justify-between py-4 pr-1" style={{ width: 46 }}>
-                {['V.High','High','Med','Low','V.Low'].map(l => (
-                  <div key={l} className="text-right text-xs" style={{ color: '#94a3b8', fontSize: '0.6rem' }}>{l}</div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", paddingBlock: 10, width: 44 }}>
+                {["V.High","High","Med","Low","V.Low"].map(l => (
+                  <div key={l} style={{ textAlign: "right", fontSize: "0.6rem", color: "var(--text-muted)" }}>{l}</div>
                 ))}
               </div>
-              <div className="flex-1">
-                <div className="grid gap-1" style={{ gridTemplateColumns: 'repeat(5,1fr)', gridTemplateRows: 'repeat(5,1fr)' }}>
-                  {data.heatmap.map((row, ri) =>
-                    row.map((val, ci) => (
-                      <div key={`${ri}-${ci}`} className="heatmap-cell aspect-square"
-                        style={{ background: getHeatColor(val), minHeight: 34, color: getHeatText(val) }}
-                        title={`Risk: ${val}`}>
-                        {val >= 7 && <span style={{ fontSize: '0.55rem', fontWeight: 700 }}>{val}</span>}
-                      </div>
-                    ))
-                  )}
+              <div style={{ flex: 1 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gridTemplateRows: "repeat(5,1fr)", gap: 4 }}>
+                  {data.heatmap.map((row, ri) => row.map((val, ci) => (
+                    <div key={`${ri}-${ci}`} className="heatmap-cell" style={{ background: getHeatColor(val), minHeight: 34, color: getHeatText(val) }} title={`Risk: ${val}`}>
+                      {val >= 7 && <span style={{ fontSize: "0.55rem", fontWeight: 700 }}>{val}</span>}
+                    </div>
+                  )))}
                 </div>
-                <div className="grid mt-1" style={{ gridTemplateColumns: 'repeat(5,1fr)' }}>
-                  {['V.Low','Low','Med','High','V.High'].map(l => (
-                    <div key={l} className="text-center" style={{ color: '#94a3b8', fontSize: '0.6rem' }}>{l}</div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", marginTop: 4 }}>
+                  {["V.Low","Low","Med","High","V.High"].map(l => (
+                    <div key={l} style={{ textAlign: "center", fontSize: "0.6rem", color: "var(--text-muted)" }}>{l}</div>
                   ))}
                 </div>
               </div>
             </div>
-            <div className="flex items-center justify-between mt-3">
-              {[['#16a34a','#bbf7d0','Low'],['#ca8a04','#fde68a','Medium'],['#dc2626','#fecaca','High']].map(([c,b,l]) => (
-                <div key={l} className="flex items-center gap-1.5">
-                  <div className="w-3 h-3 rounded" style={{ background: b, border: `1px solid ${c}44` }} />
-                  <span style={{ fontSize: '0.62rem', color: '#64748b' }}>{l}</span>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12 }}>
+              {[["#22c55e","#163a26","Low"],["#eab308","#854f0b","Medium"],["#ef4444","#7f1d1d","High"]].map(([c,b,l]) => (
+                <div key={l} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                  <div style={{ width: 12, height: 12, borderRadius: 3, background: b, border: `1px solid ${c}30` }} />
+                  <span style={{ fontSize: "0.62rem", color: "var(--text-secondary)" }}>{l}</span>
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* Reasoning Chain */}
+        {/* Reasoning chain */}
         {loading ? <CardSkeleton lines={8} /> : data && (
           <div className="glass-card p-5">
-            <div className="mb-4">
-              <h3 className="text-sm font-bold" style={{ color: '#0f172a' }}>AI Reasoning Chain</h3>
-              <p className="text-xs mt-0.5" style={{ color: '#94a3b8' }}>Causal risk propagation analysis</p>
+            <div style={{ marginBottom: 12 }}>
+              <h3 style={{ fontSize: "0.86rem", fontWeight: 600, color: "var(--text-primary)" }}>AI Reasoning Chain</h3>
+              <p style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginTop: 2 }}>Causal risk propagation analysis</p>
             </div>
-            <div className="space-y-1">
+            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
               {data.reasoningChain.map((node, i) => (
                 <div key={i}>
-                  <div className="chain-node" style={{ borderColor: `${node.color}30`, background: `${node.color}08` }}>
-                    <div className="w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0"
-                      style={{ background: `${node.color}15`, border: `1px solid ${node.color}30` }}>
-                      <span style={{ fontSize: '0.62rem', fontWeight: 700, color: node.color }}>{i + 1}</span>
+                  <div className="chain-node" style={{ borderColor: `${node.color}25`, background: `${node.color}06` }}>
+                    <div style={{ width: 22, height: 22, borderRadius: 6, background: `${node.color}14`, border: `1px solid ${node.color}28`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      <span style={{ fontSize: "0.6rem", fontWeight: 700, color: node.color }}>{i + 1}</span>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-xs font-semibold" style={{ color: node.color }}>{node.event}</div>
-                      <div className="text-xs mt-0.5" style={{ color: '#94a3b8', fontSize: '0.62rem' }}>{node.description}</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: "0.76rem", fontWeight: 600, color: node.color }}>{node.event}</div>
+                      <div style={{ fontSize: "0.66rem", color: "var(--text-muted)", marginTop: 2 }}>{node.description}</div>
                     </div>
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                      <TrendingUp size={10} style={{ color: node.color }} />
-                      <span style={{ fontSize: '0.62rem', fontWeight: 700, color: node.color }}>{node.confidence}%</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+                      <TrendingUp size={9} style={{ color: node.color }} />
+                      <span style={{ fontSize: "0.62rem", fontWeight: 700, color: node.color }}>{node.confidence}%</span>
                     </div>
                   </div>
                   {i < data.reasoningChain.length - 1 && (
-                    <div className="chain-arrow"><ArrowDown size={13} style={{ color: '#93c5fd' }} /></div>
+                    <div className="chain-arrow"><ArrowDown size={12} /></div>
                   )}
                 </div>
               ))}
@@ -161,76 +150,71 @@ export default function RiskIntelligence() {
 
       {/* Top Risks */}
       <div className="glass-card p-5">
-        <div className="flex items-center gap-2 mb-4">
-          <ShieldAlert size={15} style={{ color: '#dc2626' }} />
-          <h3 className="text-sm font-bold" style={{ color: '#0f172a' }}>Top Risk Factors</h3>
-          {!loading && data && (
-            <span className="ml-auto text-xs" style={{ color: '#94a3b8' }}>{data.topRisks.length} identified risks</span>
-          )}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+          <ShieldAlert size={14} style={{ color: "var(--red-primary)" }} />
+          <h3 style={{ fontSize: "0.86rem", fontWeight: 600, color: "var(--text-primary)" }}>Top Risk Factors</h3>
+          {!loading && data && <span style={{ marginLeft: "auto", fontSize: "0.72rem", color: "var(--text-muted)" }}>{data.topRisks.length} identified risks</span>}
         </div>
-        {loading
-          ? <div className="space-y-2">{Array.from({length:4}).map((_,i)=><RiskCardSkeleton key={i}/>)}</div>
-          : data && (
-            <div className="space-y-2">
-              {data.topRisks.map((risk: RiskFactor) => {
-                const isExp = expandedRisk === risk.id
-                const rs = riskStyle(risk.score)
-                return (
-                  <div key={risk.id} className="rounded-xl overflow-hidden transition-all"
-                    style={{ background: isExp ? rs.bg : '#f8fafc', border: `1px solid ${isExp ? rs.border : '#e2e8f0'}` }}>
-                    <div className="flex items-center gap-3 p-4 cursor-pointer"
-                      onClick={() => setExpandedRisk(isExp ? null : risk.id)}>
-                      <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                        style={{ background: rs.bg, border: `1px solid ${rs.border}` }}>
-                        <span className="text-base font-black" style={{ color: rs.color }}>{risk.score}</span>
+        {loading ? (
+          <div className="space-y-2">{Array.from({ length: 4 }).map((_, i) => <RiskCardSkeleton key={i} />)}</div>
+        ) : data && (
+          <div className="space-y-2">
+            {data.topRisks.map((risk: RiskFactor) => {
+              const isExp = expandedRisk === risk.id;
+              const rs = riskStyle(risk.score);
+              return (
+                <div key={risk.id} style={{ borderRadius: 10, overflow: "hidden", border: `1px solid ${isExp ? rs.border : "var(--border)"}`, background: isExp ? rs.bg : "var(--bg3)", transition: "all 0.2s" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", cursor: "pointer" }} onClick={() => setExpandedRisk(isExp ? null : risk.id)}>
+                    <div style={{ width: 40, height: 40, borderRadius: 9, background: rs.bg, border: `1px solid ${rs.border}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      <span style={{ fontSize: "0.95rem", fontWeight: 800, color: rs.color }}>{risk.score}</span>
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: 3 }}>
+                        <span style={{ fontSize: "0.82rem", fontWeight: 600, color: "var(--text-primary)" }}>{risk.name}</span>
+                        <Badge variant={catBadge(risk.category)}>{risk.category}</Badge>
+                        <Badge variant="gray" size="sm">P: {risk.probability}</Badge>
+                        <Badge variant={risk.impact === "Critical" ? "red" : "orange"} size="sm">I: {risk.impact}</Badge>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-sm font-bold" style={{ color: '#0f172a' }}>{risk.name}</span>
-                          <Badge variant={catBadge(risk.category)}>{risk.category}</Badge>
-                          <Badge variant="gray" size="sm">P: {risk.probability}</Badge>
-                          <Badge variant={risk.impact === 'Critical' ? 'red' : 'orange'} size="sm">I: {risk.impact}</Badge>
-                        </div>
-                        <p className="text-xs mt-1 truncate" style={{ color: '#64748b' }}>{risk.description}</p>
+                      <p style={{ fontSize: "0.72rem", color: "var(--text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{risk.description}</p>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                      <div className="progress-bar" style={{ width: 60, height: 4 }}>
+                        <div className="progress-fill" style={{ width: `${risk.score}%`, background: `linear-gradient(90deg,${rs.color}60,${rs.color})` }} />
                       </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <div className="progress-bar w-16" style={{ height: 4 }}>
-                          <div className="progress-fill" style={{ width: `${risk.score}%`, background: `linear-gradient(90deg,${rs.color}77,${rs.color})` }} />
+                      {isExp ? <ChevronUp size={14} style={{ color: "var(--text-muted)" }} /> : <ChevronDown size={14} style={{ color: "var(--text-muted)" }} />}
+                    </div>
+                  </div>
+                  {isExp && (
+                    <div style={{ padding: "0 14px 14px" }}>
+                      <div style={{ borderTop: `1px solid ${rs.border}`, paddingTop: 12, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                        <div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 8 }}>
+                            <Info size={11} style={{ color: "var(--amber)" }} />
+                            <span style={{ fontSize: "0.74rem", fontWeight: 600, color: "var(--text-primary)" }}>Risk Factors</span>
+                          </div>
+                          {risk.details.map((d, i) => (
+                            <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 7, marginBottom: 5 }}>
+                              <div style={{ width: 4, height: 4, borderRadius: "50%", background: rs.color, marginTop: 5, flexShrink: 0 }} />
+                              <span style={{ fontSize: "0.72rem", color: "var(--text-secondary)" }}>{d}</span>
+                            </div>
+                          ))}
                         </div>
-                        {isExp ? <ChevronUp size={14} style={{ color: '#94a3b8' }} /> : <ChevronDown size={14} style={{ color: '#94a3b8' }} />}
+                        <div style={{ background: "var(--green-bg)", border: "1px solid var(--green-border)", borderRadius: 10, padding: 12 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 8 }}>
+                            <Zap size={11} style={{ color: "var(--green-primary)" }} />
+                            <span style={{ fontSize: "0.74rem", fontWeight: 600, color: "var(--green-primary)" }}>AI Mitigation</span>
+                          </div>
+                          <p style={{ fontSize: "0.72rem", lineHeight: 1.6, color: "var(--text-secondary)" }}>{risk.mitigation}</p>
+                        </div>
                       </div>
                     </div>
-                    {isExp && (
-                      <div className="px-4 pb-4">
-                        <div className="border-t pt-3 grid grid-cols-1 md:grid-cols-2 gap-3" style={{ borderColor: rs.border }}>
-                          <div>
-                            <div className="flex items-center gap-1.5 mb-2">
-                              <Info size={12} style={{ color: '#2563eb' }} />
-                              <span className="text-xs font-semibold" style={{ color: '#0f172a' }}>Risk Factors</span>
-                            </div>
-                            {risk.details.map((d, i) => (
-                              <div key={i} className="flex items-start gap-2 mb-1.5">
-                                <div className="w-1 h-1 rounded-full mt-1.5 flex-shrink-0" style={{ background: rs.color }} />
-                                <span className="text-xs" style={{ color: '#64748b' }}>{d}</span>
-                              </div>
-                            ))}
-                          </div>
-                          <div className="p-3 rounded-xl" style={{ background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
-                            <div className="flex items-center gap-1.5 mb-2">
-                              <Zap size={12} style={{ color: '#16a34a' }} />
-                              <span className="text-xs font-semibold" style={{ color: '#16a34a' }}>AI Mitigation</span>
-                            </div>
-                            <p className="text-xs leading-relaxed" style={{ color: '#374151' }}>{risk.mitigation}</p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          )}
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
-  )
+  );
 }

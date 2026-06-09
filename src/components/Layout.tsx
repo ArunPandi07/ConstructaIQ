@@ -1,182 +1,98 @@
-import { Outlet, NavLink, useLocation } from 'react-router-dom'
+import { Outlet, NavLink, useLocation } from "react-router-dom";
 import {
-  LayoutDashboard, Upload, Brain, ShieldAlert, RefreshCw,
-  GitBranch, Bot, Bell, Settings, ChevronRight, Zap, Activity,
-} from 'lucide-react'
+  LayoutDashboard, Upload, Brain, ShieldAlert,
+  RefreshCw, GitBranch, Bot, Settings, Activity,
+} from "lucide-react";
 
 const navItems = [
-  { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { path: '/upload', label: 'Project Upload', icon: Upload },
-  { path: '/intelligence', label: 'Project Intelligence', icon: Brain },
-  { path: '/risk', label: 'Risk Intelligence', icon: ShieldAlert },
-  { path: '/recovery', label: 'Recovery Center', icon: RefreshCw },
-  { path: '/change-impact', label: 'Change Impact', icon: GitBranch },
-  { path: '/agents', label: 'Agent Insights', icon: Bot },
-]
+  { path: "/dashboard",    label: "Dashboard",            icon: LayoutDashboard },
+  { path: "/upload",       label: "Project Upload",        icon: Upload },
+  { path: "/intelligence", label: "Project Intelligence",  icon: Brain },
+  { path: "/risk",         label: "Risk Intelligence",     icon: ShieldAlert },
+  { path: "/recovery",     label: "Recovery Center",       icon: RefreshCw },
+  { path: "/change-impact",label: "Change Impact",         icon: GitBranch },
+  { path: "/agents",       label: "Agent Insights",        icon: Bot },
+];
 
 export default function Layout() {
-  const location = useLocation()
-  const currentPage = navItems.find(item => item.path === location.pathname)
+  const location = useLocation();
+  const currentPage = navItems.find((i) => i.path === location.pathname);
 
   return (
-    <div className="flex h-screen overflow-hidden" style={{ background: '#f1f5f9' }}>
+    <div className="flex h-screen overflow-hidden" style={{ background: "var(--bg)" }}>
+
       {/* ── Sidebar ── */}
-      <aside
-        className="w-[230px] flex-shrink-0 flex flex-col border-r"
-        style={{ background: '#ffffff', borderColor: '#e2e8f0' }}
-      >
+      <aside className="flex flex-col shrink-0" style={{ width: 220, background: "var(--sidebar-bg)" }}>
+
         {/* Logo */}
-        <div className="px-5 py-5 border-b" style={{ borderColor: '#e2e8f0' }}>
-          <div className="flex items-center gap-3">
-            <div
-              className="w-9 h-9 rounded-xl flex items-center justify-center"
-              style={{ background: 'linear-gradient(135deg, #2563eb, #4f46e5)' }}
-            >
-              <Zap size={17} className="text-white" />
-            </div>
-            <div>
-              <div className="text-sm font-bold leading-tight" style={{ color: '#0f172a' }}>
-                BuildMind AI
-              </div>
-              <div className="text-xs" style={{ color: '#94a3b8', fontSize: '0.62rem' }}>
-                Construction Intelligence
-              </div>
-            </div>
+        <div className="flex items-center gap-2.5 px-4 py-4" style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
+          <div className="flex items-center justify-center rounded-lg shrink-0" style={{ width: 34, height: 34, background: "#2563eb" }}>
+            <svg width="18" height="18" viewBox="0 0 16 16" fill="none">
+              <rect x="1" y="9" width="3" height="6" rx="1" fill="#fff" />
+              <rect x="6.5" y="5" width="3" height="10" rx="1" fill="#fff" />
+              <rect x="12" y="2" width="3" height="13" rx="1" fill="#fff" />
+            </svg>
+          </div>
+          <div>
+            <div className="font-bold" style={{ fontSize: "0.85rem", color: "#ffffff" }}>ConstructaIQ</div>
+            <div style={{ fontSize: "0.6rem", color: "rgba(255,255,255,0.4)", marginTop: 1, letterSpacing: "0.04em" }}>Intelligence Platform</div>
           </div>
         </div>
 
-        {/* Active project chip */}
-        <div
-          className="mx-3 mt-3 px-3 py-2 rounded-lg"
-          style={{ background: '#eff6ff', border: '1px solid #bfdbfe' }}
-        >
-          <div className="text-xs font-medium" style={{ color: '#94a3b8', marginBottom: 2 }}>
-            Active Project
-          </div>
-          <div className="text-xs font-semibold truncate" style={{ color: '#2563eb' }}>
-            Tower A — Downtown
-          </div>
-          <div className="flex items-center gap-1.5 mt-1">
-            <div className="w-1.5 h-1.5 rounded-full bg-orange-400 animate-pulse" />
-            <span style={{ color: '#f97316', fontSize: '0.62rem', fontWeight: 600 }}>
-              Risk: 82%
-            </span>
-          </div>
-        </div>
-
-        {/* Nav links */}
-        <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-          <div
-            className="text-xs font-semibold uppercase tracking-wider px-2 pb-2"
-            style={{ color: '#cbd5e1' }}
-          >
-            Navigation
-          </div>
+        {/* Nav */}
+        <nav className="flex-1 px-3 py-3 overflow-y-auto space-y-0.5">
+          <div style={{ fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(255,255,255,0.25)", padding: "2px 8px 8px" }}>Navigation</div>
           {navItems.map(({ path, label, icon: Icon }) => {
-            const isActive = location.pathname === path
+            const active = location.pathname === path;
             return (
-              <NavLink
-                key={path}
-                to={path}
-                className="sidebar-item"
-                style={isActive ? {
-                  background: 'linear-gradient(135deg, #eff6ff, #eef2ff)',
-                  color: '#2563eb',
-                  borderColor: '#bfdbfe',
-                } : {}}
-              >
-                <Icon size={15} style={{ flexShrink: 0 }} />
-                <span className="flex-1 text-xs font-semibold truncate">{label}</span>
-                {isActive && <ChevronRight size={11} style={{ color: '#93c5fd', flexShrink: 0 }} />}
+              <NavLink key={path} to={path} className={`sidebar-item ${active ? "active" : ""}`}>
+                <Icon size={14} style={{ flexShrink: 0 }} />
+                <span className="flex-1 truncate">{label}</span>
+                {active && <div className="rounded-full shrink-0" style={{ width: 6, height: 6, background: "#6395ff" }} />}
               </NavLink>
-            )
+            );
           })}
         </nav>
 
         {/* Footer */}
-        <div className="px-3 py-4 border-t space-y-1" style={{ borderColor: '#e2e8f0' }}>
-          <button className="sidebar-item w-full">
+        <div className="px-3 pb-3" style={{ borderTop: "1px solid rgba(255,255,255,0.07)", paddingTop: 10 }}>
+          <NavLink to="/settings" className={({ isActive }) => `sidebar-item w-full${isActive ? " active" : ""}`}>
             <Settings size={14} />
-            <span className="text-xs">Settings</span>
-          </button>
-          <div
-            className="px-3 py-2 rounded-lg mt-1"
-            style={{ background: '#f0fdf4', border: '1px solid #bbf7d0' }}
-          >
-            <div className="flex items-center gap-2">
-              <Activity size={12} style={{ color: '#16a34a' }} />
-              <span style={{ fontSize: '0.62rem', color: '#16a34a', fontWeight: 600 }}>
-                5 Agents Active
-              </span>
-            </div>
+            <span>Settings</span>
+          </NavLink>
+          <div className="flex items-center gap-2 px-3 py-2 mt-1.5 rounded-lg" style={{ background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.2)" }}>
+            <Activity size={10} className="animate-pulse" style={{ color: "#22c55e" }} />
+            <span style={{ fontSize: "0.62rem", color: "#22c55e", fontWeight: 700, letterSpacing: "0.05em" }}>5 AGENTS ACTIVE</span>
           </div>
         </div>
       </aside>
 
       {/* ── Main ── */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Header */}
-        <header
-          className="flex-shrink-0 flex items-center justify-between px-8 py-3.5 border-b"
-          style={{ background: '#ffffff', borderColor: '#e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}
-        >
+      <div className="flex flex-col flex-1 overflow-hidden">
+
+        {/* Topbar */}
+        <header className="flex items-center justify-between shrink-0 px-6" style={{ height: 56, background: "#ffffff", borderBottom: "1px solid var(--border)" }}>
           <div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs" style={{ color: '#94a3b8' }}>BuildMind AI</span>
-              <ChevronRight size={11} style={{ color: '#cbd5e1' }} />
-              <span className="text-xs font-semibold" style={{ color: '#2563eb' }}>
-                {currentPage?.label || 'Dashboard'}
-              </span>
+            <div className="flex items-center gap-1" style={{ fontSize: "0.68rem", color: "var(--text-muted)" }}>
+              <span style={{ color: "var(--text-secondary)" }}>ConstructaIQ</span>
+              <span style={{ color: "var(--border2)", margin: "0 2px" }}>/</span>
+              <span style={{ color: "var(--blue-primary)", fontWeight: 600 }}>{currentPage?.label ?? "Dashboard"}</span>
             </div>
-            <h1 className="text-sm font-bold mt-0.5" style={{ color: '#0f172a' }}>
-              {currentPage?.label || 'Dashboard'}
-            </h1>
-            <p className="text-xs" style={{ color: '#94a3b8' }}>
-              Autonomous Construction Intelligence Platform
-            </p>
+            <div className="font-semibold" style={{ fontSize: "1rem", color: "var(--text-primary)", marginTop: 1 }}>
+              {currentPage?.label ?? "Dashboard"}
+            </div>
           </div>
-
-          <div className="flex items-center gap-3">
-
-
-
-            <button
-              className="relative p-2 rounded-lg transition-all"
-              style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}
-            >
-              <Bell size={15} style={{ color: '#64748b' }} />
-              <span
-                className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 flex items-center justify-center text-white"
-                style={{ fontSize: '0.5rem', fontWeight: 700 }}
-              >
-                7
-              </span>
-            </button>
-
-            {/* Avatar */}
-            <div className="flex items-center gap-2.5">
-              <div
-                className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white"
-                style={{ background: 'linear-gradient(135deg, #2563eb, #4f46e5)' }}
-              >
-                JD
-              </div>
-              <div className="hidden md:block">
-                <div className="text-xs font-semibold" style={{ color: '#0f172a' }}>James Director</div>
-                <div className="text-xs" style={{ color: '#94a3b8' }}>VP Projects</div>
-              </div>
-            </div>
+          <div className="rounded-full flex items-center justify-center font-bold text-white shrink-0"
+            style={{ width: 36, height: 36, background: "#16a34a", fontSize: "0.72rem" }}>
+            JD
           </div>
         </header>
 
-        {/* Page */}
-        <main
-          className="flex-1 overflow-y-auto p-6 bg-mesh"
-          style={{ background: '#f1f5f9' }}
-        >
+        {/* Page content */}
+        <main className="flex-1 p-5 overflow-y-auto" style={{ background: "var(--bg)" }}>
           <Outlet />
         </main>
       </div>
     </div>
-  )
+  );
 }

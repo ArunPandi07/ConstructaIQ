@@ -1,0 +1,652 @@
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
+@import url('https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css');
+
+*{box-sizing:border-box;margin:0;padding:0}
+
+:root {
+  --bg-deep: #0a1a12;
+  --bg-mid: #0f2318;
+  --bg-panel: rgba(255,255,255,0.04);
+  --bg-panel-hover: rgba(255,255,255,0.07);
+  --border: rgba(255,255,255,0.08);
+  --border-bright: rgba(74,222,128,0.2);
+  --green: #22c55e;
+  --green-bright: #4ade80;
+  --green-dim: rgba(34,197,94,0.15);
+  --text-primary: #f0faf4;
+  --text-secondary: rgba(240,250,244,0.45);
+  --text-muted: rgba(240,250,244,0.25);
+  --red: #f87171;
+  --amber: #fbbf24;
+  --blue: #60a5fa;
+  --purple: #a78bfa;
+}
+
+body {
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  background: var(--bg-deep);
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+/* ── BACKGROUND MESH ── */
+.bg-canvas {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+.bg-canvas::before {
+  content: '';
+  position: absolute;
+  width: 600px; height: 600px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(34,197,94,0.12) 0%, transparent 70%);
+  top: -150px; left: -100px;
+}
+.bg-canvas::after {
+  content: '';
+  position: absolute;
+  width: 500px; height: 500px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(20,80,40,0.18) 0%, transparent 70%);
+  bottom: -100px; right: 100px;
+}
+.bg-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(74,222,128,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(74,222,128,0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+.shell {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ── SIDEBAR ── */
+.sidebar {
+  width: 192px;
+  flex-shrink: 0;
+  background: linear-gradient(180deg, #0d2318 0%, #091a10 100%);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  backdrop-filter: blur(20px);
+}
+.sb-logo {
+  padding: 14px 13px 11px;
+  border-bottom: 1px solid var(--border);
+}
+.sb-logo-row { display: flex; align-items: center; gap: 9px; }
+.sb-icon-box {
+  width: 30px; height: 30px;
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  border-radius: 7px;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 0 16px rgba(34,197,94,0.4);
+}
+.sb-name { font-size: 12px; font-weight: 700; color: #fff; letter-spacing: -0.02em; }
+.sb-sub { font-size: 9px; color: var(--text-muted); margin-top: 1px; }
+
+.proj-chip {
+  margin: 9px 10px;
+  padding: 9px 11px;
+  background: linear-gradient(135deg, rgba(34,197,94,0.1), rgba(34,197,94,0.05));
+  border: 1px solid var(--border-bright);
+  border-radius: 8px;
+}
+.proj-chip-label { font-size: 8px; color: var(--green-bright); letter-spacing: .1em; font-weight: 700; margin-bottom: 3px; }
+.proj-chip-name { font-size: 10.5px; font-weight: 600; color: #fff; }
+.proj-chip-risk {
+  display: flex; align-items: center; gap: 5px; margin-top: 5px;
+}
+.risk-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--red); }
+.risk-val { font-size: 9px; color: var(--red); font-weight: 700; }
+
+nav { flex: 1; padding: 8px; overflow-y: auto; }
+.nav-s {
+  font-size: 8px; color: var(--text-muted);
+  letter-spacing: .12em; font-weight: 700;
+  padding: 5px 7px 6px; text-transform: uppercase;
+}
+.nav-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 9px; border-radius: 7px;
+  color: var(--text-secondary); cursor: pointer;
+  margin-bottom: 1px; border: 1px solid transparent;
+  font-size: 11px; font-weight: 500;
+  transition: all .15s;
+}
+.nav-item:hover { background: rgba(255,255,255,0.05); color: var(--text-primary); }
+.nav-item.active {
+  background: rgba(34,197,94,0.12);
+  color: #fff;
+  border-color: rgba(34,197,94,0.2);
+}
+.nav-item i { font-size: 14px; flex-shrink: 0; }
+.nav-pip { width: 5px; height: 5px; border-radius: 50%; background: var(--green-bright); margin-left: auto; box-shadow: 0 0 6px rgba(74,222,128,0.8); }
+
+.sb-footer { padding: 8px; border-top: 1px solid var(--border); }
+.agents-row {
+  display: flex; align-items: center; gap: 7px;
+  padding: 7px 10px;
+  background: rgba(74,222,128,0.07);
+  border: 1px solid rgba(74,222,128,0.15);
+  border-radius: 7px;
+}
+.ag-dot {
+  width: 6px; height: 6px; border-radius: 50%; background: var(--green-bright);
+  box-shadow: 0 0 6px var(--green-bright);
+  animation: pulse 2s infinite;
+}
+@keyframes pulse {
+  0%,100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+.ag-txt { font-size: 9px; color: var(--green-bright); font-weight: 700; }
+
+/* ── MAIN ── */
+.main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 16px;
+  background: rgba(10, 26, 18, 0.8);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(20px);
+  flex-shrink: 0;
+}
+.page-title { font-size: 14px; font-weight: 700; letter-spacing: -0.02em; }
+.tb-right { display: flex; align-items: center; gap: 7px; }
+.chip {
+  display: flex; align-items: center; gap: 4px;
+  padding: 4px 11px; border-radius: 20px;
+  font-size: 10px; font-weight: 600;
+}
+.chip-proj {
+  background: rgba(255,255,255,0.05);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+}
+.chip-live {
+  background: rgba(22,163,74,0.2);
+  color: var(--green-bright);
+  border: 1px solid rgba(34,197,94,0.25);
+}
+.av {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: linear-gradient(135deg, #16a34a, #22c55e);
+  color: #fff; font-size: 9px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 0 10px rgba(34,197,94,0.35);
+}
+
+.content {
+  flex: 1; overflow-y: auto; padding: 14px 16px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+
+/* ── KPI ── */
+.kpi-row { display: grid; grid-template-columns: repeat(6,1fr); gap: 7px; }
+.kpi {
+  background: var(--bg-panel);
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  backdrop-filter: blur(10px);
+  transition: border-color .2s;
+}
+.kpi:hover { border-color: var(--border-bright); }
+.kpi-bar { height: 2px; }
+.kpi-body { padding: 9px 11px; display: flex; align-items: center; justify-content: space-between; }
+.kpi-num { font-size: 19px; font-weight: 700; line-height: 1; font-family: 'DM Mono', monospace; }
+.kpi-lbl { font-size: 9px; color: var(--text-secondary); margin-top: 2px; }
+.kpi-ico { width: 26px; height: 26px; border-radius: 7px; display: flex; align-items: center; justify-content: center; }
+.kpi-ico i { font-size: 13px; }
+
+/* ── CHARTS ── */
+.charts-row { display: grid; grid-template-columns: 1.5fr 1fr; gap: 10px; }
+.panel {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 13px;
+  backdrop-filter: blur(10px);
+}
+.ph { display: flex; align-items: center; justify-content: space-between; margin-bottom: 11px; }
+.pt { font-size: 11.5px; font-weight: 700; }
+.psub { font-size: 9px; color: var(--text-secondary); margin-top: 2px; }
+.live-badge { display: flex; align-items: center; gap: 5px; font-size: 9px; color: var(--green-bright); font-weight: 700; }
+.ld { width: 5px; height: 5px; border-radius: 50%; background: var(--green-bright); animation: pulse 2s infinite; }
+.chart-wrap { position: relative; height: 82px; }
+
+.rr { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+.rd { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.rn { font-size: 9.5px; color: var(--text-secondary); flex: 1; }
+.rt { flex: 1; height: 4px; background: rgba(255,255,255,0.07); border-radius: 3px; overflow: hidden; max-width: 80px; }
+.rf { height: 100%; border-radius: 3px; }
+.rp { font-size: 10px; font-weight: 600; width: 28px; text-align: right; font-family: 'DM Mono', monospace; }
+
+/* ── PROJECT CARDS (new design) ── */
+.sec-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.sec-title {
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .1em; color: var(--text-secondary);
+}
+.new-btn {
+  display: flex; align-items: center; gap: 5px;
+  padding: 6px 13px;
+  background: linear-gradient(135deg, #16a34a, #22c55e);
+  color: #fff; border-radius: 7px;
+  font-size: 10px; font-weight: 700;
+  cursor: pointer; border: none;
+  box-shadow: 0 4px 12px rgba(34,197,94,0.3);
+  transition: box-shadow .2s;
+}
+.new-btn:hover { box-shadow: 0 4px 20px rgba(34,197,94,0.5); }
+
+/* Card grid */
+.proj-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+}
+
+.proj-card {
+  position: relative;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0;
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform .2s, border-color .2s, box-shadow .2s;
+}
+.proj-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 32px rgba(0,0,0,0.4);
+}
+.proj-card.green:hover { border-color: rgba(34,197,94,0.4); box-shadow: 0 12px 32px rgba(34,197,94,0.15); }
+.proj-card.red:hover { border-color: rgba(248,113,113,0.4); box-shadow: 0 12px 32px rgba(248,113,113,0.15); }
+.proj-card.amber:hover { border-color: rgba(251,191,36,0.4); box-shadow: 0 12px 32px rgba(251,191,36,0.15); }
+.proj-card.blue:hover { border-color: rgba(96,165,250,0.4); box-shadow: 0 12px 32px rgba(96,165,250,0.15); }
+
+/* Top accent bar */
+.pc-bar { height: 3px; width: 100%; }
+.proj-card.green .pc-bar { background: linear-gradient(90deg, #16a34a, #4ade80); }
+.proj-card.red .pc-bar { background: linear-gradient(90deg, #dc2626, #f87171); }
+.proj-card.amber .pc-bar { background: linear-gradient(90deg, #d97706, #fbbf24); }
+.proj-card.blue .pc-bar { background: linear-gradient(90deg, #2563eb, #60a5fa); }
+
+.pc-body { padding: 10px 11px 11px; }
+
+/* Icon + type row */
+.pc-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.pc-icon {
+  width: 28px; height: 28px; border-radius: 7px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px;
+}
+.proj-card.green .pc-icon { background: rgba(34,197,94,0.15); color: #4ade80; }
+.proj-card.red .pc-icon { background: rgba(248,113,113,0.15); color: #f87171; }
+.proj-card.amber .pc-icon { background: rgba(251,191,36,0.15); color: #fbbf24; }
+.proj-card.blue .pc-icon { background: rgba(96,165,250,0.15); color: #60a5fa; }
+
+/* Status badge */
+.pc-badge {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 2px 7px; border-radius: 20px;
+  font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+}
+.pc-badge.on-track { background: rgba(34,197,94,0.15); color: #4ade80; border: 1px solid rgba(34,197,94,0.2); }
+.pc-badge.at-risk { background: rgba(248,113,113,0.15); color: #f87171; border: 1px solid rgba(248,113,113,0.2); }
+.pc-badge.delayed { background: rgba(251,191,36,0.12); color: #fbbf24; border: 1px solid rgba(251,191,36,0.2); }
+.pc-badge.planning { background: rgba(96,165,250,0.12); color: #60a5fa; border: 1px solid rgba(96,165,250,0.2); }
+
+/* Name + type */
+.pc-name { font-size: 11px; font-weight: 700; color: var(--text-primary); line-height: 1.25; margin-bottom: 2px; }
+.pc-type { font-size: 8.5px; color: var(--text-muted); }
+
+/* Progress */
+.pc-prog-row {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-top: 9px; margin-bottom: 4px;
+}
+.pc-prog-lbl { font-size: 8px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .06em; }
+.pc-prog-val { font-size: 11px; font-weight: 700; font-family: 'DM Mono', monospace; }
+.proj-card.green .pc-prog-val { color: #4ade80; }
+.proj-card.red .pc-prog-val { color: #f87171; }
+.proj-card.amber .pc-prog-val { color: #fbbf24; }
+.proj-card.blue .pc-prog-val { color: #60a5fa; }
+
+.pc-track {
+  height: 4px; background: rgba(255,255,255,0.07);
+  border-radius: 4px; overflow: hidden; margin-bottom: 9px;
+}
+.pc-fill { height: 100%; border-radius: 4px; }
+.proj-card.green .pc-fill { background: linear-gradient(90deg, #16a34a, #4ade80); }
+.proj-card.red .pc-fill { background: linear-gradient(90deg, #dc2626, #f87171); }
+.proj-card.amber .pc-fill { background: linear-gradient(90deg, #d97706, #fbbf24); }
+.proj-card.blue .pc-fill { background: linear-gradient(90deg, #2563eb, #60a5fa); }
+
+/* Budget + Risk row */
+.pc-footer {
+  display: flex; align-items: center; justify-content: space-between;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+.pc-stat { }
+.pc-stat-val { font-size: 12px; font-weight: 700; font-family: 'DM Mono', monospace; color: var(--text-primary); }
+.pc-stat-lbl { font-size: 7.5px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .06em; margin-top: 1px; }
+.pc-divider { width: 1px; height: 24px; background: var(--border); }
+
+/* Months tag */
+.pc-months {
+  font-size: 8px; color: var(--text-muted);
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--border);
+  padding: 2px 7px; border-radius: 20px;
+  font-weight: 600;
+}
+
+.view-all {
+  text-align: center; padding: 8px 0;
+}
+.view-all span {
+  font-size: 10.5px; color: var(--green-bright);
+  font-weight: 600; cursor: pointer;
+  transition: opacity .15s;
+}
+.view-all span:hover { opacity: 0.7; }
+</style>
+
+<div class="bg-canvas"><div class="bg-grid"></div></div>
+
+<div class="shell">
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sb-logo">
+      <div class="sb-logo-row">
+        <div class="sb-icon-box"><i class="ti ti-chart-bar" style="font-size:14px;color:#fff"></i></div>
+        <div><div class="sb-name">ConstructaIQ</div><div class="sb-sub">Intelligence Platform</div></div>
+      </div>
+    </div>
+    <div class="proj-chip">
+      <div class="proj-chip-label">ACTIVE PROJECT</div>
+      <div class="proj-chip-name">Tower A — Downtown</div>
+      <div class="proj-chip-risk"><div class="risk-dot"></div><span class="risk-val">RISK 82%</span></div>
+    </div>
+    <nav>
+      <div class="nav-s">NAVIGATION</div>
+      <div class="nav-item active"><i class="ti ti-layout-dashboard"></i><span>Dashboard</span><div class="nav-pip"></div></div>
+      <div class="nav-item"><i class="ti ti-upload"></i><span>Project Upload</span></div>
+      <div class="nav-item"><i class="ti ti-brain"></i><span>Intelligence</span></div>
+      <div class="nav-item"><i class="ti ti-shield-exclamation"></i><span>Risk Intelligence</span></div>
+      <div class="nav-item"><i class="ti ti-refresh"></i><span>Recovery Center</span></div>
+      <div class="nav-item"><i class="ti ti-git-branch"></i><span>Change Impact</span></div>
+      <div class="nav-item"><i class="ti ti-robot"></i><span>Agent Insights</span></div>
+    </nav>
+    <div class="sb-footer">
+      <div class="agents-row"><div class="ag-dot"></div><span class="ag-txt">5 AGENTS ACTIVE</span></div>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div class="topbar">
+      <div>
+        <div style="font-size:9px;color:var(--text-secondary)">ConstructaIQ / <span style="color:var(--green-bright);font-weight:600">Dashboard</span></div>
+        <div class="page-title">Command Center</div>
+      </div>
+      <div class="tb-right">
+        <div class="chip chip-proj">Tower A</div>
+        <div class="chip chip-live"><div style="width:5px;height:5px;border-radius:50%;background:var(--green-bright);box-shadow:0 0 6px var(--green-bright);animation:pulse 2s infinite"></div>5 agents live</div>
+        <div class="av">JD</div>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- KPI -->
+      <div class="kpi-row">
+        <div class="kpi"><div class="kpi-bar" style="background:#2563eb"></div><div class="kpi-body"><div><div class="kpi-num" style="color:#60a5fa">24</div><div class="kpi-lbl">Active projects</div></div><div class="kpi-ico" style="background:rgba(37,99,235,0.15)"><i class="ti ti-building" style="color:#60a5fa"></i></div></div></div>
+        <div class="kpi"><div class="kpi-bar" style="background:#dc2626"></div><div class="kpi-body"><div><div class="kpi-num" style="color:#f87171">7</div><div class="kpi-lbl">At risk</div></div><div class="kpi-ico" style="background:rgba(220,38,38,0.15)"><i class="ti ti-alert-triangle" style="color:#f87171"></i></div></div></div>
+        <div class="kpi"><div class="kpi-bar" style="background:#16a34a"></div><div class="kpi-body"><div><div class="kpi-num" style="color:#4ade80">16</div><div class="kpi-lbl">On schedule</div></div><div class="kpi-ico" style="background:rgba(22,163,74,0.15)"><i class="ti ti-check" style="color:#4ade80"></i></div></div></div>
+        <div class="kpi"><div class="kpi-bar" style="background:#d97706"></div><div class="kpi-body"><div><div class="kpi-num" style="color:#fbbf24;font-size:14px;padding-top:2px">$2.4B</div><div class="kpi-lbl">Total budget</div></div><div class="kpi-ico" style="background:rgba(217,119,6,0.15)"><i class="ti ti-coin" style="color:#fbbf24"></i></div></div></div>
+        <div class="kpi"><div class="kpi-bar" style="background:#ea580c"></div><div class="kpi-body"><div><div class="kpi-num" style="color:#fb923c">43</div><div class="kpi-lbl">Open risks</div></div><div class="kpi-ico" style="background:rgba(234,88,12,0.15)"><i class="ti ti-shield" style="color:#fb923c"></i></div></div></div>
+        <div class="kpi"><div class="kpi-bar" style="background:#7c3aed"></div><div class="kpi-body"><div><div class="kpi-num" style="color:#a78bfa">12</div><div class="kpi-lbl">Recovery plans</div></div><div class="kpi-ico" style="background:rgba(124,58,237,0.15)"><i class="ti ti-refresh" style="color:#a78bfa"></i></div></div></div>
+      </div>
+
+      <!-- Charts -->
+      <div class="charts-row">
+        <div class="panel">
+          <div class="ph">
+            <div><div class="pt">Project health trend</div><div class="psub">All 24 projects · 6-month portfolio view</div></div>
+            <div class="live-badge"><div class="ld"></div>LIVE</div>
+          </div>
+          <div class="chart-wrap">
+            <svg width="100%" height="82" viewBox="0 0 340 82" preserveAspectRatio="none">
+              <defs>
+                <linearGradient id="gh" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#4ade80" stop-opacity="0.4"/>
+                  <stop offset="100%" stop-color="#4ade80" stop-opacity="0"/>
+                </linearGradient>
+                <linearGradient id="gr" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#f87171" stop-opacity="0.3"/>
+                  <stop offset="100%" stop-color="#f87171" stop-opacity="0"/>
+                </linearGradient>
+              </defs>
+              <line x1="0" y1="20" x2="340" y2="20" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
+              <line x1="0" y1="40" x2="340" y2="40" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
+              <line x1="0" y1="60" x2="340" y2="60" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
+              <polygon points="0,32 57,28 114,24 171,26 228,20 285,22 340,18 340,82 0,82" fill="url(#gh)"/>
+              <polyline points="0,32 57,28 114,24 171,26 228,20 285,22 340,18" fill="none" stroke="#4ade80" stroke-width="2" stroke-linejoin="round"/>
+              <polygon points="0,58 57,54 114,60 171,52 228,56 285,50 340,54 340,82 0,82" fill="url(#gr)"/>
+              <polyline points="0,58 57,54 114,60 171,52 228,56 285,50 340,54" fill="none" stroke="#f87171" stroke-width="1.5" stroke-linejoin="round" stroke-dasharray="4 3"/>
+            </svg>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:0 2px;margin-bottom:5px">
+            <span style="font-size:8px;color:var(--text-muted)">Jan</span>
+            <span style="font-size:8px;color:var(--text-muted)">Feb</span>
+            <span style="font-size:8px;color:var(--text-muted)">Mar</span>
+            <span style="font-size:8px;color:var(--text-muted)">Apr</span>
+            <span style="font-size:8px;color:var(--text-muted)">May</span>
+            <span style="font-size:8px;color:var(--text-muted)">Jun</span>
+          </div>
+          <div style="display:flex;gap:14px">
+            <div style="display:flex;align-items:center;gap:5px;font-size:9px;color:var(--text-secondary)"><div style="width:12px;height:3px;border-radius:2px;background:#4ade80"></div>Health score</div>
+            <div style="display:flex;align-items:center;gap:5px;font-size:9px;color:var(--text-secondary)"><div style="width:12px;height:3px;border-radius:2px;background:repeating-linear-gradient(90deg,#f87171 0,#f87171 4px,transparent 4px,transparent 6px)"></div>Risk index</div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="ph"><div><div class="pt">Risk distribution</div><div class="psub">All projects · 43 open risks</div></div></div>
+          <div class="rr"><div class="rd" style="background:#ef4444"></div><span class="rn">Permit delays</span><div class="rt"><div class="rf" style="width:28%;background:#ef4444"></div></div><span class="rp" style="color:#ef4444">28%</span></div>
+          <div class="rr"><div class="rd" style="background:#f97316"></div><span class="rn">Supply chain</span><div class="rt"><div class="rf" style="width:22%;background:#f97316"></div></div><span class="rp" style="color:#f97316">22%</span></div>
+          <div class="rr"><div class="rd" style="background:#eab308"></div><span class="rn">Labor shortage</span><div class="rt"><div class="rf" style="width:18%;background:#eab308"></div></div><span class="rp" style="color:#eab308">18%</span></div>
+          <div class="rr"><div class="rd" style="background:#3b82f6"></div><span class="rn">Weather events</span><div class="rt"><div class="rf" style="width:15%;background:#3b82f6"></div></div><span class="rp" style="color:#3b82f6">15%</span></div>
+          <div class="rr"><div class="rd" style="background:#8b5cf6"></div><span class="rn">Design changes</span><div class="rt"><div class="rf" style="width:10%;background:#8b5cf6"></div></div><span class="rp" style="color:#8b5cf6">10%</span></div>
+          <div class="rr"><div class="rd" style="background:#6b7280"></div><span class="rn">Other</span><div class="rt"><div class="rf" style="width:7%;background:#6b7280"></div></div><span class="rp" style="color:#6b7280">7%</span></div>
+        </div>
+      </div>
+
+      <!-- ALL PROJECTS — Card grid -->
+      <div>
+        <div class="sec-head">
+          <div>
+            <div class="sec-title">All Projects</div>
+          </div>
+          <button class="new-btn"><i class="ti ti-plus"></i>New Project</button>
+        </div>
+
+        <div class="proj-grid">
+
+          <!-- Card 1: Tower A -->
+          <div class="proj-card green">
+            <div class="pc-bar"></div>
+            <div class="pc-body">
+              <div class="pc-top">
+                <div class="pc-icon"><i class="ti ti-building-skyscraper"></i></div>
+                <span class="pc-badge on-track">On track</span>
+              </div>
+              <div class="pc-name">Tower A — Downtown Core</div>
+              <div class="pc-type">Commercial</div>
+              <div class="pc-prog-row">
+                <span class="pc-prog-lbl">Completion</span>
+                <span class="pc-prog-val">68%</span>
+              </div>
+              <div class="pc-track"><div class="pc-fill" style="width:68%"></div></div>
+              <div class="pc-footer">
+                <div class="pc-stat">
+                  <div class="pc-stat-val">$340M</div>
+                  <div class="pc-stat-lbl">Budget</div>
+                </div>
+                <div class="pc-divider"></div>
+                <div class="pc-stat" style="text-align:center">
+                  <div class="pc-stat-val" style="color:#f87171">82%</div>
+                  <div class="pc-stat-lbl">Risk</div>
+                </div>
+                <div class="pc-months">24 mo</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card 2: Harbor Bridge -->
+          <div class="proj-card red">
+            <div class="pc-bar"></div>
+            <div class="pc-body">
+              <div class="pc-top">
+                <div class="pc-icon"><i class="ti ti-road-sign"></i></div>
+                <span class="pc-badge at-risk">At risk</span>
+              </div>
+              <div class="pc-name">Harbor Bridge Phase 2</div>
+              <div class="pc-type">Infrastructure</div>
+              <div class="pc-prog-row">
+                <span class="pc-prog-lbl">Completion</span>
+                <span class="pc-prog-val">42%</span>
+              </div>
+              <div class="pc-track"><div class="pc-fill" style="width:42%"></div></div>
+              <div class="pc-footer">
+                <div class="pc-stat">
+                  <div class="pc-stat-val">$820M</div>
+                  <div class="pc-stat-lbl">Budget</div>
+                </div>
+                <div class="pc-divider"></div>
+                <div class="pc-stat" style="text-align:center">
+                  <div class="pc-stat-val" style="color:#f87171">91%</div>
+                  <div class="pc-stat-lbl">Risk</div>
+                </div>
+                <div class="pc-months">36 mo</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card 3: Metro Station -->
+          <div class="proj-card amber">
+            <div class="pc-bar"></div>
+            <div class="pc-body">
+              <div class="pc-top">
+                <div class="pc-icon"><i class="ti ti-train"></i></div>
+                <span class="pc-badge delayed">Delayed</span>
+              </div>
+              <div class="pc-name">Metro Station Phase 2</div>
+              <div class="pc-type">Transit</div>
+              <div class="pc-prog-row">
+                <span class="pc-prog-lbl">Completion</span>
+                <span class="pc-prog-val">55%</span>
+              </div>
+              <div class="pc-track"><div class="pc-fill" style="width:55%"></div></div>
+              <div class="pc-footer">
+                <div class="pc-stat">
+                  <div class="pc-stat-val">$290M</div>
+                  <div class="pc-stat-lbl">Budget</div>
+                </div>
+                <div class="pc-divider"></div>
+                <div class="pc-stat" style="text-align:center">
+                  <div class="pc-stat-val" style="color:#fbbf24">67%</div>
+                  <div class="pc-stat-lbl">Risk</div>
+                </div>
+                <div class="pc-months">18 mo</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card 4: Riverside -->
+          <div class="proj-card blue">
+            <div class="pc-bar"></div>
+            <div class="pc-body">
+              <div class="pc-top">
+                <div class="pc-icon"><i class="ti ti-home"></i></div>
+                <span class="pc-badge planning">Planning</span>
+              </div>
+              <div class="pc-name">Riverside Residential</div>
+              <div class="pc-type">Residential</div>
+              <div class="pc-prog-row">
+                <span class="pc-prog-lbl">Completion</span>
+                <span class="pc-prog-val">18%</span>
+              </div>
+              <div class="pc-track"><div class="pc-fill" style="width:18%"></div></div>
+              <div class="pc-footer">
+                <div class="pc-stat">
+                  <div class="pc-stat-val">$140M</div>
+                  <div class="pc-stat-lbl">Budget</div>
+                </div>
+                <div class="pc-divider"></div>
+                <div class="pc-stat" style="text-align:center">
+                  <div class="pc-stat-val" style="color:#4ade80">28%</div>
+                  <div class="pc-stat-lbl">Risk</div>
+                </div>
+                <div class="pc-months">12 mo</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card 5: Airport Terminal -->
+          <div class="proj-card green">
+            <div class="pc-bar"></div>
+            <div class="pc-body">
+              <div class="pc-top">
+                <div class="pc-icon"><i class="ti ti-plane"></i></div>
+                <span class="pc-badge on-track">On track</span>
+              </div>
+              <div class="pc-name">Airport Terminal C</div>
+              <div class="pc-type">Aviation</div>
+              <div class="pc-prog-row">
+                <span class="pc-prog-lbl">Completion</span>
+                <span class="pc-prog-val">81%</span>
+              </div>
+              <div class="pc-track"><div class="pc-fill" style="width:81%"></div></div>
+              <div class="pc-footer">
+                <div class="pc-stat">
+                  <div class="pc-stat-val">$1.2B</div>
+                  <div class="pc-stat-lbl">Budget</div>
+                </div>
+                <div class="pc-divider"></div>
+                <div class="pc-stat" style="text-align:center">
+                  <div class="pc-stat-val" style="color:#4ade80">34%</div>
+                  <div class="pc-stat-lbl">Risk</div>
+                </div>
+                <div class="pc-months">30 mo</div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="view-all">
+          <span>View all 24 projects →</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>

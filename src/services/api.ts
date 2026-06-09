@@ -1,179 +1,205 @@
 // ─────────────────────────────────────────────────────────────
-// BuildMind AI — Mock API Service Layer
+// ConstructaIQ — Mock Service Layer
 //
-// Each function mirrors the exact FastAPI endpoint signature.
-// To switch to real backend: replace the mock body with
-//   return apiClient.get<T>(path)
-// Everything else (hooks, components) stays identical.
+// Each function returns a resolved Promise<ApiResponse<T>>
+// using data from mockData.ts.  When FastAPI is ready, swap
+// these implementations for apiClient calls — the hook layer
+// (usePageData.ts) requires no changes.
 // ─────────────────────────────────────────────────────────────
 
 import type {
-  DashboardData, ProjectIntelligenceData, RiskIntelligenceData,
-  RecoveryStrategy, ChangeImpactData, AgentInsightsData,
-  UploadSessionResponse, ApiResponse,
-} from '../types'
+  ApiResponse,
+  DashboardData,
+  ProjectIntelligenceData,
+  RiskIntelligenceData,
+  RecoveryStrategy,
+  ChangeImpactData,
+  AgentInsightsData,
+  AgentActivityItem,
+  RecommendationItem,
+  AgentInfo,
+  AgentTimelineEvent,
+} from "../types";
+
 import {
-  kpiData, projectHealthTrend, riskDistribution,
-  recentAgentActivities, recentRecommendations,
-  projectData, riskData, recoveryStrategies,
-  changeImpactData, agentData, agentTimeline,
-} from '../data/mockData'
+  kpiData,
+  projectHealthTrend,
+  riskDistribution,
+  recentAgentActivities,
+  recentRecommendations,
+  projectData,
+  riskData,
+  recoveryStrategies,
+  changeImpactData,
+  agentData,
+  agentTimeline,
+} from "../data/mockData";
 
-// ── Utility: simulate network latency ────────────────────────
+// ── Utility ───────────────────────────────────────────────────
 
-function delay(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms))
+const delay = (ms = 300) =>
+  new Promise<void>((r) => setTimeout(r, ms + Math.random() * 100));
+
+function ok<T>(data: T): ApiResponse<T> {
+  return { data, status: "success", timestamp: new Date().toISOString() };
 }
 
-function mockResponse<T>(data: T, delayMs = 800): Promise<ApiResponse<T>> {
-  return delay(delayMs).then(() => ({
-    data,
-    status: 'success' as const,
-    timestamp: new Date().toISOString(),
-  }))
-}
-
-// ─────────────────────────────────────────────────────────────
-// DASHBOARD  →  GET /api/v1/dashboard
-// FastAPI route: @router.get("/dashboard", response_model=DashboardData)
-// ─────────────────────────────────────────────────────────────
+// ── Dashboard ─────────────────────────────────────────────────
 
 export async function fetchDashboard(): Promise<ApiResponse<DashboardData>> {
-  // TODO: return apiClient.get<DashboardData>('/dashboard')
-  return mockResponse<DashboardData>({
-    kpi: kpiData,
+  await delay();
+  return ok<DashboardData>({
+    kpi: {
+      activeProjects: kpiData.activeProjects,
+      riskProjects: kpiData.riskProjects,
+      onTimeProjects: kpiData.onTimeProjects,
+      totalBudget: kpiData.totalBudget,
+      openRisks: kpiData.openRisks,
+      recoveryPlans: kpiData.recoveryPlans,
+    },
     healthTrend: projectHealthTrend,
-    riskDistribution,
-    recentActivities: recentAgentActivities as any,
-    recentRecommendations: recentRecommendations as any,
-  }, 900)
+    riskDistribution: riskDistribution,
+    recentActivities: recentAgentActivities as AgentActivityItem[],
+    recentRecommendations: recentRecommendations as RecommendationItem[],
+  });
 }
 
-// ─────────────────────────────────────────────────────────────
-// PROJECT UPLOAD  →  POST /api/v1/projects/upload
-// FastAPI route: @router.post("/projects/upload")
-// ─────────────────────────────────────────────────────────────
+// ── Project Intelligence ──────────────────────────────────────
 
-export async function uploadProjectFiles(
-  _contractFile: File | null,
-  _blueprintFile: File | null,
-): Promise<ApiResponse<UploadSessionResponse>> {
-  // Real implementation:
-  // const form = new FormData()
-  // if (contractFile)  form.append('contract',  contractFile)
-  // if (blueprintFile) form.append('blueprint', blueprintFile)
-  // return apiClient.postForm<UploadSessionResponse>('/projects/upload', form)
-
-  await delay(1200)
-  return {
-    data: {
-      sessionId: `sess-${Math.random().toString(36).slice(2, 10)}`,
-      projectId: 'proj-tower-a-2024',
-      status: 'processing',
-      overallPct: 0,
-      agentSteps: [
-        { id: 'contract',  name: 'Contract Agent',  description: 'Extracting clauses & obligations',      duration: 2400, status: 'pending' },
-        { id: 'blueprint', name: 'Blueprint Agent', description: 'Analyzing structural drawings',          duration: 4800, status: 'pending' },
-        { id: 'permit',    name: 'Permit Agent',    description: 'Cross-referencing permit requirements',  duration: 1800, status: 'pending' },
-        { id: 'risk',      name: 'Risk Agent',      description: 'Computing risk vectors & probabilities', duration: 6200, status: 'pending' },
-        { id: 'recovery',  name: 'Recovery Agent',  description: 'Generating recovery strategies',         duration: 3400, status: 'pending' },
-      ],
-    },
-    status: 'success',
-    timestamp: new Date().toISOString(),
-  }
+export async function fetchProjectIntelligence(): Promise<
+//   _projectId: string,
+  ApiResponse<ProjectIntelligenceData>
+> {
+  await delay();
+  return ok<ProjectIntelligenceData>({
+    name: projectData.name,
+    projectId: projectData.projectId,
+    client: projectData.client,
+    location: projectData.location,
+    budget: projectData.budget,
+    duration: projectData.duration,
+    startDate: projectData.startDate,
+    endDate: projectData.endDate,
+    floors: projectData.floors,
+    complexity: projectData.complexity as ProjectIntelligenceData["complexity"],
+    type: projectData.type,
+    squareFootage: projectData.squareFootage,
+    requiredPermits:
+      projectData.requiredPermits as ProjectIntelligenceData["requiredPermits"],
+    crewRequirements:
+      projectData.crewRequirements as ProjectIntelligenceData["crewRequirements"],
+    phases: projectData.phases as ProjectIntelligenceData["phases"],
+  });
 }
 
-// ─────────────────────────────────────────────────────────────
-// UPLOAD STATUS  →  GET /api/v1/projects/upload/{sessionId}/status
-// FastAPI: @router.get("/projects/upload/{session_id}/status")
-// ─────────────────────────────────────────────────────────────
+// ── Risk Intelligence ─────────────────────────────────────────
 
-export async function fetchUploadStatus(
-  _sessionId: string,
-): Promise<ApiResponse<UploadSessionResponse>> {
-  // TODO: return apiClient.get<UploadSessionResponse>(`/projects/upload/${sessionId}/status`)
-  return mockResponse({ } as UploadSessionResponse, 300)
+export async function fetchRiskIntelligence(): Promise<
+//   _projectId: string,
+  ApiResponse<RiskIntelligenceData>
+> {
+  await delay();
+  return ok<RiskIntelligenceData>({
+    overallScore: riskData.overallScore,
+    trend: riskData.trend as RiskIntelligenceData["trend"],
+    topRisks: riskData.topRisks as unknown as RiskIntelligenceData["topRisks"],
+    heatmap: riskData.heatmap,
+    reasoningChain:
+      riskData.reasoningChain as RiskIntelligenceData["reasoningChain"],
+  });
 }
 
-// ─────────────────────────────────────────────────────────────
-// PROJECT INTELLIGENCE  →  GET /api/v1/projects/{projectId}/intelligence
-// FastAPI: @router.get("/projects/{project_id}/intelligence")
-// ─────────────────────────────────────────────────────────────
+// ── Recovery Strategies ───────────────────────────────────────
+//
+// RecoveryCenter.tsx accesses: data.riskScore, data.strategies,
+// data.aiConfidence — it treats the response as a wrapper object.
+// We return a typed wrapper that satisfies both the page and the
+// existing RecoveryStrategy[] hook signature via unknown cast.
 
-export async function fetchProjectIntelligence(
-  _projectId: string,
-): Promise<ApiResponse<ProjectIntelligenceData>> {
-  // TODO: return apiClient.get<ProjectIntelligenceData>(`/projects/${projectId}/intelligence`)
-  return mockResponse(projectData as ProjectIntelligenceData, 950)
+export interface RecoveryCenterData {
+  riskScore: number;
+  aiConfidence: number;
+  strategies: RecoveryStrategy[];
 }
 
-// ─────────────────────────────────────────────────────────────
-// RISK INTELLIGENCE  →  GET /api/v1/projects/{projectId}/risks
-// FastAPI: @router.get("/projects/{project_id}/risks")
-// ─────────────────────────────────────────────────────────────
-
-export async function fetchRiskIntelligence(
-  _projectId: string,
-): Promise<ApiResponse<RiskIntelligenceData>> {
-  // TODO: return apiClient.get<RiskIntelligenceData>(`/projects/${projectId}/risks`)
-  return mockResponse(riskData as RiskIntelligenceData, 1100)
+export async function fetchRecoveryStrategies(): Promise<ApiResponse<unknown>> {
+//   _projectId: string,
+  await delay();
+  const wrapper: RecoveryCenterData = {
+    riskScore: riskData.overallScore,
+    aiConfidence: 85,
+    strategies: recoveryStrategies.map((s) => ({
+      ...s,
+      risk: s.recommended ? "Low" : "Medium",
+      confidence: s.aiConfidence,
+      cost: s.costImpact,
+      scheduleImpact: s.timeSaved,
+      steps: s.details,
+    })) as unknown as RecoveryStrategy[],
+  };
+  return ok(wrapper);
 }
 
-// ─────────────────────────────────────────────────────────────
-// RECOVERY STRATEGIES  →  GET /api/v1/projects/{projectId}/recovery
-// FastAPI: @router.get("/projects/{project_id}/recovery")
-// ─────────────────────────────────────────────────────────────
-
-export async function fetchRecoveryStrategies(
-  _projectId: string,
-): Promise<ApiResponse<RecoveryStrategy[]>> {
-  // TODO: return apiClient.get<RecoveryStrategy[]>(`/projects/${projectId}/recovery`)
-  return mockResponse(recoveryStrategies as RecoveryStrategy[], 850)
+// Activate a strategy — fires-and-forgets in mock mode
+export async function activateRecoveryStrategy(): Promise<
+//   _projectId: string,
+//   _strategyId: string,
+  ApiResponse<{ activated: boolean }>
+> {
+  await delay(800);
+  return ok({ activated: true });
 }
 
-// ─────────────────────────────────────────────────────────────
-// CHANGE IMPACT  →  POST /api/v1/projects/{projectId}/change-impact
-// FastAPI: @router.post("/projects/{project_id}/change-impact")
-// ─────────────────────────────────────────────────────────────
+// ── Change Impact ─────────────────────────────────────────────
 
-export async function analyzeChangeImpact(
-  _projectId: string,
-  _scenario: { type: string; value: unknown },
-): Promise<ApiResponse<ChangeImpactData>> {
-  // TODO: return apiClient.post<ChangeImpactData>(`/projects/${projectId}/change-impact`, scenario)
-  return mockResponse(changeImpactData as ChangeImpactData, 1400)
+export async function analyzeChangeImpact(): Promise<
+//   _projectId: string,
+//   _scenario: { type: string; value: number },
+  ApiResponse<ChangeImpactData>
+> {
+  await delay(500);
+  return ok<ChangeImpactData>({
+    scenario: changeImpactData.scenario,
+    description: changeImpactData.description,
+    before: changeImpactData.before,
+    after: changeImpactData.after,
+    impacts: changeImpactData.impacts as ChangeImpactData["impacts"],
+    dependencies:
+      changeImpactData.dependencies as ChangeImpactData["dependencies"],
+  });
 }
 
-// ─────────────────────────────────────────────────────────────
-// AGENT INSIGHTS  →  GET /api/v1/projects/{projectId}/agents
-// FastAPI: @router.get("/projects/{project_id}/agents")
-// ─────────────────────────────────────────────────────────────
+// ── Agent Insights ────────────────────────────────────────────
 
-export async function fetchAgentInsights(
-  _projectId: string,
-): Promise<ApiResponse<AgentInsightsData>> {
-  // TODO: return apiClient.get<AgentInsightsData>(`/projects/${projectId}/agents`)
-  return mockResponse({
-    agents: agentData as any,
-    timeline: agentTimeline as any,
+export async function fetchAgentInsights(): Promise<
+//   _projectId: string,
+  ApiResponse<AgentInsightsData>
+> {
+  await delay();
+  return ok<AgentInsightsData>({
+    agents: agentData as unknown as AgentInfo[],
+    timeline: agentTimeline as unknown as AgentTimelineEvent[],
     summary: {
-      totalRuns: 1247,
-      avgConfidence: 90.2,
-      totalFindings: 482,
-      processingTime: '18m 12s',
+      totalRuns: agentData.length,
+      avgConfidence: Math.round(
+        agentData.reduce((sum, a) => sum + a.confidence, 0) / agentData.length,
+      ),
+      totalFindings: agentData.reduce(
+        (sum, a) => sum + a.latestFindings.length,
+        0,
+      ),
+      processingTime: "18m 22s",
     },
-  } as AgentInsightsData, 750)
+  });
 }
 
-// ─────────────────────────────────────────────────────────────
-// ACTIVATE RECOVERY STRATEGY  →  POST /api/v1/projects/{projectId}/recovery/activate
-// ─────────────────────────────────────────────────────────────
+// ── Project Upload ────────────────────────────────────────────
 
-export async function activateRecoveryStrategy(
-  _projectId: string,
-  strategyId: string,
-): Promise<ApiResponse<{ activated: boolean; strategyId: string }>> {
-  // TODO: return apiClient.post(`/projects/${projectId}/recovery/activate`, { strategyId })
-  return mockResponse({ activated: true, strategyId }, 600)
+export async function uploadProjectFiles(): Promise<
+//   _contracts: unknown,
+//   _blueprints: unknown,
+  ApiResponse<{ sessionId: string; projectId: string }>
+> {
+  await delay(1200);
+  return ok({ sessionId: "mock-session-001", projectId: "tower-a" });
 }

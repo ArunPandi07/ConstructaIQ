@@ -1,239 +1,484 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { CheckCircle, ShieldCheck, Star, Zap, Brain, ArrowRight, ChevronDown, ChevronUp, Loader2 } from 'lucide-react'
-import Badge from '../components/Badge'
-import { StrategyCardSkeleton, CardSkeleton, ErrorState } from '../components/Skeleton'
-import { useRecoveryStrategies } from '../hooks/usePageData'
-import { activateRecoveryStrategy } from '../services/api'
-import { useAppContext } from '../context/AppContext'
-import type { RecoveryStrategy } from '../types'
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import {
+  CheckCircle,
+  ShieldCheck,
+  Star,
+  Zap,
+  Brain,
+  ArrowRight,
+  ChevronDown,
+  ChevronUp,
+  Loader2,
+} from "lucide-react";
+import Badge from "../components/Badge";
+import {
+  StrategyCardSkeleton,
+  CardSkeleton,
+  ErrorState,
+} from "../components/Skeleton";
+import { useAsync } from "../hooks/useAsync";
+import {
+  fetchRecoveryStrategies,
+  activateRecoveryStrategy,
+} from "../services/api";
+import { useAppContext } from "../context/AppContext";
+import type { RecoveryStrategy } from "../types";
+import type { RecoveryCenterData } from "../services/api";
+
+// Extended strategy shape used by this page (adds fields mapped in api.ts)
+type PageStrategy = RecoveryStrategy & {
+  risk: string;
+  confidence: number;
+  cost: string;
+  scheduleImpact: string;
+  steps: string[];
+};
 
 export default function RecoveryCenter() {
-  const navigate = useNavigate()
-  const { activeProjectId } = useAppContext()
-  const { data, loading, error, refetch } = useRecoveryStrategies(activeProjectId)
-  const [expandedStrategy, setExpandedStrategy] = useState<string | null>('A')
-  const [activating, setActivating] = useState<string | null>(null)
-  const [activated,  setActivated]  = useState<string | null>(null)
-
-  if (error) return <ErrorState message={error} onRetry={refetch} />
+  const navigate = useNavigate();
+  const { activeProjectId } = useAppContext();
+  const { data, loading, error, refetch } = useAsync<RecoveryCenterData>(
+    () =>
+      fetchRecoveryStrategies() as Promise<{ data: RecoveryCenterData }>,
+      // activeProjectId
+    [activeProjectId],
+  );
+  const [expandedStrategy, setExpandedStrategy] = useState<string | null>("A");
+  const [activating, setActivating] = useState<string | null>(null);
+  const [activated, setActivated] = useState<string | null>(null);
+  if (error) return <ErrorState message={error} onRetry={refetch} />;
 
   const handleActivate = async (strategyId: string) => {
-    setActivating(strategyId)
+    setActivating(strategyId);
     try {
-      await activateRecoveryStrategy(activeProjectId, strategyId)
-      setActivated(strategyId)
+      await activateRecoveryStrategy();
+      // activeProjectId, strategyId
+      setActivated(strategyId);
     } finally {
-      setActivating(null)
+      setActivating(null);
     }
-  }
+  };
 
   return (
-    <div className="space-y-6 animate-fade-in-up">
-      <div className="flex items-start justify-between">
+    <div className="space-y-5 animate-fade-in-up">
+      <div
+        style={{
+          display: "flex",
+          alignItems: "flex-start",
+          justifyContent: "space-between",
+        }}
+      >
         <div>
-          <h2 className="text-lg font-bold" style={{ color: '#0f172a' }}>Recovery Center</h2>
-          <p className="text-sm mt-0.5" style={{ color: '#64748b' }}>
-            AI-generated recovery strategies with confidence scoring
+          <h2
+            style={{
+              fontSize: "1rem",
+              fontWeight: 700,
+              color: "var(--text-primary)",
+            }}
+          >
+            Recovery Center
+          </h2>
+          <p
+            style={{
+              fontSize: "0.78rem",
+              color: "var(--text-secondary)",
+              marginTop: 3,
+            }}
+          >
+            AI-generated recovery strategies · Tower A — Downtown Core
           </p>
         </div>
-        {!loading && data && <Badge variant="green" dot>{data.length} Strategies Ready</Badge>}
+        <button
+          onClick={() => navigate("/risk")}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 5,
+            color: "var(--amber)",
+            fontSize: "0.76rem",
+            fontWeight: 600,
+            background: "var(--amber-bg)",
+            border: "1px solid var(--amber-border)",
+            borderRadius: 8,
+            padding: "6px 12px",
+            cursor: "pointer",
+            fontFamily: "inherit",
+          }}
+        >
+          <ArrowRight size={12} /> View Risk Analysis
+        </button>
       </div>
 
-      {/* Activation success */}
-      {activated && (
-        <div className="flex items-center justify-between p-4 rounded-xl"
-          style={{ background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
-          <div className="flex items-center gap-2">
-            <CheckCircle size={16} style={{ color: '#16a34a' }} />
-            <span className="text-sm font-semibold" style={{ color: '#16a34a' }}>
-              Strategy {activated} activated — recovery plan is now in motion
-            </span>
-          </div>
-          <button onClick={() => navigate('/agents')} className="flex items-center gap-1 text-xs font-semibold"
-            style={{ color: '#2563eb' }}>
-            Track Agent Progress <ArrowRight size={11} />
-          </button>
-        </div>
-      )}
-
-      {/* Executive summary */}
-      {loading ? <CardSkeleton lines={3} /> : data && (
-        <div className="p-6 rounded-2xl" style={{ background: '#eff6ff', border: '1px solid #bfdbfe', boxShadow: '0 0 0 3px rgba(37,99,235,0.05)' }}>
-          <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0"
-              style={{ background: 'linear-gradient(135deg,#2563eb,#4f46e5)' }}>
-              <Brain size={22} className="text-white" />
-            </div>
-            <div className="flex-1">
-              <div className="flex items-center gap-3 mb-2">
-                <h3 className="text-sm font-bold" style={{ color: '#0f172a' }}>Executive AI Recommendation</h3>
-                <Badge variant="blue" dot>Recommended Strategy {data.find(s => s.recommended)?.id}</Badge>
+      {!loading && data && (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr 1fr",
+            gap: 10,
+            marginBottom: 4,
+          }}
+        >
+          {[
+            {
+              icon: ShieldCheck,
+              label: "Risk Score",
+              value: `${data.riskScore}/100`,
+              color: "var(--red-primary)",
+              bg: "var(--red-bg)",
+              border: "var(--red-border)",
+            },
+            {
+              icon: Star,
+              label: "Strategies Generated",
+              value: data.strategies.length,
+              color: "var(--amber)",
+              bg: "var(--amber-bg)",
+              border: "var(--amber-border)",
+            },
+            {
+              icon: Brain,
+              label: "AI Confidence",
+              value: `${data.aiConfidence}%`,
+              color: "var(--green-primary)",
+              bg: "var(--green-bg)",
+              border: "var(--green-border)",
+            },
+          ].map(({ icon: Icon, label, value, color, bg, border }) => (
+            <div
+              key={label}
+              style={{
+                background: "var(--card)",
+                border: `1px solid ${border}`,
+                borderRadius: 10,
+                padding: "14px 16px",
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+              }}
+            >
+              <div
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 9,
+                  background: bg,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                }}
+              >
+                <Icon size={16} style={{ color }} />
               </div>
-              <p className="text-sm leading-relaxed" style={{ color: '#475569' }}>
-                Based on multi-factor analysis, BuildMind AI recommends{' '}
-                <strong style={{ color: '#2563eb' }}>Strategy A: Accelerated Parallel Path</strong>.
-                Recovers <strong style={{ color: '#16a34a' }}>6.5 weeks</strong> at{' '}
-                <strong style={{ color: '#d97706' }}>+$2.1M</strong> — highest ROI with{' '}
-                <strong style={{ color: '#7c3aed' }}>89% AI confidence</strong>.
-              </p>
-            </div>
-            <div className="flex-shrink-0 text-center">
-              <div className="text-3xl font-black" style={{ color: '#2563eb' }}>89%</div>
-              <div className="text-xs mt-1" style={{ color: '#94a3b8' }}>AI Confidence</div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Strategy cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {loading
-          ? Array.from({length: 3}).map((_,i) => <StrategyCardSkeleton key={i} />)
-          : data?.map((strategy: RecoveryStrategy) => {
-              const isExp = expandedStrategy === strategy.id
-              return (
-                <div key={strategy.id}
-                  className={`strategy-card ${strategy.recommended ? 'recommended' : ''}`}
-                  onClick={() => setExpandedStrategy(isExp ? null : strategy.id)}>
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-xl flex items-center justify-center font-black text-sm"
-                        style={{
-                          background: strategy.recommended ? 'linear-gradient(135deg,#2563eb,#4f46e5)' : '#f1f5f9',
-                          color:      strategy.recommended ? 'white' : '#475569',
-                          border:     strategy.recommended ? 'none' : '1px solid #e2e8f0',
-                        }}>
-                        {strategy.id}
-                      </div>
-                      <div>
-                        <div className="text-xs font-bold" style={{ color: '#0f172a' }}>{strategy.name}</div>
-                        {strategy.recommended && (
-                          <div className="flex items-center gap-1 mt-0.5">
-                            <Star size={9} style={{ color: '#d97706' }} />
-                            <span style={{ fontSize: '0.58rem', color: '#d97706', fontWeight: 700 }}>RECOMMENDED</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-sm font-bold" style={{
-                        color: strategy.aiConfidence >= 80 ? '#16a34a' : strategy.aiConfidence >= 70 ? '#2563eb' : '#ea580c'
-                      }}>{strategy.aiConfidence}%</div>
-                      <div style={{ fontSize: '0.58rem', color: '#94a3b8' }}>confidence</div>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-3 gap-2 mb-3">
-                    {[
-                      { l:'Cost',      v:strategy.costImpact,    pos: !strategy.costImpact.startsWith('+') },
-                      { l:'Time Saved',v:strategy.timeSaved,     pos: true },
-                      { l:'Risk ↓',   v:strategy.riskReduction,  pos: true },
-                    ].map(({ l, v, pos }) => (
-                      <div key={l} className="text-center p-2 rounded-lg" style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}>
-                        <div className="text-xs font-bold" style={{ color: pos ? '#16a34a' : '#ea580c' }}>{v}</div>
-                        <div style={{ fontSize: '0.58rem', color: '#94a3b8' }}>{l}</div>
-                      </div>
-                    ))}
-                  </div>
-                  <p className="text-xs leading-relaxed mb-3" style={{ color: '#64748b' }}>{strategy.description}</p>
-                  <div className="progress-bar mb-1.5">
-                    <div className="progress-fill" style={{
-                      width: `${strategy.aiConfidence}%`,
-                      background: strategy.recommended
-                        ? 'linear-gradient(90deg,#2563eb,#4f46e5)'
-                        : 'linear-gradient(90deg,#94a3b8,#cbd5e1)',
-                    }} />
-                  </div>
-                  <div className="flex items-center justify-center mt-3 pt-3 border-t" style={{ borderColor: '#e2e8f0' }}>
-                    <button className="flex items-center gap-1 text-xs font-medium" style={{ color: '#2563eb' }}
-                      onClick={e => { e.stopPropagation(); setExpandedStrategy(isExp ? null : strategy.id) }}>
-                      {isExp ? 'Collapse' : 'View Details'}
-                      {isExp ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
-                    </button>
-                  </div>
-                </div>
-              )
-            })}
-      </div>
-
-      {/* Expanded detail */}
-      {!loading && data && expandedStrategy && (() => {
-        const strategy = data.find(s => s.id === expandedStrategy)
-        if (!strategy) return null
-        const isActivated = activated === strategy.id
-        const isActivating = activating === strategy.id
-        return (
-          <div className="glass-card p-6">
-            <div className="flex items-center justify-between mb-5">
-              <h3 className="text-sm font-bold" style={{ color: '#0f172a' }}>
-                Strategy {strategy.id}: {strategy.name} — Action Plan
-              </h3>
-              <Badge variant={strategy.recommended ? 'blue' : 'gray'}>{strategy.aiConfidence}% Confidence</Badge>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <Zap size={13} style={{ color: '#2563eb' }} />
-                  <span className="text-sm font-semibold" style={{ color: '#0f172a' }}>Implementation Steps</span>
+                <div
+                  style={{
+                    fontSize: "1.1rem",
+                    fontWeight: 700,
+                    color,
+                    letterSpacing: "-0.5px",
+                    lineHeight: 1,
+                  }}
+                >
+                  {value}
                 </div>
-                <div className="space-y-2">
-                  {strategy.details.map((d, i) => (
-                    <div key={i} className="flex items-start gap-3 p-3 rounded-xl"
-                      style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}>
-                      <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 text-white"
-                        style={{ background: 'linear-gradient(135deg,#2563eb,#4f46e5)', fontSize: '0.62rem', fontWeight: 700 }}>
-                        {i + 1}
-                      </div>
-                      <span className="text-xs leading-relaxed" style={{ color: '#475569' }}>{d}</span>
-                    </div>
-                  ))}
+                <div
+                  style={{
+                    fontSize: "0.68rem",
+                    color: "var(--text-muted)",
+                    marginTop: 3,
+                  }}
+                >
+                  {label}
                 </div>
-              </div>
-              <div className="space-y-4">
-                <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <CheckCircle size={13} style={{ color: '#16a34a' }} />
-                    <span className="text-sm font-semibold" style={{ color: '#0f172a' }}>Advantages</span>
-                  </div>
-                  <div className="space-y-1.5">
-                    {strategy.pros.map((p, i) => (
-                      <div key={i} className="flex items-center gap-2 p-2 rounded-lg"
-                        style={{ background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
-                        <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: '#16a34a' }} />
-                        <span className="text-xs" style={{ color: '#374151' }}>{p}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <ShieldCheck size={13} style={{ color: '#ea580c' }} />
-                    <span className="text-sm font-semibold" style={{ color: '#0f172a' }}>Considerations</span>
-                  </div>
-                  <div className="space-y-1.5">
-                    {strategy.cons.map((c, i) => (
-                      <div key={i} className="flex items-center gap-2 p-2 rounded-lg"
-                        style={{ background: '#fff7ed', border: '1px solid #fed7aa' }}>
-                        <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: '#ea580c' }} />
-                        <span className="text-xs" style={{ color: '#374151' }}>{c}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <button
-                  onClick={() => handleActivate(strategy.id)}
-                  disabled={isActivating || isActivated}
-                  className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold text-white hover:opacity-90 transition-opacity disabled:opacity-60"
-                  style={{ background: isActivated ? 'linear-gradient(135deg,#16a34a,#22c55e)' : 'linear-gradient(135deg,#2563eb,#4f46e5)' }}>
-                  {isActivating ? <><Loader2 size={14} className="animate-spin" /> Activating…</>
-                   : isActivated ? <><CheckCircle size={14} /> Activated!</>
-                   : <><Zap size={14} /> Activate Strategy {strategy.id} <ArrowRight size={13} /></>}
-                </button>
               </div>
             </div>
+          ))}
+        </div>
+      )}
+
+      {loading ? (
+        <div className="space-y-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <StrategyCardSkeleton key={i} />
+          ))}
+          <CardSkeleton lines={2} />
+        </div>
+      ) : (
+        data && (
+          <div className="space-y-3">
+            {(data.strategies as PageStrategy[]).map((strategy) => {
+              const isExpanded = expandedStrategy === strategy.id;
+              const isRecommended = strategy.id === "A";
+              const isActivated = activated === strategy.id;
+              const isActivating = activating === strategy.id;
+              return (
+                <div
+                  key={strategy.id}
+                  className={`strategy-card ${isRecommended ? "recommended" : ""}`}
+                  onClick={() =>
+                    setExpandedStrategy(isExpanded ? null : strategy.id)
+                  }
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "flex-start",
+                      justifyContent: "space-between",
+                      gap: 12,
+                    }}
+                  >
+                    <div style={{ flex: 1 }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                          marginBottom: 6,
+                        }}
+                      >
+                        {isRecommended && (
+                          <span
+                            style={{
+                              fontSize: "0.62rem",
+                              fontWeight: 700,
+                              color: "var(--amber)",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.05em",
+                            }}
+                          >
+                            ★ AI Recommended
+                          </span>
+                        )}
+                        <Badge
+                          variant={
+                            strategy.risk === "Low"
+                              ? "green"
+                              : strategy.risk === "Medium"
+                                ? "yellow"
+                                : "orange"
+                          }
+                          size="sm"
+                        >
+                          {strategy.risk} Risk
+                        </Badge>
+                        <Badge variant="gray" size="sm">
+                          {strategy.confidence}% confidence
+                        </Badge>
+                      </div>
+                      <div
+                        style={{
+                          fontSize: "0.86rem",
+                          fontWeight: 600,
+                          color: "var(--text-primary)",
+                          marginBottom: 5,
+                        }}
+                      >
+                        Strategy {strategy.id}: {strategy.name}
+                      </div>
+                      <p
+                        style={{
+                          fontSize: "0.76rem",
+                          color: "var(--text-secondary)",
+                          lineHeight: 1.55,
+                        }}
+                      >
+                        {strategy.description}
+                      </p>
+                    </div>
+                    <div style={{ flexShrink: 0, color: "var(--text-muted)" }}>
+                      {isExpanded ? (
+                        <ChevronUp size={16} />
+                      ) : (
+                        <ChevronDown size={16} />
+                      )}
+                    </div>
+                  </div>
+
+                  {isExpanded && (
+                    <div
+                      style={{
+                        borderTop: "1px solid var(--border)",
+                        marginTop: 14,
+                        paddingTop: 14,
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: "repeat(3,1fr)",
+                          gap: 10,
+                          marginBottom: 14,
+                        }}
+                      >
+                        {[
+                          {
+                            label: "Time Saved",
+                            value: strategy.timeSaved,
+                            color: "var(--green-primary)",
+                          },
+                          {
+                            label: "Cost",
+                            value: strategy.cost,
+                            color: "var(--amber)",
+                          },
+                          {
+                            label: "Schedule Impact",
+                            value: strategy.scheduleImpact,
+                            color: "var(--blue-primary)",
+                          },
+                        ].map(({ label, value, color }) => (
+                          <div
+                            key={label}
+                            style={{
+                              background: "var(--bg3)",
+                              borderRadius: 8,
+                              padding: "10px 12px",
+                              textAlign: "center",
+                            }}
+                          >
+                            <div
+                              style={{
+                                fontSize: "1rem",
+                                fontWeight: 700,
+                                color,
+                                letterSpacing: "-0.3px",
+                              }}
+                            >
+                              {value}
+                            </div>
+                            <div
+                              style={{
+                                fontSize: "0.62rem",
+                                color: "var(--text-muted)",
+                                marginTop: 3,
+                              }}
+                            >
+                              {label}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <div style={{ marginBottom: 14 }}>
+                        <div
+                          style={{
+                            fontSize: "0.74rem",
+                            fontWeight: 600,
+                            color: "var(--text-primary)",
+                            marginBottom: 8,
+                          }}
+                        >
+                          Implementation Steps
+                        </div>
+                        <div
+                          style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 6,
+                          }}
+                        >
+                          {strategy.steps.map((step, i) => (
+                            <div
+                              key={i}
+                              style={{
+                                display: "flex",
+                                alignItems: "flex-start",
+                                gap: 10,
+                              }}
+                            >
+                              <div
+                                style={{
+                                  width: 20,
+                                  height: 20,
+                                  borderRadius: 5,
+                                  background: "var(--amber-bg)",
+                                  border: "1px solid var(--amber-border)",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  flexShrink: 0,
+                                  marginTop: 1,
+                                }}
+                              >
+                                <span
+                                  style={{
+                                    fontSize: "0.6rem",
+                                    fontWeight: 700,
+                                    color: "var(--amber)",
+                                  }}
+                                >
+                                  {i + 1}
+                                </span>
+                              </div>
+                              <span
+                                style={{
+                                  fontSize: "0.76rem",
+                                  color: "var(--text-secondary)",
+                                  lineHeight: 1.5,
+                                }}
+                              >
+                                {step}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() =>
+                          !isActivated && handleActivate(strategy.id)
+                        }
+                        disabled={isActivated || !!activating}
+                        style={{
+                          width: "100%",
+                          padding: "9px",
+                          borderRadius: 8,
+                          border: "none",
+                          fontSize: "0.78rem",
+                          fontWeight: 700,
+                          cursor: isActivated ? "default" : "pointer",
+                          fontFamily: "inherit",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: 6,
+                          transition: "all 0.2s",
+                          background: isActivated
+                            ? "var(--green-bg)"
+                            : "var(--green-primary)",
+                          color: isActivated ? "var(--green-primary)" : "#000",
+                          ...(isActivated
+                            ? { border: "1px solid var(--green-border)" }
+                            : {}),
+                        }}
+                      >
+                        {isActivating ? (
+                          <>
+                            <Loader2
+                              size={13}
+                              style={{ animation: "spin 1s linear infinite" }}
+                            />{" "}
+                            Activating…
+                          </>
+                        ) : isActivated ? (
+                          <>
+                            <CheckCircle size={13} /> Strategy Activated
+                          </>
+                        ) : (
+                          <>
+                            <Zap size={13} /> Activate This Strategy
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )
-      })()}
+      )}
     </div>
-  )
+  );
 }

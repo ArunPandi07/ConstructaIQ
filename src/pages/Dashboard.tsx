@@ -1,259 +1,949 @@
-import { useNavigate } from 'react-router-dom'
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
-  AreaChart, Area, PieChart, Pie, Cell, ResponsiveContainer,
-  XAxis, YAxis, CartesianGrid, Tooltip,
-} from 'recharts'
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 import {
-  FolderOpen, ShieldAlert, CheckCircle, DollarSign,
-  AlertTriangle, RefreshCw, TrendingUp, Bot, ArrowRight, Clock,
-} from 'lucide-react'
-import KPICard from '../components/KPICard'
-import Badge from '../components/Badge'
-import {
-  KPICardSkeleton, CardSkeleton, ErrorState,
-} from '../components/Skeleton'
-import { useDashboard } from '../hooks/usePageData'
+  FolderOpen,
+  ShieldAlert,
+  CheckCircle,
+  DollarSign,
+  AlertTriangle,
+  RefreshCw,
+  Plus,
+  ArrowRight,
+  Building2,
+  Plane,
+  Train,
+  Home,
+  Trees,
+  Milestone,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
+import { useDashboard } from "../hooks/usePageData";
+import { KPICardSkeleton, ErrorState } from "../components/Skeleton";
+import { allProjects } from "../data/mockData";
+import type { ProjectStatus } from "../data/mockData";
 
-const sevConfig = {
-  critical: { variant: 'red' as const, label: 'Critical' },
-  warning: { variant: 'orange' as const, label: 'Warning' },
-  medium: { variant: 'yellow' as const, label: 'Medium' },
-  success: { variant: 'green' as const, label: 'Success' },
-  info: { variant: 'blue' as const, label: 'Info' },
-}
+const PAGE_SIZE = 8;
 
-const CustomTooltip = ({ active, payload, label }: any) => {
-  if (!active || !payload?.length) return null
+const statusConfig: Record<
+  ProjectStatus,
+  { label: string; color: string; bg: string; border: string; barColor: string }
+> = {
+  "on-track": {
+    label: "ON TRACK",
+    color: "#16a34a",
+    bg: "rgba(22,163,74,0.08)",
+    border: "rgba(22,163,74,0.2)",
+    barColor: "#16a34a",
+  },
+  "at-risk": {
+    label: "AT RISK",
+    color: "#dc2626",
+    bg: "rgba(220,38,38,0.08)",
+    border: "rgba(220,38,38,0.2)",
+    barColor: "#dc2626",
+  },
+  delayed: {
+    label: "DELAYED",
+    color: "#ea580c",
+    bg: "rgba(234,88,12,0.08)",
+    border: "rgba(234,88,12,0.2)",
+    barColor: "#ea580c",
+  },
+  planning: {
+    label: "PLANNING",
+    color: "#2563eb",
+    bg: "rgba(37,99,235,0.08)",
+    border: "rgba(37,99,235,0.2)",
+    barColor: "#2563eb",
+  },
+};
+
+const projectIcons: Record<
+  string,
+  React.FC<{ size?: number; style?: React.CSSProperties }>
+> = {
+  building: Building2,
+  plane: Plane,
+  train: Train,
+  home: Home,
+  trees: Trees,
+  road: Milestone,
+};
+
+const kpiList = [
+  {
+    key: "activeProjects",
+    label: "Active Projects",
+    color: "#2563eb",
+    bg: "rgba(37,99,235,0.08)",
+    Icon: FolderOpen,
+  },
+  {
+    key: "riskProjects",
+    label: "At Risk",
+    color: "#dc2626",
+    bg: "rgba(220,38,38,0.08)",
+    Icon: ShieldAlert,
+  },
+  {
+    key: "onTimeProjects",
+    label: "On Schedule",
+    color: "#16a34a",
+    bg: "rgba(22,163,74,0.08)",
+    Icon: CheckCircle,
+  },
+  {
+    key: "totalBudget",
+    label: "Total Budget",
+    color: "#d97706",
+    bg: "rgba(217,119,6,0.08)",
+    Icon: DollarSign,
+  },
+  {
+    key: "openRisks",
+    label: "Open Risks",
+    color: "#ea580c",
+    bg: "rgba(234,88,12,0.08)",
+    Icon: AlertTriangle,
+  },
+  {
+    key: "recoveryPlans",
+    label: "Recovery Plans",
+    color: "#7c3aed",
+    bg: "rgba(124,58,237,0.08)",
+    Icon: RefreshCw,
+  },
+];
+
+const ChartTooltip = ({ active, payload, label }: any) => {
+  if (!active || !payload?.length) return null;
   return (
-    <div className="px-3 py-2 rounded-xl shadow-lg" style={{ background: '#fff', border: '1px solid #e2e8f0', minWidth: 150 }}>
-      <p className="text-xs font-bold mb-1.5" style={{ color: '#0f172a' }}>{label}</p>
-      {payload.map((e: any, i: number) => (
-        <div key={i} className="flex items-center gap-2 text-xs">
-          <div className="w-2 h-2 rounded-full" style={{ background: e.color }} />
-          <span style={{ color: '#64748b' }}>{e.name}:</span>
-          <span className="font-semibold" style={{ color: '#0f172a' }}>{e.value}%</span>
+    <div
+      style={{
+        background: "#fff",
+        border: "1px solid #e8eaed",
+        borderRadius: 10,
+        padding: "10px 14px",
+        minWidth: 140,
+        boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+      }}
+    >
+      <p
+        style={{
+          fontWeight: 700,
+          fontSize: "0.75rem",
+          marginBottom: 6,
+          color: "#111827",
+        }}
+      >
+        {label}
+      </p>
+      {payload.map((e: any) => (
+        <div
+          key={e.name}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            fontSize: "0.72rem",
+            marginBottom: 3,
+          }}
+        >
+          <div
+            style={{
+              width: 7,
+              height: 7,
+              borderRadius: "50%",
+              background: e.color,
+            }}
+          />
+          <span style={{ color: "#6b7280" }}>{e.name}:</span>
+          <span style={{ fontWeight: 600, color: "#111827" }}>{e.value}%</span>
         </div>
       ))}
     </div>
-  )
-}
+  );
+};
 
 export default function Dashboard() {
-  const navigate = useNavigate()
-  const { data, loading, error, refetch } = useDashboard()
+  const navigate = useNavigate();
+  const { data, loading, error, refetch } = useDashboard();
+  const [page, setPage] = useState(1);
 
-  // ── Error ────────────────────────────────────────────────────
-  if (error) return <ErrorState message={error} onRetry={refetch} />
+  if (error) return <ErrorState message={error} onRetry={refetch} />;
+
+  const totalPages = Math.ceil(allProjects.length / PAGE_SIZE);
+  const paginatedProjects = allProjects.slice(
+    (page - 1) * PAGE_SIZE,
+    page * PAGE_SIZE,
+  );
 
   return (
-    <div className="space-y-6 animate-fade-in-up">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-bold" style={{ color: '#0f172a' }}>Command Center</h2>
-          <p className="text-sm mt-0.5" style={{ color: '#64748b' }}>
-            Real-time construction intelligence across 24 active projects
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg"
-            style={{ background: '#eff6ff', border: '1px solid #bfdbfe' }}>
-            <Clock size={13} style={{ color: '#2563eb' }} />
-            <span className="text-xs font-medium" style={{ color: '#2563eb' }}>
-              {loading ? 'Loading…' : 'Last updated: Just now'}
-            </span>
-          </div>
-          <button
-            onClick={refetch}
-            disabled={loading}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold text-white hover:opacity-90 transition-opacity disabled:opacity-50"
-            style={{ background: 'linear-gradient(135deg,#2563eb,#4f46e5)' }}
-          >
-            <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
-            Refresh
-          </button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-        {loading ? Array.from({ length: 6 }).map((_, i) => <KPICardSkeleton key={i} />) : data && (
-          <>
-            <KPICard title="Active Projects" value={data.kpi.activeProjects} subtitle="Across 8 regions"
-              icon={<FolderOpen size={18} style={{ color: '#2563eb' }} />}
-              trend={{ value: '+2 this month', positive: true }} accentColor="#2563eb" />
-            <KPICard title="Risk Projects" value={data.kpi.riskProjects} subtitle="Need immediate action"
-              icon={<ShieldAlert size={18} style={{ color: '#dc2626' }} />}
-              trend={{ value: '+1 this week', positive: false }} accentColor="#dc2626" />
-            <KPICard title="On-Time Projects" value={data.kpi.onTimeProjects} subtitle="67% of portfolio"
-              icon={<CheckCircle size={18} style={{ color: '#16a34a' }} />}
-              trend={{ value: '+3 improved', positive: true }} accentColor="#16a34a" />
-            <KPICard title="Total Budget" value={data.kpi.totalBudget} subtitle="Across all projects"
-              icon={<DollarSign size={18} style={{ color: '#d97706' }} />}
-              accentColor="#d97706" />
-            <KPICard title="Open Risks" value={data.kpi.openRisks} subtitle="18 critical, 25 high"
-              icon={<AlertTriangle size={18} style={{ color: '#ea580c' }} />}
-              trend={{ value: '-5 resolved', positive: true }} accentColor="#ea580c" />
-            <KPICard title="Recovery Plans" value={data.kpi.recoveryPlans} subtitle="AI-generated strategies"
-              icon={<RefreshCw size={18} style={{ color: '#7c3aed' }} />}
-              trend={{ value: '+4 new', positive: true }} accentColor="#7c3aed" />
-          </>
-        )}
-      </div>
-
-      {/* Charts row */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        {/* Area chart */}
-        {loading ? (
-          <CardSkeleton className="xl:col-span-2" lines={6} />
-        ) : data && (
-          <div className="glass-card p-5 xl:col-span-2">
-            <div className="flex items-center justify-between mb-5">
-              <div>
-                <h3 className="text-sm font-bold" style={{ color: '#0f172a' }}>Project Health Trend</h3>
-                <p className="text-xs mt-0.5" style={{ color: '#94a3b8' }}>6-month portfolio performance</p>
-              </div>
-              <div className="flex items-center gap-4 text-xs">
-                {[['#2563eb', 'Health'], ['#16a34a', 'On-Time'], ['#dc2626', 'Risk']].map(([c, l]) => (
-                  <div key={l} className="flex items-center gap-1.5">
-                    <div className="w-3 h-1 rounded-full" style={{ background: c }} />
-                    <span style={{ color: '#94a3b8' }}>{l}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <ResponsiveContainer width="100%" height={220}>
-              <AreaChart data={data.healthTrend} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
-                <defs>
-                  {[['health', '#2563eb'], ['onTime', '#16a34a'], ['risk', '#dc2626']].map(([k, c]) => (
-                    <linearGradient key={k} id={`c-${k}`} x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={c} stopOpacity={0.12} />
-                      <stop offset="95%" stopColor={c} stopOpacity={0} />
-                    </linearGradient>
-                  ))}
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                <XAxis dataKey="month" tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} />
-                <Tooltip content={<CustomTooltip />} />
-                <Area type="monotone" dataKey="health" name="Health" stroke="#2563eb" strokeWidth={2} fill="url(#c-health)" />
-                <Area type="monotone" dataKey="onTime" name="On-Time" stroke="#16a34a" strokeWidth={2} fill="url(#c-onTime)" />
-                <Area type="monotone" dataKey="risk" name="Risk" stroke="#dc2626" strokeWidth={2} fill="url(#c-risk)" />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        )}
-
-        {/* Pie */}
-        {loading ? <CardSkeleton lines={5} /> : data && (
-          <div className="glass-card p-5">
-            <div className="mb-4">
-              <h3 className="text-sm font-bold" style={{ color: '#0f172a' }}>Risk Distribution</h3>
-              <p className="text-xs mt-0.5" style={{ color: '#94a3b8' }}>By category across portfolio</p>
-            </div>
-            <ResponsiveContainer width="100%" height={180}>
-              <PieChart>
-                <Pie data={data.riskDistribution} cx="50%" cy="50%"
-                  innerRadius={48} outerRadius={72} paddingAngle={3} dataKey="value">
-                  {data.riskDistribution.map((e, i) => <Cell key={i} fill={e.color} strokeWidth={0} />)}
-                </Pie>
-                <Tooltip contentStyle={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 12, color: '#0f172a' }} />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="space-y-1.5 mt-1">
-              {data.riskDistribution.map(item => (
-                <div key={item.name} className="flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full" style={{ background: item.color }} />
-                    <span style={{ color: '#64748b' }}>{item.name}</span>
-                  </div>
-                  <span className="font-semibold" style={{ color: '#0f172a' }}>{item.value}%</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Bottom row */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        {/* Activities */}
-        {loading ? <CardSkeleton lines={5} /> : data && (
-          <div className="glass-card p-5">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="text-sm font-bold" style={{ color: '#0f172a' }}>Recent Agent Activities</h3>
-                <p className="text-xs mt-0.5" style={{ color: '#94a3b8' }}>Live AI agent monitoring</p>
-              </div>
-              <Badge variant="blue" dot pulse>Live</Badge>
-            </div>
-            <div className="space-y-2">
-              {data.recentActivities.map((a: any) => {
-                const sev = sevConfig[a.severity as keyof typeof sevConfig]
-                return (
-                  <div key={a.id} className="flex items-start gap-3 p-3 rounded-xl"
-                    style={{ background: '#f8fafc', border: '1px solid #f1f5f9' }}>
-                    <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5"
-                      style={{ background: '#eff6ff', border: '1px solid #bfdbfe' }}>
-                      <Bot size={13} style={{ color: '#2563eb' }} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-xs font-semibold" style={{ color: '#0f172a' }}>{a.agent}</span>
-                        <Badge variant={sev.variant} size="sm">{sev.label}</Badge>
+    <div className="flex flex-col gap-5 animate-fade-in-up">
+      {/* KPI Row */}
+      <div className="grid grid-cols-6 gap-3">
+        {loading
+          ? Array.from({ length: 6 }).map((_, i) => <KPICardSkeleton key={i} />)
+          : kpiList.map(({ key, label, color, bg, Icon }) => (
+              <div key={key} className="kpi-card">
+                <div style={{ padding: "14px 16px" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "flex-start",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    <div style={{ flex: 1 }}>
+                      <div
+                        style={{
+                          fontSize: 26,
+                          fontWeight: 700,
+                          color,
+                          lineHeight: 1,
+                          letterSpacing: "-0.5px",
+                        }}
+                      >
+                        {(data?.kpi as any)?.[key] ?? "—"}
                       </div>
-                      <p className="text-xs mt-0.5 leading-relaxed" style={{ color: '#64748b' }}>{a.action}</p>
-                      <span className="text-xs mt-0.5 block" style={{ color: '#94a3b8' }}>{a.time}</span>
+                      <div
+                        style={{
+                          fontSize: "0.72rem",
+                          color: "#6b7280",
+                          marginTop: 6,
+                        }}
+                      >
+                        {label}
+                      </div>
+                    </div>
+                    <div
+                      style={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: 9,
+                        background: bg,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
+                      }}
+                    >
+                      <Icon size={16} style={{ color }} />
                     </div>
                   </div>
-                )
-              })}
+                </div>
+              </div>
+            ))}
+      </div>
+
+      {!loading && data && (
+        <>
+          {/* Section header */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginBottom: 2,
+            }}
+          >
+            <div
+              style={{
+                fontSize: "0.9rem",
+                fontWeight: 700,
+                color: "#111827",
+                letterSpacing: "0.04em",
+                textTransform: "uppercase",
+              }}
+            >
+              All Projects
+              <span
+                style={{
+                  marginLeft: 8,
+                  fontSize: "0.72rem",
+                  fontWeight: 500,
+                  color: "#6b7280",
+                  textTransform: "none",
+                  letterSpacing: 0,
+                }}
+              >
+                {allProjects.length} total
+              </span>
             </div>
-            {/* CTA → Agents page */}
-            <button onClick={() => navigate('/agents')}
-              className="mt-3 w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-all hover:bg-blue-50"
-              style={{ color: '#2563eb', border: '1px solid #bfdbfe' }}>
-              View All Agent Activity <ArrowRight size={11} />
+            <button
+              onClick={() => navigate("/upload")}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                background: "#16a34a",
+                color: "#fff",
+                border: "none",
+                borderRadius: 9,
+                padding: "8px 16px",
+                fontSize: "0.78rem",
+                fontWeight: 600,
+                cursor: "pointer",
+                fontFamily: "inherit",
+                transition: "all 0.15s",
+                boxShadow: "0 2px 6px rgba(22,163,74,0.3)",
+              }}
+            >
+              <Plus size={13} /> New Project
             </button>
           </div>
-        )}
 
-        {/* Recommendations */}
-        {loading ? <CardSkeleton lines={6} /> : data && (
-          <div className="glass-card p-5">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="text-sm font-bold" style={{ color: '#0f172a' }}>AI Recommendations</h3>
-                <p className="text-xs mt-0.5" style={{ color: '#94a3b8' }}>High-priority action items</p>
+          {/* Main grid */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "minmax(0, 1.85fr) 370px",
+              gap: 16,
+              alignItems: "start",
+            }}
+          >
+            {/* Table + Pagination */}
+            <div>
+              <div className="glass-card" style={{ overflow: "hidden" }}>
+                <div style={{ overflowX: "auto" }}>
+                  <table
+                    style={{
+                      width: "100%",
+                      minWidth: 760,
+                      borderCollapse: "collapse",
+                    }}
+                  >
+                    <thead>
+                      <tr style={{ borderBottom: "1px solid #e8eaed" }}>
+                        <th
+                          style={{
+                            position: "sticky",
+                            left: 0,
+                            zIndex: 20,
+                            background: "#f8f9fb",
+                            // borderRight: "1px solid #e8eaed",
+                            padding: "10px 14px",
+                            textAlign: "left",
+                            fontSize: "0.68rem",
+                            fontWeight: 700,
+                            letterSpacing: "0.06em",
+                            color: "#6b7280",
+                            textTransform: "uppercase",
+                          }}
+                        >
+                          Project
+                        </th>
+                        <th
+                          style={{
+                            background: "#f8f9fb",
+                            padding: "10px 14px",
+                            textAlign: "left",
+                            fontSize: "0.68rem",
+                            fontWeight: 700,
+                            letterSpacing: "0.06em",
+                            color: "#6b7280",
+                            textTransform: "uppercase",
+                            minWidth: 110,
+                          }}
+                        >
+                          Type
+                        </th>
+                        <th
+                          style={{
+                            background: "#f8f9fb",
+                            padding: "10px 14px",
+                            textAlign: "left",
+                            fontSize: "0.68rem",
+                            fontWeight: 700,
+                            letterSpacing: "0.06em",
+                            color: "#6b7280",
+                            textTransform: "uppercase",
+                            minWidth: 100,
+                          }}
+                        >
+                          Status
+                        </th>
+                        <th
+                          style={{
+                            background: "#f8f9fb",
+                            padding: "10px 14px",
+                            textAlign: "left",
+                            fontSize: "0.68rem",
+                            fontWeight: 700,
+                            letterSpacing: "0.06em",
+                            color: "#6b7280",
+                            textTransform: "uppercase",
+                            minWidth: 200,
+                          }}
+                        >
+                          Completion
+                        </th>
+                        <th
+                          style={{
+                            background: "#f8f9fb",
+                            padding: "10px 14px",
+                            textAlign: "center",
+                            fontSize: "0.68rem",
+                            fontWeight: 700,
+                            letterSpacing: "0.06em",
+                            color: "#6b7280",
+                            textTransform: "uppercase",
+                            minWidth: 90,
+                          }}
+                        >
+                          Budget
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {paginatedProjects.map((proj, idx) => {
+                        const sc = statusConfig[proj.status];
+                        const ProjIcon = projectIcons[proj.icon] ?? Building2;
+                        const globalIdx = (page - 1) * PAGE_SIZE + idx + 1;
+                        return (
+                          <tr
+                            key={proj.id}
+                            onClick={() => navigate("/intelligence")}
+                            className="project-row cursor-pointer"
+                            style={{ borderBottom: "1px solid #f3f4f6" }}
+                          >
+                            <td
+                              className="sticky-project-cell"
+                              style={{
+                                padding: "11px 14px",
+                                // background: "#fff",
+                                borderRight: "1px solid #d2e0ff",
+                              }}
+                            >
+                              <div className="project-cell">
+                                <div
+                                  style={{
+                                    width: 22,
+                                    height: 22,
+                                    borderRadius: 6,
+                                    background: "#f3f4f6",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    flexShrink: 0,
+                                    fontSize: "0.6rem",
+                                    fontWeight: 700,
+                                    color: "#9ca3af",
+                                  }}
+                                >
+                                  {globalIdx}
+                                </div>
+                                <div
+                                  className="project-icon"
+                                  style={{
+                                    background: sc.bg,
+                                    border: `1px solid ${sc.border}`,
+                                  }}
+                                >
+                                  <ProjIcon
+                                    size={16}
+                                    style={{ color: sc.barColor }}
+                                  />
+                                </div>
+                                <div className="project-info">
+                                  <div className="project-name">
+                                    {proj.name}
+                                  </div>
+                                  <div className="project-meta">
+                                    <span>{proj.id}</span>
+                                    <span className="project-dot" />
+                                    <span>{proj.duration}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+                            <td
+                              style={{
+                                padding: "11px 14px",
+                                fontSize: "0.75rem",
+                                color: "#6b7280",
+                              }}
+                            >
+                              {proj.type}
+                            </td>
+                            <td style={{ padding: "11px 14px" }}>
+                              <span
+                                className="status-badge"
+                                style={{
+                                  background: sc.bg,
+                                  border: `1px solid ${sc.border}`,
+                                  color: sc.color,
+                                  fontSize: "0.62rem",
+                                  fontWeight: 700,
+                                  padding: "3px 8px",
+                                  borderRadius: 999,
+                                  letterSpacing: "0.05em",
+                                }}
+                              >
+                                {sc.label}
+                              </span>
+                            </td>
+                            <td style={{ padding: "11px 14px", minWidth: 200 }}>
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 8,
+                                }}
+                              >
+                                <span
+                                  style={{
+                                    fontSize: "0.68rem",
+                                    color: "#9ca3af",
+                                    width: 60,
+                                    flexShrink: 0,
+                                  }}
+                                >
+                                  Completion
+                                </span>
+                                <div
+                                  className="progress-bar"
+                                  style={{ flex: 1 }}
+                                >
+                                  <div
+                                    className="progress-fill"
+                                    style={{
+                                      width: `${proj.progress}%`,
+                                      background: sc.barColor,
+                                    }}
+                                  />
+                                </div>
+                                <span
+                                  style={{
+                                    fontSize: "0.75rem",
+                                    fontWeight: 700,
+                                    color: sc.barColor,
+                                    minWidth: 30,
+                                    textAlign: "right",
+                                  }}
+                                >
+                                  {proj.progress}%
+                                </span>
+                              </div>
+                            </td>
+                            <td
+                              style={{
+                                padding: "11px 14px",
+                                textAlign: "center",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  fontSize: "0.88rem",
+                                  fontWeight: 700,
+                                  color: "#111827",
+                                }}
+                              >
+                                {proj.budget}
+                              </div>
+                              <div
+                                style={{
+                                  fontSize: "0.58rem",
+                                  color: "#9ca3af",
+                                  textTransform: "uppercase",
+                                  marginTop: 2,
+                                }}
+                              >
+                                Budget
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* ── Pagination ── */}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "11px 16px",
+                    borderTop: "1px solid #e8eaed",
+                    background: "#f8f9fb",
+                  }}
+                >
+                  {/* Info */}
+                  <span style={{ fontSize: "0.72rem", color: "#6b7280" }}>
+                    Showing{" "}
+                    <strong style={{ color: "#111827" }}>
+                      {(page - 1) * PAGE_SIZE + 1}–
+                      {Math.min(page * PAGE_SIZE, allProjects.length)}
+                    </strong>{" "}
+                    of{" "}
+                    <strong style={{ color: "#111827" }}>
+                      {allProjects.length}
+                    </strong>{" "}
+                    projects
+                  </span>
+
+                  {/* Page controls */}
+                  <div
+                    style={{ display: "flex", alignItems: "center", gap: 4 }}
+                  >
+                    {/* Prev */}
+                    <button
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      disabled={page === 1}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        width: 30,
+                        height: 30,
+                        borderRadius: 7,
+                        border: "1px solid #e2e8f0",
+                        background: page === 1 ? "#f8f9fb" : "#fff",
+                        color: page === 1 ? "#d1d5db" : "#374151",
+                        cursor: page === 1 ? "default" : "pointer",
+                        transition: "all 0.15s",
+                      }}
+                    >
+                      <ChevronLeft size={14} />
+                    </button>
+
+                    {/* Page numbers */}
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+                      (p) => (
+                        <button
+                          key={p}
+                          onClick={() => setPage(p)}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            width: 30,
+                            height: 30,
+                            borderRadius: 7,
+                            border:
+                              p === page
+                                ? "1.5px solid #16a34a"
+                                : "1px solid #e2e8f0",
+                            background:
+                              p === page ? "rgba(22,163,74,0.08)" : "#fff",
+                            color: p === page ? "#16a34a" : "#374151",
+                            fontWeight: p === page ? 700 : 500,
+                            fontSize: "0.76rem",
+                            cursor: "pointer",
+                            transition: "all 0.15s",
+                            fontFamily: "inherit",
+                          }}
+                        >
+                          {p}
+                        </button>
+                      ),
+                    )}
+
+                    {/* Next */}
+                    <button
+                      onClick={() =>
+                        setPage((p) => Math.min(totalPages, p + 1))
+                      }
+                      disabled={page === totalPages}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        width: 30,
+                        height: 30,
+                        borderRadius: 7,
+                        border: "1px solid #e2e8f0",
+                        background: page === totalPages ? "#f8f9fb" : "#fff",
+                        color: page === totalPages ? "#d1d5db" : "#374151",
+                        cursor: page === totalPages ? "default" : "pointer",
+                        transition: "all 0.15s",
+                      }}
+                    >
+                      <ChevronRight size={14} />
+                    </button>
+                  </div>
+
+                  {/* View all link */}
+                  <button
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 5,
+                      color: "#2563eb",
+                      fontSize: "0.76rem",
+                      fontWeight: 600,
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      fontFamily: "inherit",
+                    }}
+                  >
+                    View all <ArrowRight size={12} />
+                  </button>
+                </div>
               </div>
-              <button onClick={() => navigate('/recovery')} className="flex items-center gap-1 text-xs font-medium" style={{ color: '#2563eb' }}>
-                View All <ArrowRight size={11} />
-              </button>
             </div>
-            <div className="space-y-3">
-              {data.recentRecommendations.map((rec: any) => (
-                <div key={rec.id} className="p-4 rounded-xl cursor-pointer transition-all hover:shadow-sm"
-                  style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}
-                  onClick={() => navigate('/risk')}>
-                  <div className="flex items-start justify-between gap-3 mb-2">
-                    <div className="flex items-center gap-2">
-                      <Badge variant={rec.impact === 'Critical' ? 'red' : rec.impact === 'High' ? 'orange' : 'yellow'}>
-                        {rec.impact}
-                      </Badge>
-                      <Badge variant="purple">{rec.category}</Badge>
+
+            {/* Right column */}
+            <div>
+              {/* Health trend */}
+              <div className="glass-card p-5" style={{ marginBottom: 14 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "flex-start",
+                    justifyContent: "space-between",
+                    marginBottom: 14,
+                  }}
+                >
+                  <div>
+                    <div
+                      style={{
+                        fontSize: "0.9rem",
+                        fontWeight: 600,
+                        color: "#111827",
+                      }}
+                    >
+                      Project health trend
                     </div>
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                      <TrendingUp size={11} style={{ color: '#16a34a' }} />
-                      <span className="text-xs font-bold" style={{ color: '#16a34a' }}>{rec.confidence}%</span>
+                    <div
+                      style={{
+                        fontSize: "0.7rem",
+                        color: "#6b7280",
+                        marginTop: 2,
+                      }}
+                    >
+                      All {data.kpi.activeProjects} projects · 6-month portfolio
+                      view
                     </div>
                   </div>
-                  <p className="text-xs font-semibold mb-1" style={{ color: '#0f172a' }}>{rec.project}</p>
-                  <p className="text-xs leading-relaxed" style={{ color: '#64748b' }}>{rec.recommendation}</p>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 5,
+                      background: "rgba(22,163,74,0.08)",
+                      border: "1px solid rgba(22,163,74,0.2)",
+                      borderRadius: 999,
+                      padding: "3px 10px",
+                    }}
+                  >
+                    <div
+                      className="animate-pulse"
+                      style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: "50%",
+                        background: "#16a34a",
+                      }}
+                    />
+                    <span
+                      style={{
+                        fontSize: "0.62rem",
+                        color: "#16a34a",
+                        fontWeight: 700,
+                      }}
+                    >
+                      LIVE
+                    </span>
+                  </div>
                 </div>
-              ))}
+                <ResponsiveContainer width="100%" height={190}>
+                  <AreaChart
+                    data={data.healthTrend}
+                    margin={{ top: 5, right: 5, left: -25, bottom: 0 }}
+                  >
+                    <defs>
+                      <linearGradient id="gHealth" x1="0" y1="0" x2="0" y2="1">
+                        <stop
+                          offset="5%"
+                          stopColor="#16a34a"
+                          stopOpacity={0.15}
+                        />
+                        <stop
+                          offset="95%"
+                          stopColor="#16a34a"
+                          stopOpacity={0}
+                        />
+                      </linearGradient>
+                      <linearGradient id="gRisk" x1="0" y1="0" x2="0" y2="1">
+                        <stop
+                          offset="5%"
+                          stopColor="#dc2626"
+                          stopOpacity={0.1}
+                        />
+                        <stop
+                          offset="95%"
+                          stopColor="#dc2626"
+                          stopOpacity={0}
+                        />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke="rgba(0,0,0,0.05)"
+                      vertical={false}
+                    />
+                    <XAxis
+                      dataKey="month"
+                      tick={{ fill: "#9ca3af", fontSize: 10 }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <YAxis
+                      domain={[0, 100]}
+                      tick={{ fill: "#9ca3af", fontSize: 10 }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <Tooltip content={<ChartTooltip />} />
+                    <Area
+                      type="monotone"
+                      dataKey="health"
+                      name="Health score"
+                      stroke="#16a34a"
+                      strokeWidth={2}
+                      fill="url(#gHealth)"
+                      dot={false}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="risk"
+                      name="Risk Index"
+                      stroke="#dc2626"
+                      strokeWidth={1.5}
+                      fill="url(#gRisk)"
+                      strokeDasharray="5 4"
+                      dot={false}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+                <div style={{ display: "flex", gap: 16, marginTop: 6 }}>
+                  {[
+                    { color: "#16a34a", label: "Health score", dashed: false },
+                    { color: "#dc2626", label: "Risk Index", dashed: true },
+                  ].map(({ color, label, dashed }) => (
+                    <div
+                      key={label}
+                      style={{ display: "flex", alignItems: "center", gap: 6 }}
+                    >
+                      <div
+                        style={{
+                          width: 20,
+                          height: 2,
+                          borderRadius: 2,
+                          background: dashed
+                            ? `repeating-linear-gradient(90deg,${color} 0,${color} 4px,transparent 4px,transparent 8px)`
+                            : color,
+                        }}
+                      />
+                      <span style={{ fontSize: "0.7rem", color: "#6b7280" }}>
+                        {label}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Risk distribution */}
+              <div className="glass-card p-5">
+                <div style={{ marginBottom: 14 }}>
+                  <div
+                    style={{
+                      fontSize: "0.9rem",
+                      fontWeight: 600,
+                      color: "#111827",
+                    }}
+                  >
+                    Risk distribution
+                  </div>
+                  <div
+                    style={{
+                      fontSize: "0.7rem",
+                      color: "#6b7280",
+                      marginTop: 2,
+                    }}
+                  >
+                    All projects · {data.kpi.openRisks} open risks
+                  </div>
+                </div>
+                <div
+                  style={{ display: "flex", flexDirection: "column", gap: 11 }}
+                >
+                  {data.riskDistribution.map((item) => (
+                    <div
+                      key={item.name}
+                      style={{ display: "flex", alignItems: "center", gap: 10 }}
+                    >
+                      <div
+                        style={{
+                          width: 7,
+                          height: 7,
+                          borderRadius: "50%",
+                          background: item.color,
+                          flexShrink: 0,
+                        }}
+                      />
+                      <span
+                        style={{
+                          fontSize: "0.76rem",
+                          color: "#374151",
+                          width: 105,
+                          flexShrink: 0,
+                        }}
+                      >
+                        {item.name}
+                      </span>
+                      <div
+                        style={{
+                          flex: 1,
+                          height: 5,
+                          background: "#f0f2f5",
+                          borderRadius: 999,
+                          overflow: "hidden",
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: `${item.value * 2.8}%`,
+                            height: "100%",
+                            background: item.color,
+                            borderRadius: 999,
+                          }}
+                        />
+                      </div>
+                      <span
+                        style={{
+                          fontSize: "0.76rem",
+                          fontWeight: 700,
+                          color: item.color,
+                          width: 32,
+                          textAlign: "right",
+                        }}
+                      >
+                        {item.value}%
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
-        )}
-      </div>
+        </>
+      )}
     </div>
-  )
+  );
 }

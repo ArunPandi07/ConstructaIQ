@@ -439,3 +439,45 @@ export const agentTimeline = [
   { time: '09:12:42', agent: 'Recovery Agent', event: 'Strategy A recommended: 6.5-week savings', type: 'success' },
   { time: '09:13:11', agent: 'Risk Agent', event: 'Continuing deep risk analysis...', type: 'running' },
 ]
+
+// ── All Projects list (Dashboard) ─────────────────────────────
+export const allProjects = [
+  { id: 'tower-a',          name: 'Tower A — Downtown Core',         type: 'Commercial',     duration: '24 mo', progress: 68, status: 'on-track' as const, budget: '$340M',  risk: 82, icon: 'building' },
+  { id: 'harbor-bridge',    name: 'Harbor Bridge Phase 2',           type: 'Infrastructure', duration: '36 mo', progress: 42, status: 'at-risk'  as const, budget: '$820M',  risk: 91, icon: 'road'     },
+  { id: 'metro-station',    name: 'Metro Station Phase 2',           type: 'Transit',        duration: '18 mo', progress: 55, status: 'delayed'  as const, budget: '$290M',  risk: 67, icon: 'train'    },
+  { id: 'riverside',        name: 'Riverside Residential Complex',   type: 'Residential',    duration: '12 mo', progress: 18, status: 'planning' as const, budget: '$140M',  risk: 28, icon: 'home'     },
+  { id: 'airport-c',        name: 'Airport Terminal C Expansion',    type: 'Aviation',       duration: '30 mo', progress: 81, status: 'on-track' as const, budget: '$1.2B',  risk: 34, icon: 'plane'    },
+  { id: 'central-park',     name: 'Central Park Plaza',              type: 'Mixed Use',      duration: '20 mo', progress: 34, status: 'delayed'  as const, budget: '$460M',  risk: 74, icon: 'trees'    },
+  { id: 'northgate-tower',  name: 'Northgate Office Tower',          type: 'Commercial',     duration: '22 mo', progress: 72, status: 'on-track' as const, budget: '$275M',  risk: 31, icon: 'building' },
+  { id: 'westline-rail',    name: 'Westline Rail Corridor',          type: 'Transit',        duration: '48 mo', progress: 29, status: 'at-risk'  as const, budget: '$1.8B',  risk: 88, icon: 'train'    },
+  { id: 'bay-bridge',       name: 'Bay Bridge Retrofit',             type: 'Infrastructure', duration: '40 mo', progress: 61, status: 'on-track' as const, budget: '$620M',  risk: 45, icon: 'road'     },
+  { id: 'lakeview-res',     name: 'Lakeview Residences Tower B',     type: 'Residential',    duration: '14 mo', progress: 47, status: 'on-track' as const, budget: '$195M',  risk: 22, icon: 'home'     },
+  { id: 'civic-center',     name: 'Civic Center Renovation',         type: 'Government',     duration: '16 mo', progress: 88, status: 'on-track' as const, budget: '$88M',   risk: 19, icon: 'building' },
+  { id: 'eastport-hotel',   name: 'Eastport Grand Hotel',            type: 'Hospitality',    duration: '26 mo', progress: 53, status: 'delayed'  as const, budget: '$310M',  risk: 61, icon: 'building' },
+  { id: 'solar-farm-1',     name: 'Sunridge Solar Farm Phase 1',     type: 'Energy',         duration: '10 mo', progress: 94, status: 'on-track' as const, budget: '$72M',   risk: 12, icon: 'trees'    },
+  { id: 'university-lib',   name: 'University Library Annex',        type: 'Education',      duration: '18 mo', progress: 37, status: 'planning' as const, budget: '$115M',  risk: 35, icon: 'building' },
+  { id: 'waterfront-dev',   name: 'Waterfront Mixed Development',    type: 'Mixed Use',      duration: '32 mo', progress: 21, status: 'at-risk'  as const, budget: '$980M',  risk: 79, icon: 'trees'    },
+  { id: 'southpark-tunnel', name: 'Southpark Road Tunnel',           type: 'Infrastructure', duration: '44 mo', progress: 15, status: 'planning' as const, budget: '$1.1B',  risk: 43, icon: 'road'     },
+  { id: 'marina-plaza',     name: 'Marina Bay Plaza',                type: 'Commercial',     duration: '20 mo', progress: 76, status: 'on-track' as const, budget: '$255M',  risk: 27, icon: 'building' },
+  { id: 'greenhill-villas', name: 'Greenhill Villas Estate',         type: 'Residential',    duration: '15 mo', progress: 62, status: 'on-track' as const, budget: '$160M',  risk: 18, icon: 'home'     },
+  { id: 'transit-hub-d',    name: 'Transit Hub District D',          type: 'Transit',        duration: '28 mo', progress: 44, status: 'delayed'  as const, budget: '$540M',  risk: 71, icon: 'train'    },
+  { id: 'tech-campus',      name: 'Tech Campus Phase 3',             type: 'Commercial',     duration: '18 mo', progress: 58, status: 'on-track' as const, budget: '$430M',  risk: 38, icon: 'building' },
+  { id: 'stadium-roof',     name: 'City Stadium Roof Replacement',   type: 'Sports',         duration: '12 mo', progress: 83, status: 'on-track' as const, budget: '$95M',   risk: 24, icon: 'building' },
+  { id: 'old-town-restore', name: 'Old Town Heritage Restoration',   type: 'Government',     duration: '24 mo', progress: 31, status: 'at-risk'  as const, budget: '$148M',  risk: 66, icon: 'building' },
+  { id: 'airport-freight',  name: 'Airport Freight Terminal FX',     type: 'Aviation',       duration: '22 mo', progress: 9,  status: 'planning' as const, budget: '$375M',  risk: 41, icon: 'plane'    },
+  { id: 'highland-park',    name: 'Highland Park Urban Renewal',     type: 'Mixed Use',      duration: '36 mo', progress: 48, status: 'delayed'  as const, budget: '$720M',  risk: 58, icon: 'trees'    },
+]
+
+export type ProjectStatus = 'on-track' | 'at-risk' | 'delayed' | 'planning'
+
+export interface Project {
+  id: string
+  name: string
+  type: string
+  duration: string
+  progress: number
+  status: ProjectStatus
+  budget: string
+  risk: number
+  icon: string
+}
