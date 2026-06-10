@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from app.config.settings import settings
 from app.db.base import Base
+import app.db.models  # noqa: F401 — register models with Base.metadata
 
 config = context.config
 
