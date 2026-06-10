@@ -5,6 +5,23 @@ from app.services.logging_service import get_logger
 
 logger = get_logger("DocumentIntelligenceService")
 
+MOCK_CONTRACT_TEXT = (
+    "Mock contract document.\n"
+    "Project: Sample Tower Construction\n"
+    "Client: Example Corp\n"
+    "Budget: $12,500,000\n"
+    "Duration: 18 months\n"
+    "Scope: Commercial high-rise structural and MEP works."
+)
+
+MOCK_BLUEPRINT_TEXT = (
+    "Mock blueprint document.\n"
+    "Building type: Commercial tower\n"
+    "Floors: 24\n"
+    "Structural system: Reinforced concrete core with steel frame\n"
+    "Foundation: Deep pile system."
+)
+
 # Try to import Azure Document Intelligence SDK
 try:
     from azure.ai.documentintelligence.aio import DocumentIntelligenceClient

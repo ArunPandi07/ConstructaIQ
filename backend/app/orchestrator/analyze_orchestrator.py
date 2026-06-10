@@ -4,6 +4,7 @@ from typing import Dict, Any, Optional
 from app.services.logging_service import get_logger
 from app.services.foundry_service import foundry_service
 from app.services.document_intelligence import document_intelligence_service
+from app.services.blob_storage_service import blob_storage_service
 
 logger = get_logger("AnalyzeOrchestrator")
 
@@ -114,20 +115,39 @@ async def run_pipeline_from_documents(
 
     contract_text = ""
     blueprint_text = ""
+    stored_documents: Dict[str, str] = {}
 
     # Extract contract text if provided
     if contract_bytes and contract_filename:
         logger.info(f"Extracting text from contract: {contract_filename}")
-        contract_text = await document_intelligence_service.extract_text_from_bytes(
-            contract_bytes, contract_filename
-        )
+        if blob_storage_service.is_enabled:
+            blob_result = await blob_storage_service.upload_document(
+                project_name, contract_filename, contract_bytes
+            )
+            stored_documents["contract"] = blob_result.blob_path
+            contract_text = await document_intelligence_service.extract_text_from_blob(
+                blob_result.blob_url_with_sas, contract_filename
+            )
+        else:
+            contract_text = await document_intelligence_service.extract_text_from_bytes(
+                contract_bytes, contract_filename
+            )
 
     # Extract blueprint text if provided
     if blueprint_bytes and blueprint_filename:
         logger.info(f"Extracting text from blueprint: {blueprint_filename}")
-        blueprint_text = await document_intelligence_service.extract_text_from_bytes(
-            blueprint_bytes, blueprint_filename
-        )
+        if blob_storage_service.is_enabled:
+            blob_result = await blob_storage_service.upload_document(
+                project_name, blueprint_filename, blueprint_bytes
+            )
+            stored_documents["blueprint"] = blob_result.blob_path
+            blueprint_text = await document_intelligence_service.extract_text_from_blob(
+                blob_result.blob_url_with_sas, blueprint_filename
+            )
+        else:
+            blueprint_text = await document_intelligence_service.extract_text_from_bytes(
+                blueprint_bytes, blueprint_filename
+            )
 
     # Step 1: Contract Agent
     if contract_text:
@@ -152,12 +172,15 @@ async def run_pipeline_from_documents(
         logger.info("No blueprint provided — using empty blueprint data.")
         blueprint_data = {}
 
-    return await _run_downstream_agents(
+    result = await _run_downstream_agents(
         project_name=project_name,
         contract_data=contract_data,
         blueprint_data=blueprint_data,
         agent_version=agent_version,
     )
+    if stored_documents:
+        result["stored_documents"] = stored_documents
+    return result
 
 
 # ─────────────────────────────────────────────────────────────────────────────

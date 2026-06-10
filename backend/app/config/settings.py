@@ -17,6 +17,11 @@ class Settings(BaseSettings):
     AZURE_AIFOUNDRY_ENDPOINT: Optional[str] = None
     AZURE_AIFOUNDRY_KEY: Optional[str] = None
 
+    # Azure Blob Storage (optional — omit to use in-memory bytes for document extraction)
+    AZURE_STORAGE_CONNECTION_STRING: Optional[str] = None
+    AZURE_STORAGE_CONTAINER_NAME: str = "constructaiq-documents"
+    AZURE_STORAGE_SAS_EXPIRY_MINUTES: int = 60
+
     # Azure SQL Database (optional — app runs without DB when unset)
     DATABASE_URL: Optional[str] = None
     DB_POOL_SIZE: int = 5
@@ -28,5 +33,9 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore"
     )
+
+    @property
+    def use_blob_storage(self) -> bool:
+        return bool(self.AZURE_STORAGE_CONNECTION_STRING and self.AZURE_STORAGE_CONTAINER_NAME)
 
 settings = Settings()
