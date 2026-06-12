@@ -15,6 +15,7 @@ class DocumentRepository(BaseRepository[Document]):
         stmt = (
             select(Document)
             .where(Document.project_id == project_id)
+            .order_by(Document.document_id)
             .offset(skip)
             .limit(limit)
         )

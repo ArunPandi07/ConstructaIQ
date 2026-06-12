@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.crew_plan import CrewPlan
@@ -15,8 +15,15 @@ class CrewPlanRepository(BaseRepository[CrewPlan]):
         stmt = (
             select(CrewPlan)
             .where(CrewPlan.project_id == project_id)
+            .order_by(CrewPlan.crew_plan_id)
             .offset(skip)
             .limit(limit)
         )
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
+
+    async def delete_by_project(self, project_id: int) -> int:
+        stmt = delete(CrewPlan).where(CrewPlan.project_id == project_id)
+        result = await self.session.execute(stmt)
+        await self.session.flush()
+        return result.rowcount or 0

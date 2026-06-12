@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.permit import Permit
@@ -15,8 +15,15 @@ class PermitRepository(BaseRepository[Permit]):
         stmt = (
             select(Permit)
             .where(Permit.project_id == project_id)
+            .order_by(Permit.permit_id)
             .offset(skip)
             .limit(limit)
         )
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
+
+    async def delete_by_project(self, project_id: int) -> int:
+        stmt = delete(Permit).where(Permit.project_id == project_id)
+        result = await self.session.execute(stmt)
+        await self.session.flush()
+        return result.rowcount or 0

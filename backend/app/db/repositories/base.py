@@ -19,7 +19,12 @@ class BaseRepository(Generic[ModelT]):
         return await self.session.get(self.model, entity_id)
 
     async def list(self, *, skip: int = 0, limit: int = 100) -> list[ModelT]:
-        stmt = select(self.model).offset(skip).limit(limit)
+        stmt = (
+            select(self.model)
+            .order_by(getattr(self.model, self.pk_attr))
+            .offset(skip)
+            .limit(limit)
+        )
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
 

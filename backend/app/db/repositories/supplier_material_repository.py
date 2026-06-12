@@ -15,6 +15,7 @@ class SupplierMaterialRepository(BaseRepository[SupplierMaterial]):
         stmt = (
             select(SupplierMaterial)
             .where(SupplierMaterial.supplier_id == supplier_id)
+            .order_by(SupplierMaterial.supplier_material_id)
             .offset(skip)
             .limit(limit)
         )

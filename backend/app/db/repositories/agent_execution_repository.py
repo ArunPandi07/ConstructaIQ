@@ -15,6 +15,7 @@ class AgentExecutionRepository(BaseRepository[AgentExecution]):
         stmt = (
             select(AgentExecution)
             .where(AgentExecution.project_id == project_id)
+            .order_by(AgentExecution.execution_id.desc())
             .offset(skip)
             .limit(limit)
         )
@@ -35,8 +36,17 @@ class AgentExecutionRepository(BaseRepository[AgentExecution]):
                 AgentExecution.project_id == project_id,
                 AgentExecution.agent_name == agent_name,
             )
+            .order_by(AgentExecution.execution_id.desc())
             .offset(skip)
             .limit(limit)
         )
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
+
+    async def get_latest_by_agent(
+        self, project_id: int, agent_name: str
+    ) -> AgentExecution | None:
+        rows = await self.list_by_project_and_agent(
+            project_id, agent_name, skip=0, limit=1
+        )
+        return rows[0] if rows else None

@@ -3,7 +3,7 @@ from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.db.engine import get_engine
+from app.db.engine import get_engine, is_db_configured
 
 _session_factory: Optional[async_sessionmaker[AsyncSession]] = None
 
@@ -33,6 +33,32 @@ def reset_session_factory() -> None:
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """FastAPI dependency that yields an async database session."""
+    factory = _get_session_factory()
+    async with factory() as session:
+        yield session
+
+
+async def get_db_optional() -> AsyncGenerator[AsyncSession | None, None]:
+    """Yield a DB session when configured, otherwise None."""
+    if not is_db_configured():
+        yield None
+        return
+
+    factory = _get_session_factory()
+    async with factory() as session:
+        yield session
+
+
+async def get_db_required() -> AsyncGenerator[AsyncSession, None]:
+    """FastAPI dependency that requires a configured database."""
+    if not is_db_configured():
+        from fastapi import HTTPException, status
+
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="DATABASE_URL is not configured.",
+        )
+
     factory = _get_session_factory()
     async with factory() as session:
         yield session
