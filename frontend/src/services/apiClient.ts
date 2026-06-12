@@ -11,7 +11,7 @@ import type { ApiResponse } from '../types'
 // ── Config ───────────────────────────────────────────────────
 
 /** Switch to your FastAPI server URL in production */
-const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000/api'
+const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000/api/v1'
 
 /** Default timeout in ms */
 const DEFAULT_TIMEOUT = 30_000
@@ -62,12 +62,19 @@ class ApiClient {
 
   private async handleResponse<T>(res: Response): Promise<ApiResponse<T>> {
     if (!res.ok) {
-      const errorBody = await res.json().catch(() => ({}))
-      throw new ApiError(
-        errorBody.message ?? `HTTP ${res.status}: ${res.statusText}`,
-        res.status,
-        errorBody,
-      )
+      const errorBody = await res.json().catch(() => ({})) as {
+        message?: string
+        detail?: string | Array<{ msg?: string }>
+      }
+      const detail = errorBody.detail
+      const message =
+        errorBody.message ??
+        (typeof detail === 'string'
+          ? detail
+          : Array.isArray(detail)
+            ? detail.map((d) => d.msg ?? '').filter(Boolean).join('; ') || `HTTP ${res.status}`
+            : `HTTP ${res.status}: ${res.statusText}`)
+      throw new ApiError(message, res.status, errorBody)
     }
     return res.json()
   }

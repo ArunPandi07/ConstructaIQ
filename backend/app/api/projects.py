@@ -37,6 +37,7 @@ from app.services.project_service import (
     get_project_crew,
     get_project_summary,
     get_project_suppliers,
+    list_projects,
     start_analyze_job,
     upload_project_documents,
 )
@@ -48,6 +49,16 @@ router = APIRouter(prefix="/projects", tags=["Projects"])
 
 class AnalyzeProjectRequest(BaseModel):
     description: Optional[str] = None
+
+
+@router.get("")
+async def read_projects(
+    skip: int = 0,
+    limit: int = 100,
+    session: AsyncSession = Depends(get_db_required),
+):
+    items = await list_projects(session, skip=skip, limit=limit)
+    return success_response(items)
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)

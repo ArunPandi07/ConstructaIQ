@@ -1,6 +1,13 @@
-import { createContext, useContext, useState, useCallback } from 'react'
+import {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  useEffect,
+} from 'react'
 import type { ReactNode } from 'react'
-import type { Project } from '../types'
+import type { AnalyzePipelineResult, Project } from '../types'
+import { listProjects, mapProjectListToUI } from '../services/projectApi'
 
 // ─────────────────────────────────────────────────────────────
 // BuildMind AI — Global App Context
@@ -30,90 +37,88 @@ interface AppContextValue {
   /** Projects list */
   projects: Project[]
   setProjects: (projects: Project[]) => void
-  handleProjectCreated: (newProj: Project, addedTelemetry?: any) => void
+  projectsLoading: boolean
+  projectsError: string | null
+  refreshProjects: () => Promise<void>
+  handleProjectCreated: (newProj: Project, addedTelemetry?: unknown) => void
+
+  /** Latest async analyze pipeline result (6-agent keys) */
+  latestAnalysisResult: AnalyzePipelineResult | null
+  setLatestAnalysisResult: (result: AnalyzePipelineResult | null) => void
+
+  /** Current analyze job id for status polling */
+  analyzeJobId: string | null
+  setAnalyzeJobId: (id: string | null) => void
 }
-
-const DEFAULT_PROJECT_ID = 'proj-tower-a-2024'
-
-const initialProjects: Project[] = [
-  {
-    id: "proj-1",
-    name: "Urban Heights Commercial Complex",
-    description:
-      "Multi-story retail and office complex with high-density steel truss designs and reinforced concrete base foundations.",
-    budget: "$2.5M",
-    status: "LIVE",
-    progress: 72,
-    location: "Austin, TX",
-    createdAt: "June 2, 2026",
-    leadIcon: "HardHat",
-  },
-  {
-    id: "proj-2",
-    name: "Golden Gate Waterfront Terminal",
-    description:
-      "Industrial warehouse terminal with custom marine grading requirements and wind load resistance for ocean fronting environments.",
-    budget: "$4.1M",
-    status: "LIVE",
-    progress: 40,
-    location: "San Francisco, CA",
-    createdAt: "May 28, 2026",
-    leadIcon: "HardHat",
-  },
-  {
-    id: "proj-3",
-    name: "Pecos Valley Solar Storage Pad",
-    description:
-      "Grid solar thermal field protective structural pads with continuous concrete curing checks.",
-    budget: "$1.8M",
-    status: "PENDING",
-    progress: 15,
-    location: "Pecos, NM",
-    createdAt: "June 8, 2026",
-    leadIcon: "HardHat",
-  },
-  {
-    id: "proj-4",
-    name: "Metro Transit Depot Extension",
-    description:
-      "Heavy reinforced concrete girder structural expansion, platform layout, and municipal utility connections.",
-    budget: "$3.2M",
-    status: "LIVE",
-    progress: 88,
-    location: "Seattle, WA",
-    createdAt: "May 15, 2026",
-    leadIcon: "HardHat",
-  },
-];
 
 const AppContext = createContext<AppContextValue | null>(null)
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [activeProjectId, setActiveProjectId] = useState<string>(DEFAULT_PROJECT_ID)
+  const [activeProjectId, setActiveProjectId] = useState<string>('')
   const [uploadSessionId, setUploadSessionId] = useState<string | null>(null)
   const [uploadJustCompleted, setUploadJustCompleted] = useState(false)
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [projects, setProjects] = useState<Project[]>(initialProjects)
+  const [projects, setProjects] = useState<Project[]>([])
+  const [projectsLoading, setProjectsLoading] = useState(true)
+  const [projectsError, setProjectsError] = useState<string | null>(null)
+  const [latestAnalysisResult, setLatestAnalysisResult] =
+    useState<AnalyzePipelineResult | null>(null)
+  const [analyzeJobId, setAnalyzeJobId] = useState<string | null>(null)
 
-  const handleProjectCreated = useCallback((newProj: Project, addedTelemetry?: any) => {
-    setProjects((prev) => [newProj, ...prev])
+  const refreshProjects = useCallback(async () => {
+    setProjectsLoading(true)
+    setProjectsError(null)
+    try {
+      const items = await listProjects()
+      setProjects(mapProjectListToUI(items))
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Failed to load projects'
+      setProjectsError(message)
+    } finally {
+      setProjectsLoading(false)
+    }
   }, [])
+
+  useEffect(() => {
+    void refreshProjects()
+  }, [refreshProjects])
+
+  const handleProjectCreated = useCallback(
+    (newProj: Project) => {
+      setActiveProjectId(newProj.id)
+      void refreshProjects()
+    },
+    [refreshProjects],
+  )
 
   const reset = useCallback(() => {
     setUploadSessionId(null)
     setUploadJustCompleted(false)
+    setAnalyzeJobId(null)
   }, [])
 
   return (
     <AppContext.Provider
       value={{
-        activeProjectId, setActiveProjectId,
-        uploadSessionId, setUploadSessionId,
-        uploadJustCompleted, setUploadJustCompleted,
+        activeProjectId,
+        setActiveProjectId,
+        uploadSessionId,
+        setUploadSessionId,
+        uploadJustCompleted,
+        setUploadJustCompleted,
         reset,
-        isModalOpen, setIsModalOpen,
-        projects, setProjects,
+        isModalOpen,
+        setIsModalOpen,
+        projects,
+        setProjects,
+        projectsLoading,
+        projectsError,
+        refreshProjects,
         handleProjectCreated,
+        latestAnalysisResult,
+        setLatestAnalysisResult,
+        analyzeJobId,
+        setAnalyzeJobId,
       }}
     >
       {children}

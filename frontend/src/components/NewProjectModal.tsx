@@ -19,8 +19,14 @@ import {
 } from "lucide-react";
 import AgentThinkingLoader from "./AgentThinkingLoader";
 import { useAppContext } from "../context/AppContext";
-
-const API_BASE = "http://localhost:8000/api/analyze";
+import {
+  createProject,
+  mapBackendProjectToUI,
+  pollAnalyzeUntilComplete,
+  startAnalyze,
+  uploadProjectPdfs,
+} from "../services/projectApi";
+import { ApiError } from "../services/apiClient";
 
 interface NewProjectModalProps {
   open: boolean;
@@ -83,7 +89,13 @@ const inputBase: React.CSSProperties = {
 
 export default function NewProjectModal({ open, onClose }: NewProjectModalProps) {
   const navigate = useNavigate();
-  const { setLatestAnalysisData } = useAppContext();
+  const {
+    setLatestAnalysisResult,
+    setAnalyzeJobId,
+    setActiveProjectId,
+    handleProjectCreated,
+    setUploadJustCompleted,
+  } = useAppContext();
   const [activeTab, setActiveTab] = useState<Tab>("describe");
 
   /* tab 1 — describe */
@@ -112,6 +124,9 @@ export default function NewProjectModal({ open, onClose }: NewProjectModalProps)
   const [thinkingProjectName, setThinkingProjectName] = useState("");
   const [thinkingError, setThinkingError] = useState<string | null>(null);
   const [thinkingResolved, setThinkingResolved] = useState(false);
+  const [progressStep, setProgressStep] = useState<string | null>(null);
+  const [overallPct, setOverallPct] = useState<number | null>(null);
+  const [completedProjectId, setCompletedProjectId] = useState<string | null>(null);
 
   const contractRef = useRef<HTMLInputElement>(null);
   const blueprintRef = useRef<HTMLInputElement>(null);
@@ -161,7 +176,41 @@ export default function NewProjectModal({ open, onClose }: NewProjectModalProps)
     return `${(bytes / 1048576).toFixed(1)} MB`;
   };
 
-  /* ── API call: /text ── */
+  const formatApiError = (e: unknown): string => {
+    if (e instanceof ApiError) return e.message;
+    if (e instanceof TypeError && e.message.includes("fetch")) {
+      return "Cannot reach backend — is the server running on port 8000?";
+    }
+    return e instanceof Error ? e.message : "Unexpected error";
+  };
+
+  const runAnalyzeJob = async (
+    projectId: number,
+    description: string | undefined,
+    uiProject: ReturnType<typeof mapBackendProjectToUI>,
+  ) => {
+    const job = await startAnalyze(projectId, description);
+    setAnalyzeJobId(job.job_id);
+    setProgressStep("ContractAgent");
+    setOverallPct(0);
+
+    const result = await pollAnalyzeUntilComplete(projectId, job.job_id, {
+      onProgress: (status) => {
+        setProgressStep(status.progress_step ?? null);
+        setOverallPct(status.overall_pct ?? null);
+      },
+    });
+
+    setLatestAnalysisResult(result);
+    setActiveProjectId(String(projectId));
+    handleProjectCreated({ ...uiProject, progress: 100 });
+    setUploadJustCompleted(true);
+    setCompletedProjectId(String(projectId));
+    setValidated(true);
+    setThinkingResolved(true);
+  };
+
+  /* ── Lifecycle: create project → async analyze ── */
   const handleValidate = async () => {
     if (!projectName.trim()) return;
     setDescribeError(null);
@@ -170,33 +219,20 @@ export default function NewProjectModal({ open, onClose }: NewProjectModalProps)
     setThinkingProjectName(projectName.trim());
     setThinkingError(null);
     setThinkingResolved(false);
+    setProgressStep(null);
+    setOverallPct(null);
+    setCompletedProjectId(null);
     setValidating(true);
     try {
-      const form = new FormData();
-      form.append("project_name", projectName.trim());
-      form.append("description", scope.trim() || projectName.trim());
-
-      const res = await fetch(`${API_BASE}/text`, {
-        method: "POST",
-        body: form,
+      const description = scope.trim() || projectName.trim();
+      const backendProject = await createProject({
+        project_name: projectName.trim(),
+        scope: description,
       });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ detail: "Server error" }));
-        throw new Error(err.detail ?? `HTTP ${res.status}`);
-      }
-
-      const responseData = await res.json();
-      setLatestAnalysisData(responseData);
-
-      // Signal loader to flush — navigation happens in onFlushComplete
-      setValidated(true);
-      setThinkingResolved(true);
+      const uiProject = mapBackendProjectToUI(backendProject, 0);
+      await runAnalyzeJob(backendProject.project_id, description, uiProject);
     } catch (e: unknown) {
-      const msg =
-        e instanceof TypeError && e.message.includes("fetch")
-          ? "Cannot reach backend — is the server running on port 8000?"
-          : (e as Error).message;
+      const msg = formatApiError(e);
       setThinkingError(msg);
       setDescribeError(msg);
     } finally {
@@ -204,7 +240,7 @@ export default function NewProjectModal({ open, onClose }: NewProjectModalProps)
     }
   };
 
-  /* ── API call: /documents ── */
+  /* ── Lifecycle: upload PDFs → async analyze ── */
   const handleUploadAnalyse = async () => {
     if (!uploadProjectName.trim()) return;
     setUploadError(null);
@@ -213,33 +249,27 @@ export default function NewProjectModal({ open, onClose }: NewProjectModalProps)
     setThinkingProjectName(uploadProjectName.trim());
     setThinkingError(null);
     setThinkingResolved(false);
+    setProgressStep(null);
+    setOverallPct(null);
+    setCompletedProjectId(null);
     setUploading(true);
     try {
-      const form = new FormData();
-      form.append("project_name", uploadProjectName.trim());
-      contractRawFiles.forEach((f) => form.append("contract", f));
-      blueprintRawFiles.forEach((f) => form.append("blueprint", f));
+      const upload = await uploadProjectPdfs(
+        uploadProjectName.trim(),
+        contractRawFiles,
+        blueprintRawFiles,
+      );
+      const uiProject = mapBackendProjectToUI(
+        {
+          project_id: upload.project_id,
+          project_name: uploadProjectName.trim(),
+        },
+        0,
+      );
 
-      const res = await fetch(`${API_BASE}/documents`, {
-        method: "POST",
-        body: form,
-      });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ detail: "Server error" }));
-        throw new Error(err.detail ?? `HTTP ${res.status}`);
-      }
-
-      const responseData = await res.json();
-      setLatestAnalysisData(responseData);
-
-      // Signal loader to flush — navigation happens in onFlushComplete
-      setThinkingResolved(true);
+      await runAnalyzeJob(upload.project_id, undefined, uiProject);
     } catch (e: unknown) {
-      const msg =
-        e instanceof TypeError && e.message.includes("fetch")
-          ? "Cannot reach backend — is the server running on port 8000?"
-          : (e as Error).message;
+      const msg = formatApiError(e);
       setThinkingError(msg);
       setUploadError(msg);
     } finally {
@@ -264,6 +294,9 @@ export default function NewProjectModal({ open, onClose }: NewProjectModalProps)
     setIsThinking(false);
     setThinkingError(null);
     setThinkingResolved(false);
+    setProgressStep(null);
+    setOverallPct(null);
+    setCompletedProjectId(null);
     onClose();
   };
 
@@ -328,14 +361,21 @@ export default function NewProjectModal({ open, onClose }: NewProjectModalProps)
               mode={thinkingMode}
               resolved={thinkingResolved}
               error={thinkingError}
+              progressStep={progressStep}
+              overallPct={overallPct}
               onDismissError={() => {
                 setIsThinking(false);
                 setThinkingError(null);
                 setThinkingResolved(false);
               }}
               onFlushComplete={() => {
+                const targetId = completedProjectId;
                 resetAndClose();
-                navigate("/intelligence");
+                if (targetId) {
+                  navigate(`/projects/${targetId}`);
+                } else {
+                  navigate("/projects");
+                }
               }}
             />
 

@@ -1,12 +1,15 @@
 import { useAsync } from "./useAsync";
+import { useAppContext } from "../context/AppContext";
 import { fetchDashboard } from "../services/api";
 import { fetchProjectIntelligence } from "../services/api";
 import { fetchRiskIntelligence } from "../services/api";
 import { fetchRecoveryStrategies } from "../services/api";
 import { analyzeChangeImpact } from "../services/api";
 import { fetchAgentInsights } from "../services/api";
+import { getProjectAgents, isBackendProjectId } from "../services/projectApi";
 import type { RecoveryCenterData } from "../services/api";
 import type {
+  AgentExecutionRead,
   DashboardData,
   ProjectIntelligenceData,
   RiskIntelligenceData,
@@ -19,6 +22,17 @@ import type {
 // When FastAPI is live, only the service functions need changing.
 // ─────────────────────────────────────────────────────────────
 
+/** Hydrated project list from AppContext */
+export function useProjects() {
+  const {
+    projects,
+    projectsLoading,
+    projectsError,
+    refreshProjects,
+  } = useAppContext();
+  return { projects, loading: projectsLoading, error: projectsError, refreshProjects };
+}
+
 /** Dashboard KPIs, charts, and recent activity */
 export function useDashboard() {
   return useAsync<DashboardData>(fetchDashboard);
@@ -27,9 +41,7 @@ export function useDashboard() {
 /** Project intelligence — permits, crew, phases */
 export function useProjectIntelligence(projectId: string) {
   return useAsync<ProjectIntelligenceData>(
-    () =>
-      fetchProjectIntelligence(),
-      // projectId
+    () => fetchProjectIntelligence(projectId),
     [projectId],
   );
 }
@@ -37,9 +49,7 @@ export function useProjectIntelligence(projectId: string) {
 /** Risk score, heatmap, reasoning chain, top risks */
 export function useRiskIntelligence(projectId: string) {
   return useAsync<RiskIntelligenceData>(
-    () =>
-      fetchRiskIntelligence(),
-      // projectId
+    () => fetchRiskIntelligence(projectId),
     [projectId],
   );
 }
@@ -48,8 +58,7 @@ export function useRiskIntelligence(projectId: string) {
 export function useRecoveryStrategies(projectId: string) {
   return useAsync<RecoveryCenterData>(
     () =>
-      fetchRecoveryStrategies() as Promise<{ data: RecoveryCenterData }>,
-      // projectId
+      fetchRecoveryStrategies(projectId) as Promise<{ data: RecoveryCenterData }>,
     [projectId],
   );
 }
@@ -57,9 +66,7 @@ export function useRecoveryStrategies(projectId: string) {
 /** Change impact analysis — scenario must trigger a POST */
 export function useChangeImpact(projectId: string) {
   return useAsync<ChangeImpactData>(
-    () =>
-      analyzeChangeImpact(),
-      // projectId, { type: "add_floor", value: 1 }
+    () => analyzeChangeImpact(projectId, { type: "add_floor", value: 1 }),
     [projectId],
   );
 }
@@ -67,9 +74,19 @@ export function useChangeImpact(projectId: string) {
 /** Agent insights — agent cards + timeline */
 export function useAgentInsights(projectId: string) {
   return useAsync<AgentInsightsData>(
-    () =>
-      fetchAgentInsights(),
-      // projectId
+    () => fetchAgentInsights(projectId),
+    [projectId],
+  );
+}
+
+/** Raw agent execution rows for a project */
+export function useProjectAgents(projectId: string) {
+  return useAsync<AgentExecutionRead[]>(
+    async () => {
+      if (!isBackendProjectId(projectId)) return { data: [] };
+      const res = await getProjectAgents(Number(projectId));
+      return { data: res.agents };
+    },
     [projectId],
   );
 }

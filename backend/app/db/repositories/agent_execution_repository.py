@@ -50,3 +50,26 @@ class AgentExecutionRepository(BaseRepository[AgentExecution]):
             project_id, agent_name, skip=0, limit=1
         )
         return rows[0] if rows else None
+
+    async def list_by_projects(
+        self, project_ids: list[int], *, limit: int = 5000
+    ) -> list[AgentExecution]:
+        if not project_ids:
+            return []
+        stmt = (
+            select(AgentExecution)
+            .where(AgentExecution.project_id.in_(project_ids))
+            .order_by(AgentExecution.execution_id.desc())
+            .limit(limit)
+        )
+        result = await self.session.execute(stmt)
+        return list(result.scalars().all())
+
+    async def list_recent_global(self, *, limit: int = 20) -> list[AgentExecution]:
+        stmt = (
+            select(AgentExecution)
+            .order_by(AgentExecution.execution_id.desc())
+            .limit(limit)
+        )
+        result = await self.session.execute(stmt)
+        return list(result.scalars().all())

@@ -378,3 +378,19 @@ thead tr th {
   background: #f5c51840 !important;
   padding: 8px !important;
 }
+
+/* Crew plan Gantt — align with ConstructaIQ palette */
+.crew-gantt-wrap ._3_ygE,
+.crew-gantt-wrap ._2dZTy,
+.crew-gantt-wrap ._3ZbQT {
+  font-family: Inter, system-ui, sans-serif;
+}
+
+.crew-gantt-wrap svg text {
+  fill: #78716c;
+  font-size: 11px;
+}
+
+.crew-gantt-wrap ._3lLk3 {
+  stroke: #e7e5e4;
+}

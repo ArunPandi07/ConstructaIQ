@@ -88,7 +88,7 @@ export const AGENT_STEPS: AgentStep[] = [
       "Generating labor cost breakdown...",
       "Finalizing crew plan and confidence score...",
     ],
-    weight: 12, // NOTE: Last agent never auto-completes — it waits for resolved=true
+    weight: 12, // Last agent waits for resolved=true from the live job poll
   },
 ];
 
@@ -101,7 +101,7 @@ const AGENT_START_AT = AGENT_STEPS.reduce<number[]>((acc, step, i) => {
 }, []);
 
 // Cumulative progress threshold at which each agent would normally END
-// The last agent (DoctorAgent) never auto-completes; it stays at ~0.88 until resolved
+// Animation caps below 100% until the live analyze job signals resolved=true
 const RUNDOWN_CAP = 0.88; // animation never auto-advances past this
 const FLUSH_INTERVAL_MS = 200; // ms between agents completing during flush phase
 const TICK_MS = 80; // animation tick rate
@@ -143,6 +143,10 @@ interface Props {
   resolved: boolean;
   /** Set to a string when the API call fails */
   error: string | null;
+  /** Live pipeline step from GET /analyze/status */
+  progressStep?: string | null;
+  /** Live overall percent from GET /analyze/status */
+  overallPct?: number | null;
   onDismissError?: () => void;
   /** Called after the flush animation fully completes */
   onFlushComplete?: () => void;
@@ -154,6 +158,8 @@ export default function AgentThinkingLoader({
   mode,
   resolved,
   error,
+  progressStep,
+  overallPct,
   onDismissError,
   onFlushComplete,
 }: Props) {
@@ -201,7 +207,7 @@ export default function AgentThinkingLoader({
       const elapsed = Date.now() - (startTimeRef.current ?? Date.now());
       setElapsedMs(elapsed);
 
-      // Progress ratio — capped at RUNDOWN_CAP so DoctorAgent never auto-finishes
+      // Progress ratio — capped at RUNDOWN_CAP until the job completes
       const rawProgress = Math.min(elapsed / SIMULATED_TOTAL_MS, 1);
       const progress = Math.min(rawProgress, RUNDOWN_CAP);
 
@@ -241,6 +247,22 @@ export default function AgentThinkingLoader({
 
     return () => { if (tickRef.current) clearInterval(tickRef.current); };
   }, [visible, phase]);
+
+  /* ── Sync agent statuses from live poll progress ── */
+  useEffect(() => {
+    if (!visible || !progressStep) return;
+    const idx = AGENT_STEPS.findIndex((step) => step.name === progressStep);
+    if (idx === -1) return;
+
+    setActiveIdx(idx);
+    setStatuses((prev) => {
+      const next = [...prev];
+      for (let i = 0; i < idx; i++) next[i] = "done";
+      if (next[idx] !== "done") next[idx] = "thinking";
+      for (let i = idx + 1; i < next.length; i++) next[i] = "pending";
+      return next;
+    });
+  }, [progressStep, visible]);
 
   /* ── Handle error ── */
   useEffect(() => {
@@ -310,11 +332,14 @@ export default function AgentThinkingLoader({
   );
 
   const doneCount = statuses.filter((s) => s === "done").length;
+  const simulatedProgress = phase === "flushing"
+    ? Math.round((doneCount / AGENT_STEPS.length) * 100)
+    : Math.round(Math.min(elapsedMs / SIMULATED_TOTAL_MS, RUNDOWN_CAP) * 100);
   const totalProgress = phase === "done"
     ? 100
-    : phase === "flushing"
-      ? Math.round(((doneCount) / AGENT_STEPS.length) * 100)
-      : Math.round(Math.min(elapsedMs / SIMULATED_TOTAL_MS, RUNDOWN_CAP) * 100);
+    : overallPct != null
+      ? overallPct
+      : simulatedProgress;
 
   if (!visible) return null;
 

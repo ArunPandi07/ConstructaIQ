@@ -84,6 +84,8 @@ export interface DashboardData {
   riskDistribution:    RiskCategoryShare[]
   recentActivities:    AgentActivityItem[]
   recentRecommendations: RecommendationItem[]
+  totalTokensRecent?:  number
+  meanProgress?:       number
 }
 
 // ── Project Upload ───────────────────────────────────────────
@@ -288,4 +290,174 @@ export interface NavigationState {
   projectId?:   string
   fromUpload?:  boolean
   sessionId?:   string
+}
+
+// ── Backend project lifecycle API ────────────────────────────
+
+export interface BackendProjectRead {
+  project_id: number
+  project_name: string
+  project_type?: string | null
+  location?: string | null
+  client_name?: string | null
+  status?: string | null
+  start_date?: string | null
+  target_completion_date?: string | null
+  contract_value?: number | string | null
+  duration_months?: number | null
+  scope?: string | null
+  milestones?: string | null
+  square_footage?: number | string | null
+  floor_count?: number | null
+  complexity_level?: string | null
+  priority_score?: number | null
+}
+
+export interface ProjectListItem extends BackendProjectRead {
+  agent_completed?: number
+  supplier_count?: number
+  crew_count?: number
+  phase_progress?: number | null
+}
+
+export interface DashboardApiKPI {
+  active_projects: number
+  risk_projects: number
+  on_time_projects: number
+  total_budget: string
+  open_risks: number
+  recovery_plans: number
+}
+
+export interface DashboardApiActivity {
+  id: number
+  agent: string
+  action: string
+  time: string
+  severity: Severity
+  project: string
+  project_id: number
+}
+
+export interface DashboardApiRecommendation {
+  id: number
+  project: string
+  recommendation: string
+  confidence: number
+  impact: 'Critical' | 'High' | 'Medium' | 'Low'
+  category: string
+}
+
+export interface DashboardApiResponse {
+  kpi: DashboardApiKPI
+  health_trend: HealthTrendPoint[]
+  risk_distribution: RiskCategoryShare[]
+  recent_activities: DashboardApiActivity[]
+  recent_recommendations: DashboardApiRecommendation[]
+  total_tokens_recent: number
+}
+
+export interface ProjectCreatePayload {
+  project_name: string
+  project_type?: string
+  location?: string
+  client_name?: string
+  scope?: string
+  duration_months?: number
+  floor_count?: number
+  complexity_level?: string
+}
+
+export interface ProjectUploadResponse {
+  project_id: number
+  documents: Array<{ document_id?: number; file_name?: string; document_type?: string }>
+}
+
+export interface AnalyzeJobResponse {
+  job_id: string
+  project_id: number
+  status: string
+}
+
+export interface AnalyzeJobStatus {
+  job_id: string
+  project_id: number
+  status: 'queued' | 'running' | 'complete' | 'error'
+  progress_step?: string | null
+  overall_pct?: number | null
+  result?: AnalyzePipelineResult | null
+  error?: string | null
+}
+
+export interface PersistenceSummary {
+  permits_created?: number
+  permits_deleted?: number
+  schedules_created?: number
+  schedules_deleted?: number
+  budgets_created?: number
+  budgets_deleted?: number
+  inspections_created?: number
+  inspections_deleted?: number
+  project_suppliers_created?: number
+  project_suppliers_deleted?: number
+  crew_plans_created?: number
+  crew_plans_deleted?: number
+  agent_executions_created?: number
+}
+
+export interface AnalyzePipelineResult {
+  projectSummary?: Record<string, unknown>
+  blueprintSummary?: Record<string, unknown>
+  permitAssessment?: Record<string, unknown>
+  projectPlan?: Record<string, unknown>
+  supplierAnalysis?: Record<string, unknown>
+  crewAnalysis?: Record<string, unknown>
+  persistenceSummary?: PersistenceSummary
+  stored_documents?: Record<string, string>
+}
+
+export interface ProjectSummaryResponse {
+  project: BackendProjectRead
+  intelligence: ProjectIntelligenceData
+}
+
+export interface ProjectSuppliersResponse {
+  project_id: number
+  suppliers: Array<Record<string, unknown>>
+}
+
+export interface CrewPlanRead {
+  crew_plan_id: number
+  project_id: number
+  phase_name?: string | null
+  crew_name?: string | null
+  labor_cost?: number | string | null
+  start_date?: string | null
+  end_date?: string | null
+  created_at?: string
+}
+
+export interface ProjectCrewResponse {
+  project_id: number
+  crew_plans: CrewPlanRead[]
+}
+
+export interface AgentExecutionRead {
+  execution_id: number
+  project_id: number
+  agent_name?: string | null
+  agent_version?: string | null
+  status?: string | null
+  started_at?: string | null
+  completed_at?: string | null
+  duration_seconds?: number | null
+  tokens_used?: number | null
+  output_json?: string | null
+  error_message?: string | null
+  created_at?: string
+}
+
+export interface ProjectAgentsResponse {
+  project_id: number
+  agents: AgentExecutionRead[]
 }

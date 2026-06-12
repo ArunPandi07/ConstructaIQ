@@ -63,3 +63,47 @@ class CallAgentResponse(BaseModel):
     agent_name: str
     version: str
     output: Any
+
+
+class ProjectListItem(ProjectRead):
+    agent_completed: int = 0
+    supplier_count: int = 0
+    crew_count: int = 0
+    phase_progress: Optional[int] = None
+
+
+class DashboardKPI(BaseModel):
+    active_projects: int = 0
+    risk_projects: int = 0
+    on_time_projects: int = 0
+    total_budget: str = "$0"
+    open_risks: int = 0
+    recovery_plans: int = 0
+
+
+class DashboardActivityItem(BaseModel):
+    id: int
+    agent: str
+    action: str
+    time: str
+    severity: str = "info"
+    project: str
+    project_id: int
+
+
+class DashboardRecommendationItem(BaseModel):
+    id: int
+    project: str
+    recommendation: str
+    confidence: int = 75
+    impact: str = "Medium"
+    category: str = "Permits"
+
+
+class DashboardResponse(BaseModel):
+    kpi: DashboardKPI
+    health_trend: list[dict[str, Any]] = []
+    risk_distribution: list[dict[str, Any]] = []
+    recent_activities: list[DashboardActivityItem] = []
+    recent_recommendations: list[DashboardRecommendationItem] = []
+    total_tokens_recent: int = 0

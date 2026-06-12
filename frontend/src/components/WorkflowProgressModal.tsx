@@ -40,9 +40,9 @@ const AGENT_KEY_MAP: Record<string, string> = {
   projectSummary:    'contract',
   blueprintSummary:  'blueprint',
   permitAssessment:  'permit',
-  schedulePlan:      'schedule',
+  projectPlan:       'schedule',
   supplierAnalysis:  'supplier',
-  crewAssessment:    'crew',
+  crewAnalysis:      'crew',
 };
 
 function formatTime(d: Date): string {

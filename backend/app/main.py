@@ -9,6 +9,7 @@ from app.db import check_db, dispose_db, init_db
 from app.services.logging_service import get_logger
 from app.api.analyze import router as analyze_router
 from app.api.catalogs import router as catalogs_router
+from app.api.dashboard import router as dashboard_router
 from app.api.projects import router as projects_router
 
 logger = get_logger("MainApp")
@@ -40,6 +41,7 @@ app.add_middleware(
 # Mount API routers (/api and /api/v1 alias for frontend contract)
 for api_prefix in ("/api", "/api/v1"):
     app.include_router(projects_router, prefix=api_prefix)
+    app.include_router(dashboard_router, prefix=api_prefix)
     app.include_router(analyze_router, prefix=api_prefix)
     app.include_router(catalogs_router, prefix=api_prefix)
 

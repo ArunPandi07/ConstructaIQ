@@ -7,71 +7,11 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-
-interface Project {
-  id: string;
-  name: string;
-  description: string;
-  budget: string;
-  status: "LIVE" | "PENDING" | "UPCOMING";
-  progress: number;
-  location: string;
-  createdAt: string;
-  leadIcon: string;
-}
-
-const initialProjects: Project[] = [
-  {
-    id: "proj-1",
-    name: "Urban Heights Commercial Complex",
-    description:
-      "Multi-story retail and office complex with high-density steel truss designs.",
-    budget: "$2.5M",
-    status: "LIVE",
-    progress: 72,
-    location: "Austin, TX",
-    createdAt: "June 2, 2026",
-    leadIcon: "HardHat",
-  },
-  {
-    id: "proj-2",
-    name: "Golden Gate Waterfront Terminal",
-    description:
-      "Industrial warehouse terminal with custom marine grading requirements.",
-    budget: "$4.1M",
-    status: "LIVE",
-    progress: 40,
-    location: "San Francisco, CA",
-    createdAt: "May 28, 2026",
-    leadIcon: "DraftingCompass",
-  },
-  {
-    id: "proj-3",
-    name: "Pecos Valley Solar Storage Pad",
-    description: "Grid solar thermal field protective structural pads.",
-    budget: "$1.8M",
-    status: "PENDING",
-    progress: 15,
-    location: "Pecos, NM",
-    createdAt: "June 8, 2026",
-    leadIcon: "HardHat",
-  },
-  {
-    id: "proj-4",
-    name: "Metro Transit Depot Extension",
-    description: "Heavy reinforced concrete girder structural expansion.",
-    budget: "$3.2M",
-    status: "LIVE",
-    progress: 88,
-    location: "Seattle, WA",
-    createdAt: "May 15, 2026",
-    leadIcon: "DraftingCompass",
-  },
-];
+import { useProjects } from "../hooks/usePageData";
 
 export default function Projects() {
   const navigate = useNavigate();
-  const [projects] = useState<Project[]>(initialProjects);
+  const { projects, loading, error, refreshProjects } = useProjects();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<"ALL" | "LIVE" | "PENDING">(
     "ALL",
@@ -87,6 +27,23 @@ export default function Projects() {
 
   return (
     <div className="glass-card p-6 space-y-6">
+      {error && (
+        <div className="p-4 border border-red-200 bg-red-50 rounded-xl flex justify-between items-center gap-3">
+          <p className="text-sm text-red-700">{error}</p>
+          <button
+            type="button"
+            onClick={() => void refreshProjects()}
+            className="px-3 py-1.5 text-xs font-bold bg-white border border-red-200 rounded-lg"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+      {loading && (
+        <p className="text-sm text-stone-400 text-center py-8">
+          Loading projects from API…
+        </p>
+      )}
       <div
         className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center pb-4"
         style={{ borderBottom: "1px solid var(--border)" }}
@@ -158,7 +115,7 @@ export default function Projects() {
         </div>
       </div>
 
-      {filtered.length === 0 ? (
+      {!loading && filtered.length === 0 ? (
         <div
           className="text-center py-16"
           style={{

@@ -2,25 +2,31 @@ import { useNavigate } from "react-router-dom";
 import {
   Building2,
   HardHat,
-  Bot,
   AlertTriangle,
   ArrowRight,
   MapPin,
-  Activity,
   Plus,
-  Shield,
-  Clock,
-  CheckCircle2,
 } from "lucide-react";
 import { useAppContext } from "../context/AppContext";
+import { useDashboard, useProjects } from "../hooks/usePageData";
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { projects, setIsModalOpen } = useAppContext();
+  const { setIsModalOpen } = useAppContext();
+  const { projects, loading: projectsLoading, error: projectsError, refreshProjects } =
+    useProjects();
+  const { data: dashboard, loading: dashLoading, error: dashError, refetch } =
+    useDashboard();
 
   const activeProjects = projects.filter((p) => p.status === "LIVE");
+  const distinctLocations = new Set(
+    projects.map((p) => p.location).filter((l) => l && l !== "TBD"),
+  ).size;
 
   const getCumulativeBudget = () => {
+    if (dashboard?.kpi.totalBudget && dashboard.kpi.totalBudget !== "$0") {
+      return dashboard.kpi.totalBudget;
+    }
     let total = 0;
     activeProjects.forEach((p) => {
       const num = parseFloat(p.budget.replace(/[^0-9.]/g, ""));
@@ -30,14 +36,40 @@ export default function Dashboard() {
   };
 
   const getMeanProgress = () => {
+    if (dashboard?.meanProgress != null) return dashboard.meanProgress;
     if (activeProjects.length === 0) return 0;
     return Math.round(
       activeProjects.reduce((acc, p) => acc + p.progress, 0) / activeProjects.length,
     );
   };
 
+  const activeCount =
+    dashboard?.kpi.activeProjects ?? activeProjects.length;
+
+  const recentActivities = dashboard?.recentActivities ?? [];
+  const totalTokens = dashboard?.totalTokensRecent ?? 0;
+
+  const isLoading = projectsLoading || dashLoading;
+  const loadError = projectsError ?? dashError;
+
   return (
     <div className="space-y-8 animate-fade-in-up">
+      {loadError && (
+        <div className="glass-card p-4 border border-red-200 bg-red-50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+          <p className="text-sm text-red-700">{loadError}</p>
+          <button
+            type="button"
+            onClick={() => {
+              void refreshProjects();
+              void refetch();
+            }}
+            className="px-3 py-1.5 text-xs font-bold bg-white border border-red-200 rounded-lg"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
       <div className="glass-card p-6 md:p-8 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-112.5 h-112.5 bg-radial from-[#F5C518]/10 via-transparent to-transparent pointer-events-none rounded-full blur-3xl -mr-20 -mt-20"></div>
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 relative z-10">
@@ -61,7 +93,7 @@ export default function Dashboard() {
               </p>
               <p className="text-2xl font-black text-stone-900 flex items-center justify-center gap-1.5 mt-1 font-mono">
                 <Building2 className="w-5 h-5 text-[#F5C518]" />
-                {activeProjects.length}
+                {isLoading ? "—" : activeCount}
               </p>
             </div>
             <div className="w-px h-10 bg-stone-200"></div>
@@ -70,7 +102,7 @@ export default function Dashboard() {
                 Capital Value
               </p>
               <p className="text-2xl font-black text-stone-900 mt-1 font-mono">
-                {getCumulativeBudget()}
+                {isLoading ? "—" : getCumulativeBudget()}
               </p>
             </div>
             <div className="w-px h-10 bg-stone-200"></div>
@@ -79,7 +111,7 @@ export default function Dashboard() {
                 Mean Progress
               </p>
               <p className="text-2xl font-black text-emerald-600 mt-1 font-mono">
-                {getMeanProgress()}%
+                {isLoading ? "—" : `${getMeanProgress()}%`}
               </p>
             </div>
           </div>
@@ -87,7 +119,7 @@ export default function Dashboard() {
         <div className="mt-6 pt-5 border-t border-stone-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-3 text-xs text-stone-500">
           <span className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
-            6 Autonomous Coordinator Agents analyzing {activeProjects.length}{" "}
+            6 Autonomous Coordinator Agents analyzing {activeCount}{" "}
             active construction sites in parallel
           </span>
           <button
@@ -119,12 +151,32 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {activeProjects.map((p) => {
-              const mockReadiness = 50 + (p.name.length % 40);
-              return (
+            {isLoading && (
+              <div className="glass-card p-10 text-center col-span-full text-stone-400 text-sm">
+                Loading projects from API…
+              </div>
+            )}
+            {!isLoading && activeProjects.length === 0 && (
+              <div className="glass-card p-10 text-center col-span-full">
+                <p className="text-stone-500 text-sm mb-4">
+                  No projects yet. Onboard a project to run the 6-agent analyze pipeline.
+                </p>
+                <button
+                  onClick={() => setIsModalOpen(true)}
+                  className="px-4 py-2 font-bold text-xs"
+                  style={{ borderRadius: 9, background: "#f5c518", color: "#000" }}
+                >
+                  On Board New Project
+                </button>
+              </div>
+            )}
+            {!isLoading &&
+              activeProjects.map((p) => (
                 <div
                   key={p.id}
-                  onClick={() => navigate(`/projects/${p.id}`, { state: { from: "dashboard" } })}
+                  onClick={() =>
+                    navigate(`/projects/${p.id}`, { state: { from: "dashboard" } })
+                  }
                   className="glass-card p-5 hover:border-[#F5C518] hover:shadow-md transition duration-300 cursor-pointer flex flex-col justify-between group relative min-h-75"
                 >
                   <div className="absolute top-0 right-0 w-24 h-24 bg-radial from-[#F5C518]/5 to-transparent pointer-events-none rounded-bl-3xl"></div>
@@ -172,7 +224,7 @@ export default function Dashboard() {
                           Site Readiness
                         </span>
                         <span className="font-bold text-[#E2B30D] font-mono text-xs">
-                          {mockReadiness}%
+                          {p.progress}%
                         </span>
                       </div>
                     </div>
@@ -182,8 +234,7 @@ export default function Dashboard() {
                     </div>
                   </div>
                 </div>
-              );
-            })}
+              ))}
           </div>
         </div>
 
@@ -210,72 +261,85 @@ export default function Dashboard() {
               </div>
               <div className="font-mono text-[10px] leading-relaxed space-y-2.5 text-stone-300">
                 <div className="text-emerald-400">
-                  ✔️ CORE COMPILER BOOT: SUCCESSFUL
+                  ✔️ API CONNECTED: {projects.length} project(s) loaded
                 </div>
                 <div className="text-[#F5C518]">
-                  [SYSTEM ACTIVE]: Monitoring {activeProjects.length} sites
+                  [SYSTEM ACTIVE]: Monitoring {activeCount} sites
                 </div>
-                <div className="text-stone-400 bg-white/5 p-2 px-2.5 rounded-lg border border-white/5 leading-normal">
-                  Agent ScheduleAgent optimizing site milestones...
-                </div>
+                {recentActivities.length > 0 ? (
+                  recentActivities.slice(0, 4).map((a) => (
+                    <div
+                      key={a.id}
+                      className="text-stone-400 bg-white/5 p-2 px-2.5 rounded-lg border border-white/5 leading-normal"
+                    >
+                      [{a.agent}] {a.action}
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-stone-400 bg-white/5 p-2 px-2.5 rounded-lg border border-white/5 leading-normal">
+                    No agent executions logged yet.
+                  </div>
+                )}
+                <div className="text-zinc-500">· System state: LOOP_STATE_OK</div>
+                {totalTokens > 0 && (
+                  <div className="text-zinc-500">
+                    · Recent token usage: {totalTokens.toLocaleString()}
+                  </div>
+                )}
                 <div className="text-zinc-500">
-                  · System state: LOOP_STATE_OK
-                </div>
-                <div className="text-zinc-500">
-                  · Available compute strength: 14.2 GFLOPs
-                </div>
-                <div className="text-zinc-500">
-                  · Active submittals tracked: 4 municipalities
+                  · Active submittals tracked: {distinctLocations} location
+                  {distinctLocations === 1 ? "" : "s"}
                 </div>
               </div>
             </div>
-            <div className="bg-[#f0f2f5]/5 border border-white/5 p-3 rounded-2xl space-y-2">
-              <div className="flex items-center gap-2 text-xs font-black text-[#F5C518]">
-                <AlertTriangle className="w-4 h-4" />
-                ZONING SAFETY ALERTS
+            {activeProjects.length > 0 && (
+              <div className="bg-[#f0f2f5]/5 border border-white/5 p-3 rounded-2xl space-y-2">
+                <div className="flex items-center gap-2 text-xs font-black text-[#F5C518]">
+                  <AlertTriangle className="w-4 h-4" />
+                  PIPELINE STATUS
+                </div>
+                <p className="text-[10px] text-stone-400 leading-normal">
+                  {activeProjects.length} active project(s). Open a workspace for
+                  permits, suppliers, and crew from the latest analyze run.
+                </p>
               </div>
-              <p className="text-[10px] text-stone-400 leading-normal">
-                Apex Structural Core warns: Seattle extension reports
-                continuous heavy rain forecasts starting June 14. Planning
-                agents auto-scheduling concrete retarder delays.
-              </p>
-            </div>
+            )}
           </div>
 
-          <div className="glass-card p-5 space-y-4">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-stone-400 pl-1">
-              Compliance Health Index
-            </h3>
-            <div className="space-y-3.5">
-              <div>
-                <div className="flex justify-between text-[11px] mb-1 font-semibold text-stone-700">
-                  <span>Average Contract Verified Score</span>
-                  <span>78%</span>
+          {activeProjects.length > 0 && (
+            <div className="glass-card p-5 space-y-4">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-stone-400 pl-1">
+                Portfolio progress
+              </h3>
+              <div className="space-y-3.5">
+                <div>
+                  <div className="flex justify-between text-[11px] mb-1 font-semibold text-stone-700">
+                    <span>Mean integration progress</span>
+                    <span>{getMeanProgress()}%</span>
+                  </div>
+                  <div className="progress-bar">
+                    <div
+                      className="progress-fill"
+                      style={{ width: `${getMeanProgress()}%` }}
+                    ></div>
+                  </div>
                 </div>
-                <div className="progress-bar">
-                  <div
-                    className="progress-fill"
-                    style={{ width: "78%" }}
-                  ></div>
-                </div>
-              </div>
-              <div>
-                <div className="flex justify-between text-[11px] mb-1 font-semibold text-stone-700">
-                  <span>Average Blueprint Safety Compliance</span>
-                  <span>68%</span>
-                </div>
-                <div className="progress-bar">
-                  <div
-                    className="progress-fill"
-                    style={{ width: "68%", backgroundColor: "#F5C518" }}
-                  ></div>
-                </div>
-              </div>
-              <div className="pt-2 text-[10px] text-stone-400 text-center italic">
-                Autonomous review cycles occur every 12 hrs.
               </div>
             </div>
-          </div>
+          )}
+
+          {(dashboard?.recentRecommendations?.length ?? 0) > 0 && (
+            <div className="glass-card p-5 space-y-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-stone-400">
+                Permit follow-ups
+              </h3>
+              {dashboard!.recentRecommendations.slice(0, 3).map((r) => (
+                <p key={r.id} className="text-[11px] text-stone-600 leading-snug">
+                  <strong>{r.project}:</strong> {r.recommendation}
+                </p>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>

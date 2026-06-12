@@ -18,3 +18,13 @@ class ProjectRepository(BaseRepository[Project]):
         )
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
+
+    async def list_desc(self, *, skip: int = 0, limit: int = 100) -> list[Project]:
+        stmt = (
+            select(Project)
+            .order_by(Project.project_id.desc())
+            .offset(skip)
+            .limit(limit)
+        )
+        result = await self.session.execute(stmt)
+        return list(result.scalars().all())

@@ -300,6 +300,8 @@ async def persist_analysis_outputs(
     ):
         update_payload["complexity_level"] = complexity
 
+    update_payload["status"] = "active"
+
     if update_payload:
         await project_repo.update(project, ProjectUpdate(**update_payload))
 

@@ -57,7 +57,7 @@ export default function Layout() {
 
       {/* TOP NAVIGATION BAR */}
       <header className="bg-white border-b border-stone-200/80 sticky top-0 z-40 shadow-xs backdrop-blur-md">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-18 flex items-center justify-between gap-4">
+        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-10 h-18 flex items-center justify-between gap-4">
           {/* Logo */}
           <div className="flex items-center gap-3 shrink-0">
             <div className="w-10 h-10 rounded-xl bg-[#F5C518] text-[#1A1A1A] flex items-center justify-center shadow-xs">
@@ -131,7 +131,7 @@ export default function Layout() {
       </header>
 
       {/* Main content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 flex-1 w-full">
+      <main className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-10 pt-8 flex-1 w-full">
         <Outlet />
       </main>
 
