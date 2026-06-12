@@ -109,5 +109,17 @@ class BlobStorageService:
         logger.info(f"Upload completed for blob path: {blob_path}")
         return BlobUploadResult(blob_path=blob_path, blob_url_with_sas=blob_url_with_sas)
 
+    async def download_document(self, blob_path: str) -> bytes:
+        if not self.is_enabled:
+            raise RuntimeError("Blob storage is not configured.")
+
+        async with BlobServiceClient.from_connection_string(self.connection_string) as client:
+            blob_client = client.get_blob_client(
+                container=self.container_name,
+                blob=blob_path,
+            )
+            stream = await blob_client.download_blob()
+            return await stream.readall()
+
 
 blob_storage_service = BlobStorageService()
