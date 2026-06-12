@@ -7,8 +7,6 @@ import {
   FileText,
   UploadCloud,
   Upload,
-  Bot,
-  Cpu,
   CheckCircle2,
   Loader2,
   FileCheck2,
@@ -87,7 +85,10 @@ const inputBase: React.CSSProperties = {
   outline: "none",
 };
 
-export default function NewProjectModal({ open, onClose }: NewProjectModalProps) {
+export default function NewProjectModal({
+  open,
+  onClose,
+}: NewProjectModalProps) {
   const navigate = useNavigate();
   const {
     setLatestAnalysisResult,
@@ -120,18 +121,25 @@ export default function NewProjectModal({ open, onClose }: NewProjectModalProps)
 
   /* agent thinking loader */
   const [isThinking, setIsThinking] = useState(false);
-  const [thinkingMode, setThinkingMode] = useState<"text" | "documents">("text");
+  const [thinkingMode, setThinkingMode] = useState<"text" | "documents">(
+    "text",
+  );
   const [thinkingProjectName, setThinkingProjectName] = useState("");
   const [thinkingError, setThinkingError] = useState<string | null>(null);
   const [thinkingResolved, setThinkingResolved] = useState(false);
   const [progressStep, setProgressStep] = useState<string | null>(null);
   const [overallPct, setOverallPct] = useState<number | null>(null);
-  const [completedProjectId, setCompletedProjectId] = useState<string | null>(null);
+  const [completedProjectId, setCompletedProjectId] = useState<string | null>(
+    null,
+  );
 
   const contractRef = useRef<HTMLInputElement>(null);
   const blueprintRef = useRef<HTMLInputElement>(null);
 
-  const makeFileObj = (f: File, docType: "contract" | "blueprint"): UploadedFile => ({
+  const makeFileObj = (
+    f: File,
+    docType: "contract" | "blueprint",
+  ): UploadedFile => ({
     id: Math.random().toString(36).slice(2),
     name: f.name,
     size: f.size,
@@ -151,7 +159,7 @@ export default function NewProjectModal({ open, onClose }: NewProjectModalProps)
         setBlueprintRawFiles((p) => [...p, ...rawArr]);
       }
     },
-    []
+    [],
   );
 
   const removeFile = (id: string, docType: "contract" | "blueprint") => {
@@ -300,7 +308,6 @@ export default function NewProjectModal({ open, onClose }: NewProjectModalProps)
     onClose();
   };
 
-
   const canUpload =
     uploadProjectName.trim() &&
     (contractFiles.length > 0 || blueprintFiles.length > 0);
@@ -338,7 +345,8 @@ export default function NewProjectModal({ open, onClose }: NewProjectModalProps)
             maxWidth: 860,
             display: "flex",
             flexDirection: "column",
-            animation: "npSlideIn 0.32s cubic-bezier(0.34,1.56,0.64,1) forwards",
+            animation:
+              "npSlideIn 0.32s cubic-bezier(0.34,1.56,0.64,1) forwards",
             margin: "auto",
           }}
         >
@@ -379,7 +387,6 @@ export default function NewProjectModal({ open, onClose }: NewProjectModalProps)
               }}
             />
 
-
             {/* ═══ DARK HEADER ═══ */}
             <div
               style={{
@@ -404,7 +411,8 @@ export default function NewProjectModal({ open, onClose }: NewProjectModalProps)
                       width: 44,
                       height: 44,
                       borderRadius: 12,
-                      background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
+                      background:
+                        "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
@@ -477,14 +485,28 @@ export default function NewProjectModal({ open, onClose }: NewProjectModalProps)
               </div>
 
               {/* ── Tab bar (inside header, bottom border glows) ── */}
-
             </div>
             <div style={{ padding: "0" }}>
-              <div style={{ display: "flex", background: "#f8fafc", padding: "10px", borderBottom: "1px solid #e2e8f0" }}>
+              <div
+                style={{
+                  display: "flex",
+                  background: "#f8fafc",
+                  padding: "10px",
+                  borderBottom: "1px solid #e2e8f0",
+                }}
+              >
                 {(
                   [
-                    { id: "describe", label: "Describe Your Project", Icon: HardHat },
-                    { id: "upload", label: "Upload Documents", Icon: DraftingCompass },
+                    {
+                      id: "describe",
+                      label: "Describe Your Project",
+                      Icon: HardHat,
+                    },
+                    {
+                      id: "upload",
+                      label: "Upload Documents",
+                      Icon: DraftingCompass,
+                    },
                   ] as const
                 ).map(({ id, label, Icon }) => {
                   const active = activeTab === id;
@@ -536,7 +558,6 @@ export default function NewProjectModal({ open, onClose }: NewProjectModalProps)
                 minHeight: 0,
               }}
             >
-
               {/* ────────────────────────────────────────
                 TAB 1 — Describe Your Project
             ──────────────────────────────────────── */}
@@ -559,7 +580,9 @@ export default function NewProjectModal({ open, onClose }: NewProjectModalProps)
 
                   {/* Scope of Building & Project Specifications */}
                   <div>
-                    <FieldLabel>Scope of Building &amp; Project Specifications</FieldLabel>
+                    <FieldLabel>
+                      Scope of Building &amp; Project Specifications
+                    </FieldLabel>
                     <textarea
                       id="np-scope"
                       value={scope}
@@ -575,7 +598,6 @@ export default function NewProjectModal({ open, onClose }: NewProjectModalProps)
                       onBlur={(e) => blurInput(e.currentTarget)}
                     />
                   </div>
-
 
                   {validated ? (
                     <div
@@ -604,10 +626,7 @@ export default function NewProjectModal({ open, onClose }: NewProjectModalProps)
                       style={{
                         width: "100%",
                         padding: "16px 20px",
-                        background:
-                          !projectName.trim()
-                            ? "#e5e7eb"
-                            : "#eab308",
+                        background: !projectName.trim() ? "#e5e7eb" : "#eab308",
                         color: !projectName.trim() ? "#9ca3af" : "#ffffff",
                         border: "none",
                         borderRadius: 12,
@@ -641,7 +660,10 @@ export default function NewProjectModal({ open, onClose }: NewProjectModalProps)
                     >
                       {validating ? (
                         <>
-                          <Loader2 size={18} style={{ animation: "npSpin 0.8s linear infinite" }} />
+                          <Loader2
+                            size={18}
+                            style={{ animation: "npSpin 0.8s linear infinite" }}
+                          />
                           Validating with ContractAnalysisAgent...
                         </>
                       ) : (
@@ -668,12 +690,30 @@ export default function NewProjectModal({ open, onClose }: NewProjectModalProps)
                         animation: "npFadeUp 0.2s ease forwards",
                       }}
                     >
-                      <WifiOff size={15} color="#ef4444" style={{ flexShrink: 0, marginTop: 1 }} />
+                      <WifiOff
+                        size={15}
+                        color="#ef4444"
+                        style={{ flexShrink: 0, marginTop: 1 }}
+                      />
                       <div>
-                        <p style={{ margin: "0 0 2px", fontSize: "0.73rem", fontWeight: 700, color: "#dc2626" }}>
+                        <p
+                          style={{
+                            margin: "0 0 2px",
+                            fontSize: "0.73rem",
+                            fontWeight: 700,
+                            color: "#dc2626",
+                          }}
+                        >
                           Request Failed
                         </p>
-                        <p style={{ margin: 0, fontSize: "0.7rem", color: "#7f1d1d", lineHeight: 1.5 }}>
+                        <p
+                          style={{
+                            margin: 0,
+                            fontSize: "0.7rem",
+                            color: "#7f1d1d",
+                            lineHeight: 1.5,
+                          }}
+                        >
                           {describeError}
                         </p>
                       </div>
@@ -703,7 +743,13 @@ export default function NewProjectModal({ open, onClose }: NewProjectModalProps)
                   </div>
 
                   {/* ── Contract + Blueprint side by side ── */}
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr 1fr",
+                      gap: 14,
+                    }}
+                  >
                     {/* Contract Document */}
                     <div>
                       <FieldLabel>Contract Document</FieldLabel>
@@ -711,7 +757,10 @@ export default function NewProjectModal({ open, onClose }: NewProjectModalProps)
                         label="Drop Contract PDF here"
                         subLabel="Legal PDFs, Agreements up to 25MB"
                         dragActive={contractDrag}
-                        onDragOver={(e) => { e.preventDefault(); setContractDrag(true); }}
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          setContractDrag(true);
+                        }}
                         onDragLeave={() => setContractDrag(false)}
                         onDrop={(e) => {
                           e.preventDefault();
@@ -729,7 +778,11 @@ export default function NewProjectModal({ open, onClose }: NewProjectModalProps)
                         onChange={(e) => addFiles(e.target.files, "contract")}
                       />
                       {contractFiles.length > 0 && (
-                        <FileList files={contractFiles} onRemove={(id) => removeFile(id, "contract")} formatSize={formatSize} />
+                        <FileList
+                          files={contractFiles}
+                          onRemove={(id) => removeFile(id, "contract")}
+                          formatSize={formatSize}
+                        />
                       )}
                     </div>
 
@@ -740,7 +793,10 @@ export default function NewProjectModal({ open, onClose }: NewProjectModalProps)
                         label="Drop Blueprint PDF here"
                         subLabel="DWG, site plans, architectural PDFs up to 10MB"
                         dragActive={blueprintDrag}
-                        onDragOver={(e) => { e.preventDefault(); setBlueprintDrag(true); }}
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          setBlueprintDrag(true);
+                        }}
                         onDragLeave={() => setBlueprintDrag(false)}
                         onDrop={(e) => {
                           e.preventDefault();
@@ -758,12 +814,14 @@ export default function NewProjectModal({ open, onClose }: NewProjectModalProps)
                         onChange={(e) => addFiles(e.target.files, "blueprint")}
                       />
                       {blueprintFiles.length > 0 && (
-                        <FileList files={blueprintFiles} onRemove={(id) => removeFile(id, "blueprint")} formatSize={formatSize} />
+                        <FileList
+                          files={blueprintFiles}
+                          onRemove={(id) => removeFile(id, "blueprint")}
+                          formatSize={formatSize}
+                        />
                       )}
                     </div>
                   </div>
-
-
 
                   {/* Upload & Extract CTA */}
                   <button
@@ -810,7 +868,10 @@ export default function NewProjectModal({ open, onClose }: NewProjectModalProps)
                   >
                     {uploading ? (
                       <>
-                        <Loader2 size={17} style={{ animation: "npSpin 0.8s linear infinite" }} />
+                        <Loader2
+                          size={17}
+                          style={{ animation: "npSpin 0.8s linear infinite" }}
+                        />
                         Extracting Structural Analytics...
                       </>
                     ) : (
@@ -852,12 +913,30 @@ export default function NewProjectModal({ open, onClose }: NewProjectModalProps)
                         animation: "npFadeUp 0.2s ease forwards",
                       }}
                     >
-                      <WifiOff size={15} color="#ef4444" style={{ flexShrink: 0, marginTop: 1 }} />
+                      <WifiOff
+                        size={15}
+                        color="#ef4444"
+                        style={{ flexShrink: 0, marginTop: 1 }}
+                      />
                       <div>
-                        <p style={{ margin: "0 0 2px", fontSize: "0.73rem", fontWeight: 700, color: "#dc2626" }}>
+                        <p
+                          style={{
+                            margin: "0 0 2px",
+                            fontSize: "0.73rem",
+                            fontWeight: 700,
+                            color: "#dc2626",
+                          }}
+                        >
                           Upload Failed
                         </p>
-                        <p style={{ margin: 0, fontSize: "0.7rem", color: "#7f1d1d", lineHeight: 1.5 }}>
+                        <p
+                          style={{
+                            margin: 0,
+                            fontSize: "0.7rem",
+                            color: "#7f1d1d",
+                            lineHeight: 1.5,
+                          }}
+                        >
                           {uploadError}
                         </p>
                       </div>
@@ -865,11 +944,9 @@ export default function NewProjectModal({ open, onClose }: NewProjectModalProps)
                   )}
                 </>
               )}
-
             </div>
           </div>
         </div>
-
       </div>
       {/* ── Animations ── */}
       <style>{`
@@ -890,7 +967,7 @@ export default function NewProjectModal({ open, onClose }: NewProjectModalProps)
         }
       `}</style>
     </>,
-    document.body
+    document.body,
   );
 }
 
@@ -957,7 +1034,8 @@ function DropZone({
           }}
           dangerouslySetInnerHTML={{ __html: label }}
         />
-        <div style={{ fontSize: "0.7rem", color: "#6b7280", lineHeight: 1.4 }}
+        <div
+          style={{ fontSize: "0.7rem", color: "#6b7280", lineHeight: 1.4 }}
           dangerouslySetInnerHTML={{ __html: subLabel }}
         />
       </div>
@@ -971,12 +1049,19 @@ function FileList({
   onRemove,
   formatSize,
 }: {
-  files: { id: string; name: string; size: number; docType: "contract" | "blueprint" }[];
+  files: {
+    id: string;
+    name: string;
+    size: number;
+    docType: "contract" | "blueprint";
+  }[];
   onRemove: (id: string) => void;
   formatSize: (n: number) => string;
 }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 5, marginTop: 8 }}>
+    <div
+      style={{ display: "flex", flexDirection: "column", gap: 5, marginTop: 8 }}
+    >
       {files.map((f) => (
         <div
           key={f.id}
@@ -1022,13 +1107,19 @@ function FileList({
             >
               {f.name}
             </div>
-            <div style={{ fontSize: "0.63rem", color: "#9ca3af", marginTop: 1 }}>
-              {formatSize(f.size)} · {f.docType === "blueprint" ? "Blueprint" : "Contract"}
+            <div
+              style={{ fontSize: "0.63rem", color: "#9ca3af", marginTop: 1 }}
+            >
+              {formatSize(f.size)} ·{" "}
+              {f.docType === "blueprint" ? "Blueprint" : "Contract"}
             </div>
           </div>
           <CheckCircle2 size={14} color="#16a34a" style={{ flexShrink: 0 }} />
           <button
-            onClick={(e) => { e.stopPropagation(); onRemove(f.id); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onRemove(f.id);
+            }}
             style={{
               background: "none",
               border: "none",
@@ -1041,8 +1132,12 @@ function FileList({
               transition: "color 0.15s",
               flexShrink: 0,
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = "#ef4444"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = "#d1d5db"; }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = "#ef4444";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = "#d1d5db";
+            }}
           >
             <Trash2 size={13} />
           </button>

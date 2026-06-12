@@ -1,0 +1,26 @@
+/* Name / From / To header */
+.crew-gantt-wrap .ganttTable_HeaderItem {
+  padding-left: 10px !important;
+}
+
+/* Row values */
+.crew-gantt-wrap .ganttTable_ListCell {
+  padding-left: 10px !important;
+}
+
+.crew-gantt-wrap .ganttTable_Header,
+.crew-gantt-wrap .calendarTop {
+  background: #f8fafc !important;
+  font-weight: 700 !important;
+  border-bottom: 2px solid #f5c518 !important;
+}
+
+.crew-gantt-wrap .calendarTop text {
+  fill: #444 !important;
+  font-weight: 700 !important;
+}
+
+.crew-gantt-wrap .calendarTop text {
+  font-size: 11px !important;
+  font-weight: 600 !important;
+}

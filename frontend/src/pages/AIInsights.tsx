@@ -1,8 +1,10 @@
-import { useMemo } from "react";
-import { Bot, Building2, Clock, Activity } from "lucide-react";
+import { useEffect, useMemo } from "react";
+import { Bot, Building2, Clock, Activity, AlertCircle } from "lucide-react";
 import Badge from "../components/Badge";
 import { useAppContext } from "../context/AppContext";
+import { useLoading } from "../context/LoadingContext";
 import { useProjectAgents, useProjects } from "../hooks/usePageData";
+import { ContentSkeleton } from "../components/Loader";
 import {
   isBackendProjectId,
   PIPELINE_AGENT_NAMES,
@@ -13,6 +15,7 @@ import {
   latestByAgent,
   summarizeOutputJson,
 } from "../utils/agentHelpers";
+import { useStaggeredAnimation } from "../hooks/useScrollAnimation";
 
 const statusCfg = {
   complete: { label: "Completed", variant: "green" as const },
@@ -23,8 +26,17 @@ const statusCfg = {
   failed: { label: "Error", variant: "red" as const },
 };
 
+interface KpiDef {
+  key: string;
+  icon: typeof Building2;
+  label: string;
+  value: string | number;
+  mono?: boolean;
+}
+
 export default function AIInsights() {
   const { activeProjectId, setActiveProjectId } = useAppContext();
+  const { setLoading } = useLoading();
   const { projects, loading: projectsLoading } = useProjects();
 
   const backendProjects = projects.filter((p) => isBackendProjectId(p.id));
@@ -50,11 +62,27 @@ export default function AIInsights() {
     setActiveProjectId(id);
   };
 
+  useEffect(() => {
+    setLoading("ai-insights", agentsLoading && isBackendProjectId(selectedId),
+      agentsLoading && isBackendProjectId(selectedId) ? { message: "Loading agent executions" } : undefined,
+    );
+  }, [agentsLoading, selectedId, setLoading]);
+
+  const kpis: KpiDef[] = useMemo(() => [
+    { key: "projects", icon: Building2, label: "Projects loaded", value: projectsLoading ? "—" : projects.length },
+    { key: "agents", icon: Bot, label: "Pipeline agents", value: PIPELINE_AGENT_NAMES.length },
+    { key: "executions", icon: Activity, label: "Executions logged", value: executionList.length },
+    { key: "tokens", icon: Clock, label: "Tokens used", value: usage.totalTokens.toLocaleString(), mono: true },
+  ], [projectsLoading, projects.length, executionList.length, usage.totalTokens]);
+
+  const kpiAnim = useStaggeredAnimation(kpis.length, { baseDelay: 100 });
+  const agentAnim = useStaggeredAnimation(PIPELINE_AGENT_NAMES.length, { baseDelay: 80 });
+
   return (
     <div className="space-y-6 animate-fade-in-up">
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
         <div>
-          <h2 className="text-lg font-bold text-stone-900">AI Insights</h2>
+          <h2 className="text-lg font-bold gradient-text">AI Insights</h2>
           <p className="text-sm mt-0.5 text-stone-500">
             Agent execution audit for the active project pipeline
           </p>
@@ -64,7 +92,7 @@ export default function AIInsights() {
             <select
               value={selectedId}
               onChange={(e) => handleProjectChange(e.target.value)}
-              className="text-sm border border-stone-200 rounded-xl px-3 py-2 bg-white min-w-48"
+              className="text-sm border border-stone-200 rounded-xl px-3 py-2 bg-white min-w-48 outline-none transition-all duration-200 focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400"
             >
               {backendProjects.map((p) => (
                 <option key={p.id} value={p.id}>
@@ -79,67 +107,60 @@ export default function AIInsights() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="glass-card p-4">
-          <div className="flex items-center gap-2 mb-2 text-stone-400 text-xs">
-            <Building2 size={13} />
-            Projects loaded
+      <div ref={kpiAnim.containerRef} className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {kpis.map((kpi, i) => (
+          <div key={kpi.key} className="kpi-card p-4" style={kpiAnim.itemStyles[i]}>
+            <div className="flex items-center gap-2 mb-2 text-stone-400 text-xs">
+              <kpi.icon size={13} />
+              {kpi.label}
+            </div>
+            <div className={`font-bold text-stone-900 ${kpi.mono ? "text-sm truncate font-mono" : "text-xl"}`}>
+              {kpi.value}
+            </div>
           </div>
-          <div className="text-xl font-bold text-stone-900">
-            {projectsLoading ? "—" : projects.length}
-          </div>
-        </div>
-        <div className="glass-card p-4">
-          <div className="flex items-center gap-2 mb-2 text-stone-400 text-xs">
-            <Bot size={13} />
-            Pipeline agents
-          </div>
-          <div className="text-xl font-bold text-stone-900">
-            {PIPELINE_AGENT_NAMES.length}
-          </div>
-        </div>
-        <div className="glass-card p-4">
-          <div className="flex items-center gap-2 mb-2 text-stone-400 text-xs">
-            <Activity size={13} />
-            Executions logged
-          </div>
-          <div className="text-xl font-bold text-stone-900">{executionList.length}</div>
-        </div>
-        <div className="glass-card p-4">
-          <div className="flex items-center gap-2 mb-2 text-stone-400 text-xs">
-            <Clock size={13} />
-            Tokens used
-          </div>
-          <div className="text-sm font-bold text-stone-900 truncate">
-            {usage.totalTokens.toLocaleString()}
-          </div>
-        </div>
+        ))}
       </div>
 
       {!isBackendProjectId(selectedId) && (
-        <div className="glass-card p-8 text-center text-stone-500 text-sm">
-          Create and analyze a project to view agent execution history.
+        <div className="glass-card p-10 text-center">
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-12 h-12 rounded-xl bg-amber-50 flex items-center justify-center">
+              <Bot size={24} className="text-amber-500" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-stone-700">No project selected</p>
+              <p className="text-xs text-stone-400 mt-1">
+                Create and analyze a project to view agent execution history.
+              </p>
+            </div>
+          </div>
         </div>
       )}
 
       {error && (
-        <div className="glass-card p-4 text-sm text-red-600 border border-red-200">
-          {error}
+        <div className="glass-card p-4 flex items-start gap-3 text-sm bg-red-50/50 border border-red-200">
+          <AlertCircle size={16} className="text-red-500 mt-0.5 shrink-0" />
+          <span className="text-red-700">{error}</span>
         </div>
       )}
 
       {agentsLoading && isBackendProjectId(selectedId) && (
-        <div className="text-sm text-stone-500">Loading agent executions…</div>
+        <div className="pt-2">
+          <ContentSkeleton variant="card" count={3} />
+        </div>
       )}
 
       {isBackendProjectId(selectedId) && !agentsLoading && (
         <>
-          <p className="text-xs text-stone-500">
-            Viewing: <strong>{project?.name ?? selectedId}</strong> · avg
-            duration {usage.avgDuration}s
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {PIPELINE_AGENT_NAMES.map((name) => {
+          <div className="flex items-center gap-2 text-xs text-stone-500">
+            <span>
+              Viewing: <strong>{project?.name ?? selectedId}</strong>
+            </span>
+            <span className="text-stone-300">·</span>
+            <span>avg duration {usage.avgDuration}s</span>
+          </div>
+          <div ref={agentAnim.containerRef} className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {PIPELINE_AGENT_NAMES.map((name, i) => {
               const run = byAgent[name];
               const statusKey = (run?.status ?? "pending").toLowerCase();
               const cfg =
@@ -149,7 +170,7 @@ export default function AIInsights() {
                 };
 
               return (
-                <div key={name} className="glass-card p-5 flex flex-col gap-3">
+                <div key={name} className="agent-card p-5 flex flex-col gap-3" style={agentAnim.itemStyles[i]}>
                   <div className="flex items-center justify-between">
                     <h3 className="text-sm font-bold text-stone-900">{name}</h3>
                     <Badge variant={cfg.variant}>{cfg.label}</Badge>

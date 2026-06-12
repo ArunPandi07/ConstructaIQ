@@ -1,17 +1,23 @@
-import { useState } from "react";
-import {
-  Search,
-  MapPin,
-  Calendar,
-  Building2,
-  ArrowRight,
-} from "lucide-react";
+import { useEffect, useState } from "react";
+import { Search, MapPin, Calendar, Building2, ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useLoading } from "../context/LoadingContext";
 import { useProjects } from "../hooks/usePageData";
+import { ContentSkeleton } from "../components/Loader";
+import { useStaggeredAnimation } from "../hooks/useScrollAnimation";
 
 export default function Projects() {
   const navigate = useNavigate();
+  const { setLoading } = useLoading();
   const { projects, loading, error, refreshProjects } = useProjects();
+
+  useEffect(() => {
+    setLoading(
+      "projects",
+      loading,
+      loading ? { message: "Loading project registry" } : undefined,
+    );
+  }, [loading, setLoading]);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<"ALL" | "LIVE" | "PENDING">(
     "ALL",
@@ -25,41 +31,38 @@ export default function Projects() {
     return matchesSearch && matchesStatus;
   });
 
+  const { containerRef, itemStyles } = useStaggeredAnimation<HTMLDivElement>(
+    filtered.length,
+    { animation: "fade-up", baseDelay: 80 },
+  );
+
   return (
-    <div className="glass-card p-6 space-y-6">
+    <div className="glass-card p-4 sm:p-6 space-y-6 animate-fade-in">
       {error && (
-        <div className="p-4 border border-red-200 bg-red-50 rounded-xl flex justify-between items-center gap-3">
+        <div className="p-4 border border-red-200 bg-red-50 rounded-xl flex justify-between items-center gap-3 shadow-xs">
           <p className="text-sm text-red-700">{error}</p>
           <button
             type="button"
             onClick={() => void refreshProjects()}
-            className="px-3 py-1.5 text-xs font-bold bg-white border border-red-200 rounded-lg"
+            className="btn-ghost px-3 py-1.5 text-xs font-bold rounded-lg"
           >
             Retry
           </button>
         </div>
       )}
-      {loading && (
-        <p className="text-sm text-stone-400 text-center py-8">
-          Loading projects from API…
-        </p>
-      )}
+      {loading && <ContentSkeleton variant="card" count={2} />}
       <div
-        className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center pb-4"
-        style={{ borderBottom: "1px solid var(--border)" }}
+        className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center pb-4 border-b"
+        style={{ borderColor: "var(--border)" }}
       >
         <div>
-          <h2
-            className="text-xl font-bold tracking-tight flex items-center gap-2"
-            style={{ color: "var(--text-primary)" }}
-          >
-            <Building2
-              className="w-5 h-5"
-              style={{ color: "var(--blue-primary)" }}
-            />
+          <h2 className="text-xl font-bold tracking-tight flex items-center gap-2 text-(--text-primary)">
+            <span className="bg-linear-to-br from-[#F5C518] to-amber-600 p-2 rounded-xl">
+              <Building2 className="w-4 h-4 text-white" />
+            </span>
             Site Onboarding Registries
           </h2>
-          <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
+          <p className="text-xs text-(--text-secondary)">
             Track and manage onboarding status across regional divisions
           </p>
         </div>
@@ -67,16 +70,13 @@ export default function Projects() {
 
       <div className="flex flex-col md:flex-row gap-3">
         <div className="relative flex-1">
-          <Search
-            className="absolute left-3 top-3 w-4 h-4"
-            style={{ color: "var(--text-muted)" }}
-          />
+          <Search className="absolute left-3 top-3 w-4 h-4 text-(--text-muted)" />
           <input
             type="text"
             placeholder="Search projects by name, city or location..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 text-sm focus:outline-hidden"
+            className="w-full pl-9 pr-4 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-[#F5C518]/30 transition-shadow"
             style={{
               background: "var(--bg3)",
               border: "1px solid var(--border)",
@@ -98,11 +98,11 @@ export default function Projects() {
             <button
               key={f}
               onClick={() => setStatusFilter(f)}
-              className={`px-4 py-2 rounded-lg font-semibold transition ${statusFilter === f ? "shadow-xs" : "hover:opacity-80"}`}
+              className={`btn-ghost px-4 py-2 rounded-lg font-semibold transition ${statusFilter === f ? "shadow-xs" : "hover:opacity-80"}`}
               style={
                 statusFilter === f
                   ? { background: "var(--card)", color: "var(--text-primary)" }
-                  : { color: "var(--text-secondary)" }
+                  : { color: "var(--text-secondary)", border: "none" }
               }
             >
               {f === "ALL"
@@ -116,41 +116,44 @@ export default function Projects() {
       </div>
 
       {!loading && filtered.length === 0 ? (
-        <div
-          className="text-center py-16"
-          style={{
-            background: "var(--bg3)",
-            borderRadius: 12,
-            border: "1px dashed var(--border)",
-          }}
-        >
-          <p className="text-3xl mb-2">🏜️</p>
-          <h3
-            className="text-sm font-bold"
-            style={{ color: "var(--text-primary)" }}
-          >
+        <div className="text-center py-20 bg-(--bg3) rounded-xl border-2 border-dashed border-(--border)">
+          <div className="text-5xl mb-4 opacity-60">🏜️</div>
+          <h3 className="text-base font-black text-(--text-primary)">
             No project records found
           </h3>
-          <p
-            className="text-xs mt-1 max-w-xs mx-auto"
-            style={{ color: "var(--text-muted)" }}
-          >
+          <p className="text-xs mt-2 max-w-xs mx-auto leading-relaxed text-(--text-muted)">
             Try adjusting your zoning search queries or onboard a brand new plot
             to kickstart.
           </p>
+          <button
+            type="button"
+            onClick={() => setSearchTerm("")}
+            className="mt-6 btn-ghost px-4 py-2 text-xs font-bold rounded-lg"
+            style={{ border: "1px solid var(--border)" }}
+          >
+            Clear filters
+          </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {filtered.map((proj) => {
+        <div
+          ref={containerRef}
+          className="grid grid-cols-1 md:grid-cols-2 gap-6"
+        >
+          {filtered.map((proj, idx) => {
             return (
               <div
                 key={proj.id}
-                onClick={() => navigate(`/projects/${proj.id}`, { state: { from: "projects" } })}
-                className="p-5 hover:shadow-md transition duration-300 cursor-pointer flex flex-col justify-between hover:border-[#F5C518]"
+                onClick={() =>
+                  navigate(`/projects/${proj.id}`, {
+                    state: { from: "projects" },
+                  })
+                }
+                className="premium-card p-5 hover:shadow-md transition duration-300 cursor-pointer flex flex-col justify-between hover:border-[#F5C518]"
                 style={{
                   border: "1px solid var(--border)",
                   background: "var(--card)",
                   borderRadius: 12,
+                  ...itemStyles[idx],
                 }}
               >
                 <div>
@@ -233,13 +236,13 @@ export default function Projects() {
                     </div>
                     <div className="w-full bg-stone-100 h-2 rounded-full overflow-hidden">
                       <div
-                        className="h-2 bg-[#F5C518] rounded-full"
+                        className="h-2 bg-[#F5C518] rounded-full transition-all duration-500"
                         style={{ width: `${proj.progress}%` }}
                       ></div>
                     </div>
                   </div>
                   <button
-                    className="w-full text-[10px] font-bold py-2 flex items-center justify-center gap-1 uppercase tracking-wider"
+                    className="w-full text-[10px] font-bold py-2 flex items-center justify-center gap-1 uppercase tracking-wider group transition-all active:scale-[0.98]"
                     style={{
                       background: "var(--bg3)",
                       borderRadius: 12,
@@ -249,7 +252,7 @@ export default function Projects() {
                     }}
                   >
                     Open Project Workspace{" "}
-                    <ArrowRight className="w-3 h-3" />
+                    <ArrowRight className="w-3 h-3 transition-transform duration-200 group-hover:translate-x-0.5" />
                   </button>
                 </div>
               </div>
