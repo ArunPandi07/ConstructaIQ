@@ -135,3 +135,133 @@ Health endpoints:
 
 - `GET /healthz` — process liveness
 - `GET /healthz/db` — database connectivity (requires `DATABASE_URL`)
+
+## Project lifecycle APIs
+
+Routers are mounted at `/api` and `/api/v1` (frontend alias). Responses use the wrapper:
+
+```json
+{ "data": { ... }, "status": "success", "timestamp": "..." }
+```
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/projects` | Create project (JSON body) |
+| `POST` | `/api/projects/upload` | Multipart upload (`project_name`, optional `contract`/`blueprint` PDFs) |
+| `POST` | `/api/projects/{id}/analyze` | Enqueue analyze job (`202`, poll status) |
+| `GET` | `/api/projects/{id}/analyze/status` | Job status (`queued` / `running` / `complete` / `error`) |
+| `GET` | `/api/projects/{id}` | Project metadata |
+| `GET` | `/api/projects/{id}/summary` | Intelligence view (permits, phases, crew) |
+| `GET` | `/api/projects/{id}/suppliers` | Persisted procurement rows |
+| `GET` | `/api/projects/{id}/crew` | Persisted crew plans |
+| `GET` | `/api/projects/{id}/agents` | Agent execution audit trail |
+
+Stateless shortcuts (no project record required):
+
+- `POST /api/analyze/text` — Mode 1 text pipeline
+- `POST /api/analyze/documents` — Mode 2 PDF pipeline
+
+### Pipeline agents (fixed versions in code)
+
+| Agent | Foundry version |
+|-------|-----------------|
+| ContractAgent | 4 |
+| BlueprintAgent | 3 |
+| PermitAgent | 3 |
+| ScheduleAgent | 2 |
+| SupplierAgent | 3 |
+| CrewAgent | 2 |
+
+### Master catalog CRUD
+
+| Method | Path |
+|--------|------|
+| `GET/POST` | `/api/suppliers` |
+| `GET/POST` | `/api/suppliers/{id}/materials` |
+| `GET/POST` | `/api/crew` |
+
+Seed catalogs:
+
+```bash
+python scripts/seed_supplier_master.py
+python scripts/seed_crew_master.py
+```
+
+## Agent extraction samples
+
+Realistic test inputs and field-by-field extraction reference:
+
+```
+backend/docs/samples/
+  sample_contract.txt / .pdf      Mode 2 contract
+  sample_blueprint_spec.txt / .pdf Mode 2 blueprint
+  sample_mode1_description.txt      Mode 1 text paste
+  expected_pipeline_output.example.json
+  AGENT_EXTRACTION_REFERENCE.md   Full extraction guide
+```
+
+Build PDFs from text samples:
+
+```bash
+python scripts/build_sample_pdfs.py
+```
+
+## Documentation (PDF)
+
+Detailed backend documentation is available at:
+
+`backend/docs/ConstructaIQ-Backend-Documentation.pdf`
+
+Regenerate after major changes:
+
+```bash
+python scripts/generate_backend_docs_pdf.py
+```
+
+## Postman
+
+Import both files from `backend/postman/`:
+
+- `ConstructaIQ.postman_collection.json` — all API requests
+- `ConstructaIQ-Local.postman_environment.json` — `baseUrl`, `projectId`, `jobId` variables
+
+`projectId` and `jobId` are auto-captured when you run Create Project, Upload, or Start Analyze.
+
+Recommended test flow: **Create Project** → **Start Analyze** → **Poll Analyze Status** → **Get Summary**.
+
+For synchronous analyze requests, set Postman request timeout to **180 seconds** or more.
+
+## Testing
+
+Unit tests:
+
+```bash
+pytest tests/
+```
+
+Project API flow (DB required, no live Foundry):
+
+```bash
+python scripts/e2e_project_flow_test.py
+# or
+python verify_backend.py
+```
+
+Full Foundry pipeline (live agents, ~2 min):
+
+```bash
+python scripts/e2e_backend_test.py
+```
+
+Mode 2 document pipeline (Document Intelligence + Foundry):
+
+```bash
+python scripts/e2e_mode2_documents.py
+```
+
+Optional live analyze in project flow:
+
+```bash
+set RUN_LIVE_ANALYZE=1
+python scripts/e2e_project_flow_test.py
+```

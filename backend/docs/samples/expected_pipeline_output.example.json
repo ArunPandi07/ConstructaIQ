@@ -1,0 +1,175 @@
+{
+  "_comment": "Illustrative shape only. Live Foundry responses vary. Use as persistence/mapping reference.",
+  "projectSummary": {
+    "project_name": "Lakefront Mixed-Use Tower — Phase 1",
+    "client_name": "Lakefront Development Partners, LLC",
+    "location": "1200 South Lakeshore Drive, Chicago, IL 60605",
+    "project_type": "Mixed-Use Commercial / Residential High-Rise",
+    "budget": 186500000,
+    "duration_months": 28,
+    "scope": "42-story mixed-use tower: retail podium, parking, office, residential units, structural steel, MEP fit-out, curtain wall.",
+    "square_footage": 1250000,
+    "floor_count": 42,
+    "complexity_level": "High",
+    "milestones": [
+      { "name": "Notice to Proceed", "date": "2026-03-01" },
+      { "name": "Foundation Complete", "date": "2026-09-30" },
+      { "name": "Structural Steel Topped Out", "date": "2027-04-30" },
+      { "name": "Substantial Completion", "date": "2028-07-01" }
+    ]
+  },
+  "blueprintSummary": {
+    "construction_type": "Type I-A",
+    "stories_above_grade": 42,
+    "structural_steel_tons": 14200,
+    "concrete_cy": 68500,
+    "curtain_wall_sf": 285000,
+    "lateral_system": "core shear walls + perimeter moment frames",
+    "mep_highlights": {
+      "electrical_service_amps": 12000,
+      "elevators": 20
+    }
+  },
+  "permitAssessment": {
+    "required_permits": [
+      {
+        "name": "Building Permit",
+        "category": "Municipal",
+        "status": "Pending",
+        "estimated_days": 45,
+        "documents": ["Architectural drawings", "Structural calcs", "MEP plans"]
+      },
+      {
+        "name": "Shoring & Excavation Permit",
+        "category": "Municipal",
+        "status": "Not Started",
+        "estimated_days": 30,
+        "documents": ["Shoring design", "Geotechnical report"]
+      },
+      {
+        "name": "Fire Department Plan Review",
+        "category": "Life Safety",
+        "status": "In Review",
+        "estimated_days": 21,
+        "documents": ["Fire alarm layout", "Sprinkler hydraulic calc"]
+      }
+    ]
+  },
+  "projectPlan": {
+    "estimated_duration_days": 840,
+    "project_phases": [
+      {
+        "name": "Mobilization & Demolition",
+        "status": "pending",
+        "start_date": "2026-03-01",
+        "end_date": "2026-04-30",
+        "progress": 0
+      },
+      {
+        "name": "Excavation & Foundation",
+        "status": "pending",
+        "start_date": "2026-04-01",
+        "end_date": "2026-09-30",
+        "progress": 0
+      },
+      {
+        "name": "Structural Steel Erection",
+        "status": "pending",
+        "start_date": "2026-08-01",
+        "end_date": "2027-04-30",
+        "progress": 0
+      },
+      {
+        "name": "MEP Rough-In",
+        "status": "pending",
+        "start_date": "2027-02-01",
+        "end_date": "2028-01-31",
+        "progress": 0
+      }
+    ],
+    "materials": [
+      { "material_name": "Structural Steel", "quantity": 14200, "unit": "TON" },
+      { "material_name": "Ready-Mix Concrete", "quantity": 68500, "unit": "CY" },
+      { "material_name": "Curtain Wall Panels", "quantity": 4200, "unit": "EA" }
+    ],
+    "crew_requirements": [
+      { "role": "Ironworkers", "count": 24 },
+      { "role": "Electricians", "count": 18 },
+      { "role": "Plumbers", "count": 12 },
+      { "role": "Concrete Finishers", "count": 16 }
+    ],
+    "inspection_stages": [
+      "Caisson bearing verification",
+      "Rebar pre-pour inspection",
+      "Structural steel connection inspection",
+      "Curtain wall water test"
+    ],
+    "dependencies": [
+      { "predecessor": "Foundation Complete", "successor": "Structural Steel Erection" },
+      { "predecessor": "Building Enclosed", "successor": "MEP Rough-In" }
+    ]
+  },
+  "supplierAnalysis": {
+    "procurement_plan": [
+      {
+        "material_name": "Wide Flange Beam W14x90",
+        "supplier_name": "MidWest Steel Corp",
+        "quantity": 120,
+        "unit_price": 2850.0,
+        "delivery_date": "2026-08-01",
+        "total_cost": 342000.0
+      },
+      {
+        "material_name": "Ready-Mix Concrete 5000 psi",
+        "supplier_name": "Chicago Ready Mix Co",
+        "quantity": 5000,
+        "unit_price": 165.0,
+        "delivery_date": "Month 4",
+        "total_cost": 825000.0
+      }
+    ],
+    "supply_chain_risks": [
+      {
+        "risk": "Steel lead time extension",
+        "severity": "Medium",
+        "mitigation": "Early mill order with approved alternates"
+      }
+    ],
+    "recommended_suppliers": []
+  },
+  "crewAnalysis": {
+    "crew_allocations": [
+      {
+        "phase_name": "Structural Steel Erection",
+        "crew_name": "Derek Sullivan",
+        "skill_type": "Steel Worker",
+        "labor_cost": 49000.0,
+        "start_date": "2026-08-01",
+        "end_date": "2027-04-30"
+      },
+      {
+        "phase_name": "MEP Rough-In",
+        "crew_name": "Marcus Webb",
+        "skill_type": "Electrician",
+        "labor_cost": 38500.0,
+        "start_date": "Month 14",
+        "end_date": "Month 24"
+      }
+    ],
+    "workforce_gaps": [
+      { "role": "Certified Welder", "shortage": 2 }
+    ],
+    "recommendations": [
+      "Pre-book ironworker crew for steel peak months"
+    ]
+  },
+  "persistenceSummary": {
+    "permits_created": 3,
+    "schedules_created": 1,
+    "budgets_created": 1,
+    "inspections_created": 4,
+    "project_suppliers_created": 2,
+    "crew_plans_created": 2,
+    "agent_executions_created": 6
+  }
+}
