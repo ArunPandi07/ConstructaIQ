@@ -64,7 +64,7 @@ class FoundryService:
         payload = self._build_payload(text, agent_name, version)
         headers = self._build_headers()
 
-        logger.info(f"POST {endpoint_url} → agent='{agent_name}' v{version}")
+        logger.info(f"POST {endpoint_url} -> agent='{agent_name}' v{version}")
         async with httpx.AsyncClient(timeout=60.0) as client:
             response = await client.post(endpoint_url, json=payload, headers=headers)
 

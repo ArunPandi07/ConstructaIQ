@@ -1,0 +1,284 @@
+[
+  {
+    "agent": "ContractAgent",
+    "version": "1",
+    "status": "ok",
+    "elapsed_seconds": 2.78,
+    "format": "structured_json",
+    "top_level_keys": [
+      "project_name",
+      "location",
+      "client",
+      "building_type",
+      "number_of_floors",
+      "budget",
+      "schedule_months",
+      "gross_square_feet",
+      "structural_system",
+      "foundation_type",
+      "MEP_scope"
+    ],
+    "key_count": 11,
+    "shape": {
+      "project_name": "str(18): 'Format Probe Tower'",
+      "location": "str(16): 'Downtown Chicago'",
+      "client": "str(30): 'Lakefront Development Partners'",
+      "building_type": "str(26): 'Mixed-use commercial tower'",
+      "number_of_floors": 42,
+      "budget": 186500000,
+      "schedule_months": 28,
+      "gross_square_feet": 1250000,
+      "structural_system": "str(24): 'Structural steel framing'",
+      "foundation_type": "str(15): 'Deep foundation'",
+      "MEP_scope": "str(11): 'MEP fit-out'"
+    },
+    "raw_preview": "{   \"project_name\": \"Format Probe Tower\",   \"location\": \"Downtown Chicago\",   \"client\": \"Lakefront Development Partners\",   \"building_type\": \"Mixed-use commercial tower\",   \"number_of_floors\": 42,   \"budget\": 186500000,   \"schedule_months\": 28,   \"gross_square_feet\": 1250000,   \"structural_system\": \"Structural steel framing\",   \"foundation_type\": \"Deep foundation\",   \"MEP_scope\": \"MEP fit-out\" }"
+  },
+  {
+    "agent": "BlueprintAgent",
+    "version": "1",
+    "status": "ok",
+    "elapsed_seconds": 5.01,
+    "format": "structured_json",
+    "top_level_keys": [
+      "project_name",
+      "location",
+      "type",
+      "client",
+      "budget_usd",
+      "schedule_months",
+      "floors",
+      "gross_square_footage",
+      "structural_system",
+      "foundation_type",
+      "MEP_scope",
+      "likely_structural_details",
+      "building_features"
+    ],
+    "key_count": 13,
+    "shape": {
+      "project_name": "str(18): 'Format Probe Tower'",
+      "location": "str(16): 'Downtown Chicago'",
+      "type": "str(26): 'Mixed-use commercial tower'",
+      "client": "str(30): 'Lakefront Development Partners'",
+      "budget_usd": 186500000,
+      "schedule_months": 28,
+      "floors": 42,
+      "gross_square_footage": 1250000,
+      "structural_system": "str(24): 'Structural steel framing'",
+      "foundation_type": "str(15): 'Deep foundation'",
+      "MEP_scope": "str(16): 'Full MEP fit-out'",
+      "likely_structural_details": {
+        "core": "str",
+        "floor_system": "str",
+        "column_spacing": "str",
+        "floor_to_floor_height": "str",
+        "lateral_load_system": "str",
+        "foundation_type_detail": "str"
+      },
+      "building_features": {
+        "_count": 4,
+        "_first_item": "str"
+      }
+    },
+    "raw_preview": "{   \"project_name\": \"Format Probe Tower\",   \"location\": \"Downtown Chicago\",   \"type\": \"Mixed-use commercial tower\",   \"client\": \"Lakefront Development Partners\",   \"budget_usd\": 186500000,   \"schedule_months\": 28,   \"floors\": 42,   \"gross_square_footage\": 1250000,   \"structural_system\": \"Structural steel framing\",   \"foundation_type\": \"Deep foundation\",   \"MEP_scope\": \"Full MEP fit-out\",   \"likely_structural_details\": {     \"core\": \"Reinforced concrete core (typical for lateral stability in stee"
+  },
+  {
+    "agent": "PermitAgent",
+    "version": "3",
+    "status": "ok",
+    "elapsed_seconds": 10.3,
+    "format": "structured_json",
+    "top_level_keys": [
+      "required_permits",
+      "approval_days",
+      "compliance_risks",
+      "required_documents"
+    ],
+    "key_count": 4,
+    "shape": {
+      "required_permits": {
+        "_count": 7,
+        "_first_item": "str"
+      },
+      "approval_days": 41,
+      "compliance_risks": {
+        "_count": 5,
+        "_first_item": "str"
+      },
+      "required_documents": {
+        "_count": 9,
+        "_first_item": "str"
+      }
+    },
+    "raw_preview": "{\"required_permits\":[     \"Building Permit (full plan review via E\u2011Plan) for new commercial high\u2011rise construction\",     \"Trade permits: Electrical, Plumbing, Mechanical (HVAC), Fire Protection (sprinkler, alarm)\",     \"Fire Alarm System Permit (Chicago Department of Buildings plus Fire Department review per NFPA\u201172)\",     \"Sprinkler / Standpipe System Permit (High\u2011rise fire protection systems)\",     \"Elevator/conveyance device permits (for lifts, escalators, etc.)\",     \"Deep foundation/caisson"
+  },
+  {
+    "agent": "PlanningAgent",
+    "version": "1",
+    "status": "ok",
+    "elapsed_seconds": 11.0,
+    "format": "structured_json",
+    "top_level_keys": [
+      "project_phases",
+      "estimated_duration_days",
+      "materials",
+      "crew_requirements",
+      "inspection_stages",
+      "dependencies"
+    ],
+    "key_count": 6,
+    "shape": {
+      "project_phases": {
+        "_count": 11,
+        "_first_item": "dict"
+      },
+      "estimated_duration_days": 850,
+      "materials": {
+        "_count": 12,
+        "_first_item": "dict"
+      },
+      "crew_requirements": {
+        "_count": 18,
+        "_first_item": "dict"
+      },
+      "inspection_stages": {
+        "_count": 10,
+        "_first_item": "str"
+      },
+      "dependencies": {
+        "_count": 11,
+        "_first_item": "dict"
+      }
+    },
+    "raw_preview": "{   \"project_phases\": [     {       \"name\": \"Permit and Approvals\",       \"start\": \"2026-06-15\",       \"end\": \"2026-07-25\"     },     {       \"name\": \"Site Preparation and Foundation\",       \"start\": \"2026-07-26\",       \"end\": \"2026-10-20\"     },     {       \"name\": \"Structural Framing\",       \"start\": \"2026-10-21\",       \"end\": \"2027-06-28\"     },     {       \"name\": \"Core Construction and Vertical Transportation\",       \"start\": \"2026-10-31\",       \"end\": \"2027-05-31\"     },     {       \"name\""
+  },
+  {
+    "agent": "SupplierAgent",
+    "version": "1",
+    "status": "ok",
+    "elapsed_seconds": 5.31,
+    "format": "structured_json",
+    "top_level_keys": [
+      "procurement_plan",
+      "supply_chain_risks",
+      "recommended_suppliers"
+    ],
+    "key_count": 3,
+    "shape": {
+      "procurement_plan": {
+        "_count": 2,
+        "_first_item": "dict"
+      },
+      "supply_chain_risks": {
+        "_count": 4,
+        "_first_item": "dict"
+      },
+      "recommended_suppliers": {
+        "_count": 2,
+        "_first_item": "dict"
+      }
+    },
+    "raw_preview": "{   \"procurement_plan\": [     {       \"material_name\": \"Structural Steel (Framing)\",       \"supplier_name\": \"MidWest Steel Corp\",       \"quantity\": 18500,       \"unit_price\": 2850.00,       \"delivery_date\": \"2026-10-21\",       \"total_cost\": 52725000.00     },     {       \"material_name\": \"Reinforced Concrete (Core, Foundation, Floors)\",       \"supplier_name\": \"Chicago Concrete Supply\",       \"quantity\": 53000,       \"unit_price\": 142.00,       \"delivery_date\": \"2026-07-26\",       \"total_cost\": 7"
+  },
+  {
+    "agent": "CrewAgent",
+    "version": "1",
+    "status": "ok",
+    "elapsed_seconds": 9.44,
+    "format": "structured_json",
+    "top_level_keys": [
+      "crew_allocations",
+      "workforce_gaps",
+      "recommendations"
+    ],
+    "key_count": 3,
+    "shape": {
+      "crew_allocations": {
+        "_count": 12,
+        "_first_item": "dict"
+      },
+      "workforce_gaps": {
+        "_count": 16,
+        "_first_item": "dict"
+      },
+      "recommendations": {
+        "_count": 8,
+        "_first_item": "str"
+      }
+    },
+    "raw_preview": "{   \"crew_allocations\": [     {       \"phase_name\": \"Permit and Approvals\",       \"crew_name\": \"Elena Vasquez\",       \"skill_type\": \"Project Manager\",       \"labor_cost\": \"950.00\",       \"start_date\": \"2026-06-15\",       \"end_date\": \"2026-07-25\"     },     {       \"phase_name\": \"Site Preparation and Foundation\",       \"crew_name\": \"Robert Nakamura\",       \"skill_type\": \"Structural Engineer\",       \"labor_cost\": \"820.00\",       \"start_date\": \"2026-07-26\",       \"end_date\": \"2026-10-20\"     },    "
+  },
+  {
+    "agent": "ConstructionKnowledgeAgent",
+    "version": "1",
+    "status": "ok",
+    "elapsed_seconds": 13.42,
+    "format": "structured_json",
+    "top_level_keys": [
+      "historical_risks",
+      "best_practices",
+      "failure_patterns",
+      "recommendations"
+    ],
+    "key_count": 4,
+    "shape": {
+      "historical_risks": {
+        "_count": 10,
+        "_first_item": "str"
+      },
+      "best_practices": {
+        "_count": 10,
+        "_first_item": "str"
+      },
+      "failure_patterns": {
+        "_count": 5,
+        "_first_item": "dict"
+      },
+      "recommendations": {
+        "_count": 10,
+        "_first_item": "str"
+      }
+    },
+    "raw_preview": "{   \"historical_risks\": [     \"Permit delays due to complex high-rise plan reviews and correction cycles, especially in large urban markets like Chicago\",     \"Supply chain disruptions and long lead times for essential materials (structural steel, glass fa\u00e7ade panels, elevators)\",     \"Labor shortages, particularly for skilled specialty trades, leading to phase delays\",     \"Cost overruns caused by material price volatility and scope changes\",     \"Safety incidents during steel erection, fa\u00e7ade "
+  },
+  {
+    "agent": "RiskAgent",
+    "version": "1",
+    "status": "skipped"
+  },
+  {
+    "agent": "RecoveryAgent",
+    "version": "1",
+    "status": "skipped"
+  },
+  {
+    "agent": "DoctorAgent",
+    "version": "1",
+    "status": "ok",
+    "elapsed_seconds": 8.99,
+    "format": "structured_json",
+    "top_level_keys": [
+      "health_score",
+      "failure_probability",
+      "diagnosis",
+      "treatment_plan",
+      "critical_issues"
+    ],
+    "key_count": 5,
+    "shape": {
+      "health_score": 52,
+      "failure_probability": 0.38,
+      "diagnosis": "str(1264): 'The Format Probe Tower is at high risk in its preconstruction phase due to significant labor force s'",
+      "treatment_plan": {
+        "_count": 6,
+        "_first_item": "str"
+      },
+      "critical_issues": {
+        "_count": 5,
+        "_first_item": "str"
+      }
+    },
+    "raw_preview": "{   \"health_score\": 52,   \"failure_probability\": 0.38,   \"diagnosis\": \"The Format Probe Tower is at high risk in its preconstruction phase due to significant labor force shortages and unresolved supply chain risks. All major construction roles exhibit undersupply: there is a complete lack of essential site management (site superintendent, civil engineer), labor (general laborers, carpenters, finish trades, inspection specialists), and specialty trades (steel erectors, concrete workers, electrici"
+  }
+]
