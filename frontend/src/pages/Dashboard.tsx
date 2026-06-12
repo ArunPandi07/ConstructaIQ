@@ -1,949 +1,283 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts";
-import {
-  FolderOpen,
-  ShieldAlert,
-  CheckCircle,
-  DollarSign,
-  AlertTriangle,
-  RefreshCw,
-  Plus,
-  ArrowRight,
   Building2,
-  Plane,
-  Train,
-  Home,
-  Trees,
-  Milestone,
-  ChevronLeft,
-  ChevronRight,
+  HardHat,
+  Bot,
+  AlertTriangle,
+  ArrowRight,
+  MapPin,
+  Activity,
+  Plus,
+  Shield,
+  Clock,
+  CheckCircle2,
 } from "lucide-react";
-import { useDashboard } from "../hooks/usePageData";
-import { KPICardSkeleton, ErrorState } from "../components/Skeleton";
-import { allProjects } from "../data/mockData";
-import type { ProjectStatus } from "../data/mockData";
-
-const PAGE_SIZE = 8;
-
-const statusConfig: Record<
-  ProjectStatus,
-  { label: string; color: string; bg: string; border: string; barColor: string }
-> = {
-  "on-track": {
-    label: "ON TRACK",
-    color: "#16a34a",
-    bg: "rgba(22,163,74,0.08)",
-    border: "rgba(22,163,74,0.2)",
-    barColor: "#16a34a",
-  },
-  "at-risk": {
-    label: "AT RISK",
-    color: "#dc2626",
-    bg: "rgba(220,38,38,0.08)",
-    border: "rgba(220,38,38,0.2)",
-    barColor: "#dc2626",
-  },
-  delayed: {
-    label: "DELAYED",
-    color: "#ea580c",
-    bg: "rgba(234,88,12,0.08)",
-    border: "rgba(234,88,12,0.2)",
-    barColor: "#ea580c",
-  },
-  planning: {
-    label: "PLANNING",
-    color: "#2563eb",
-    bg: "rgba(37,99,235,0.08)",
-    border: "rgba(37,99,235,0.2)",
-    barColor: "#2563eb",
-  },
-};
-
-const projectIcons: Record<
-  string,
-  React.FC<{ size?: number; style?: React.CSSProperties }>
-> = {
-  building: Building2,
-  plane: Plane,
-  train: Train,
-  home: Home,
-  trees: Trees,
-  road: Milestone,
-};
-
-const kpiList = [
-  {
-    key: "activeProjects",
-    label: "Active Projects",
-    color: "#2563eb",
-    bg: "rgba(37,99,235,0.08)",
-    Icon: FolderOpen,
-  },
-  {
-    key: "riskProjects",
-    label: "At Risk",
-    color: "#dc2626",
-    bg: "rgba(220,38,38,0.08)",
-    Icon: ShieldAlert,
-  },
-  {
-    key: "onTimeProjects",
-    label: "On Schedule",
-    color: "#16a34a",
-    bg: "rgba(22,163,74,0.08)",
-    Icon: CheckCircle,
-  },
-  {
-    key: "totalBudget",
-    label: "Total Budget",
-    color: "#d97706",
-    bg: "rgba(217,119,6,0.08)",
-    Icon: DollarSign,
-  },
-  {
-    key: "openRisks",
-    label: "Open Risks",
-    color: "#ea580c",
-    bg: "rgba(234,88,12,0.08)",
-    Icon: AlertTriangle,
-  },
-  {
-    key: "recoveryPlans",
-    label: "Recovery Plans",
-    color: "#7c3aed",
-    bg: "rgba(124,58,237,0.08)",
-    Icon: RefreshCw,
-  },
-];
-
-const ChartTooltip = ({ active, payload, label }: any) => {
-  if (!active || !payload?.length) return null;
-  return (
-    <div
-      style={{
-        background: "#fff",
-        border: "1px solid #e8eaed",
-        borderRadius: 10,
-        padding: "10px 14px",
-        minWidth: 140,
-        boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-      }}
-    >
-      <p
-        style={{
-          fontWeight: 700,
-          fontSize: "0.75rem",
-          marginBottom: 6,
-          color: "#111827",
-        }}
-      >
-        {label}
-      </p>
-      {payload.map((e: any) => (
-        <div
-          key={e.name}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            fontSize: "0.72rem",
-            marginBottom: 3,
-          }}
-        >
-          <div
-            style={{
-              width: 7,
-              height: 7,
-              borderRadius: "50%",
-              background: e.color,
-            }}
-          />
-          <span style={{ color: "#6b7280" }}>{e.name}:</span>
-          <span style={{ fontWeight: 600, color: "#111827" }}>{e.value}%</span>
-        </div>
-      ))}
-    </div>
-  );
-};
+import { useAppContext } from "../context/AppContext";
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { data, loading, error, refetch } = useDashboard();
-  const [page, setPage] = useState(1);
+  const { projects, setIsModalOpen } = useAppContext();
 
-  if (error) return <ErrorState message={error} onRetry={refetch} />;
+  const activeProjects = projects.filter((p) => p.status === "LIVE");
 
-  const totalPages = Math.ceil(allProjects.length / PAGE_SIZE);
-  const paginatedProjects = allProjects.slice(
-    (page - 1) * PAGE_SIZE,
-    page * PAGE_SIZE,
-  );
+  const getCumulativeBudget = () => {
+    let total = 0;
+    activeProjects.forEach((p) => {
+      const num = parseFloat(p.budget.replace(/[^0-9.]/g, ""));
+      if (!isNaN(num)) total += num;
+    });
+    return `$${total.toFixed(1)}M`;
+  };
+
+  const getMeanProgress = () => {
+    if (activeProjects.length === 0) return 0;
+    return Math.round(
+      activeProjects.reduce((acc, p) => acc + p.progress, 0) / activeProjects.length,
+    );
+  };
 
   return (
-    <div className="flex flex-col gap-5 animate-fade-in-up">
-      {/* KPI Row */}
-      <div className="grid grid-cols-6 gap-3">
-        {loading
-          ? Array.from({ length: 6 }).map((_, i) => <KPICardSkeleton key={i} />)
-          : kpiList.map(({ key, label, color, bg, Icon }) => (
-              <div key={key} className="kpi-card">
-                <div style={{ padding: "14px 16px" }}>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "flex-start",
-                      justifyContent: "space-between",
-                    }}
-                  >
-                    <div style={{ flex: 1 }}>
-                      <div
-                        style={{
-                          fontSize: 26,
-                          fontWeight: 700,
-                          color,
-                          lineHeight: 1,
-                          letterSpacing: "-0.5px",
-                        }}
-                      >
-                        {(data?.kpi as any)?.[key] ?? "—"}
-                      </div>
-                      <div
-                        style={{
-                          fontSize: "0.72rem",
-                          color: "#6b7280",
-                          marginTop: 6,
-                        }}
-                      >
-                        {label}
-                      </div>
-                    </div>
-                    <div
-                      style={{
-                        width: 36,
-                        height: 36,
-                        borderRadius: 9,
-                        background: bg,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        flexShrink: 0,
-                      }}
-                    >
-                      <Icon size={16} style={{ color }} />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
+    <div className="space-y-8 animate-fade-in-up">
+      <div className="glass-card p-6 md:p-8 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-112.5 h-112.5 bg-radial from-[#F5C518]/10 via-transparent to-transparent pointer-events-none rounded-full blur-3xl -mr-20 -mt-20"></div>
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 relative z-10">
+          <div>
+            <span className="text-[10px] bg-[#F5C518]/15 text-[#E2B30D] font-black px-3 py-1 rounded-full uppercase tracking-widest font-mono">
+              Site Ops Command Console
+            </span>
+            <h1 className="text-2xl md:text-4xl font-extrabold text-stone-900 tracking-tight mt-3">
+              Active Construction Sites
+            </h1>
+            <p className="text-sm text-stone-500 mt-2 max-w-2xl">
+              Unified multi-project intelligence dashboard tracking autonomous
+              legal, structural, and logistical zoning agents across active
+              design-build locations.
+            </p>
+          </div>
+          <div className="flex items-center gap-6 bg-stone-50 px-6 py-4 rounded-2xl border border-stone-200 self-stretch sm:self-auto shrink-0 justify-around">
+            <div className="text-center">
+              <p className="text-[10px] text-stone-400 font-extrabold uppercase tracking-wider">
+                Active Sectors
+              </p>
+              <p className="text-2xl font-black text-stone-900 flex items-center justify-center gap-1.5 mt-1 font-mono">
+                <Building2 className="w-5 h-5 text-[#F5C518]" />
+                {activeProjects.length}
+              </p>
+            </div>
+            <div className="w-px h-10 bg-stone-200"></div>
+            <div className="text-center">
+              <p className="text-[10px] text-stone-400 font-extrabold uppercase tracking-wider">
+                Capital Value
+              </p>
+              <p className="text-2xl font-black text-stone-900 mt-1 font-mono">
+                {getCumulativeBudget()}
+              </p>
+            </div>
+            <div className="w-px h-10 bg-stone-200"></div>
+            <div className="text-center">
+              <p className="text-[10px] text-stone-400 font-extrabold uppercase tracking-wider">
+                Mean Progress
+              </p>
+              <p className="text-2xl font-black text-emerald-600 mt-1 font-mono">
+                {getMeanProgress()}%
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="mt-6 pt-5 border-t border-stone-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-3 text-xs text-stone-500">
+          <span className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+            6 Autonomous Coordinator Agents analyzing {activeProjects.length}{" "}
+            active construction sites in parallel
+          </span>
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="px-4 py-2 font-bold flex items-center gap-1.5 transition text-xs shadow-xs"
+            style={{
+              borderRadius: 9,
+              background: "#f5c518",
+              color: "#000",
+              cursor: "pointer",
+            }}
+          >
+            <Plus className="w-4 h-4" style={{ color: "#000" }} />
+            On Board New Project
+          </button>
+        </div>
       </div>
 
-      {!loading && data && (
-        <>
-          {/* Section header */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              marginBottom: 2,
-            }}
-          >
-            <div
-              style={{
-                fontSize: "0.9rem",
-                fontWeight: 700,
-                color: "#111827",
-                letterSpacing: "0.04em",
-                textTransform: "uppercase",
-              }}
-            >
-              All Projects
-              <span
-                style={{
-                  marginLeft: 8,
-                  fontSize: "0.72rem",
-                  fontWeight: 500,
-                  color: "#6b7280",
-                  textTransform: "none",
-                  letterSpacing: 0,
-                }}
-              >
-                {allProjects.length} total
-              </span>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-6">
+          <div className="flex justify-between items-center pl-1">
+            <div>
+              <h2 className="text-lg font-black text-stone-800 tracking-tight">
+                Active Projects ({activeProjects.length})
+              </h2>
+              <p className="text-xs text-stone-400">
+                Click any project to access its full workspace
+              </p>
             </div>
-            <button
-              onClick={() => navigate("/upload")}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                background: "#16a34a",
-                color: "#fff",
-                border: "none",
-                borderRadius: 9,
-                padding: "8px 16px",
-                fontSize: "0.78rem",
-                fontWeight: 600,
-                cursor: "pointer",
-                fontFamily: "inherit",
-                transition: "all 0.15s",
-                boxShadow: "0 2px 6px rgba(22,163,74,0.3)",
-              }}
-            >
-              <Plus size={13} /> New Project
-            </button>
           </div>
-
-          {/* Main grid */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "minmax(0, 1.85fr) 370px",
-              gap: 16,
-              alignItems: "start",
-            }}
-          >
-            {/* Table + Pagination */}
-            <div>
-              <div className="glass-card" style={{ overflow: "hidden" }}>
-                <div style={{ overflowX: "auto" }}>
-                  <table
-                    style={{
-                      width: "100%",
-                      minWidth: 760,
-                      borderCollapse: "collapse",
-                    }}
-                  >
-                    <thead>
-                      <tr style={{ borderBottom: "1px solid #e8eaed" }}>
-                        <th
-                          style={{
-                            position: "sticky",
-                            left: 0,
-                            zIndex: 20,
-                            background: "#f8f9fb",
-                            // borderRight: "1px solid #e8eaed",
-                            padding: "10px 14px",
-                            textAlign: "left",
-                            fontSize: "0.68rem",
-                            fontWeight: 700,
-                            letterSpacing: "0.06em",
-                            color: "#6b7280",
-                            textTransform: "uppercase",
-                          }}
-                        >
-                          Project
-                        </th>
-                        <th
-                          style={{
-                            background: "#f8f9fb",
-                            padding: "10px 14px",
-                            textAlign: "left",
-                            fontSize: "0.68rem",
-                            fontWeight: 700,
-                            letterSpacing: "0.06em",
-                            color: "#6b7280",
-                            textTransform: "uppercase",
-                            minWidth: 110,
-                          }}
-                        >
-                          Type
-                        </th>
-                        <th
-                          style={{
-                            background: "#f8f9fb",
-                            padding: "10px 14px",
-                            textAlign: "left",
-                            fontSize: "0.68rem",
-                            fontWeight: 700,
-                            letterSpacing: "0.06em",
-                            color: "#6b7280",
-                            textTransform: "uppercase",
-                            minWidth: 100,
-                          }}
-                        >
-                          Status
-                        </th>
-                        <th
-                          style={{
-                            background: "#f8f9fb",
-                            padding: "10px 14px",
-                            textAlign: "left",
-                            fontSize: "0.68rem",
-                            fontWeight: 700,
-                            letterSpacing: "0.06em",
-                            color: "#6b7280",
-                            textTransform: "uppercase",
-                            minWidth: 200,
-                          }}
-                        >
-                          Completion
-                        </th>
-                        <th
-                          style={{
-                            background: "#f8f9fb",
-                            padding: "10px 14px",
-                            textAlign: "center",
-                            fontSize: "0.68rem",
-                            fontWeight: 700,
-                            letterSpacing: "0.06em",
-                            color: "#6b7280",
-                            textTransform: "uppercase",
-                            minWidth: 90,
-                          }}
-                        >
-                          Budget
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {paginatedProjects.map((proj, idx) => {
-                        const sc = statusConfig[proj.status];
-                        const ProjIcon = projectIcons[proj.icon] ?? Building2;
-                        const globalIdx = (page - 1) * PAGE_SIZE + idx + 1;
-                        return (
-                          <tr
-                            key={proj.id}
-                            onClick={() => navigate("/intelligence")}
-                            className="project-row cursor-pointer"
-                            style={{ borderBottom: "1px solid #f3f4f6" }}
-                          >
-                            <td
-                              className="sticky-project-cell"
-                              style={{
-                                padding: "11px 14px",
-                                // background: "#fff",
-                                borderRight: "1px solid #d2e0ff",
-                              }}
-                            >
-                              <div className="project-cell">
-                                <div
-                                  style={{
-                                    width: 22,
-                                    height: 22,
-                                    borderRadius: 6,
-                                    background: "#f3f4f6",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    flexShrink: 0,
-                                    fontSize: "0.6rem",
-                                    fontWeight: 700,
-                                    color: "#9ca3af",
-                                  }}
-                                >
-                                  {globalIdx}
-                                </div>
-                                <div
-                                  className="project-icon"
-                                  style={{
-                                    background: sc.bg,
-                                    border: `1px solid ${sc.border}`,
-                                  }}
-                                >
-                                  <ProjIcon
-                                    size={16}
-                                    style={{ color: sc.barColor }}
-                                  />
-                                </div>
-                                <div className="project-info">
-                                  <div className="project-name">
-                                    {proj.name}
-                                  </div>
-                                  <div className="project-meta">
-                                    <span>{proj.id}</span>
-                                    <span className="project-dot" />
-                                    <span>{proj.duration}</span>
-                                  </div>
-                                </div>
-                              </div>
-                            </td>
-                            <td
-                              style={{
-                                padding: "11px 14px",
-                                fontSize: "0.75rem",
-                                color: "#6b7280",
-                              }}
-                            >
-                              {proj.type}
-                            </td>
-                            <td style={{ padding: "11px 14px" }}>
-                              <span
-                                className="status-badge"
-                                style={{
-                                  background: sc.bg,
-                                  border: `1px solid ${sc.border}`,
-                                  color: sc.color,
-                                  fontSize: "0.62rem",
-                                  fontWeight: 700,
-                                  padding: "3px 8px",
-                                  borderRadius: 999,
-                                  letterSpacing: "0.05em",
-                                }}
-                              >
-                                {sc.label}
-                              </span>
-                            </td>
-                            <td style={{ padding: "11px 14px", minWidth: 200 }}>
-                              <div
-                                style={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: 8,
-                                }}
-                              >
-                                <span
-                                  style={{
-                                    fontSize: "0.68rem",
-                                    color: "#9ca3af",
-                                    width: 60,
-                                    flexShrink: 0,
-                                  }}
-                                >
-                                  Completion
-                                </span>
-                                <div
-                                  className="progress-bar"
-                                  style={{ flex: 1 }}
-                                >
-                                  <div
-                                    className="progress-fill"
-                                    style={{
-                                      width: `${proj.progress}%`,
-                                      background: sc.barColor,
-                                    }}
-                                  />
-                                </div>
-                                <span
-                                  style={{
-                                    fontSize: "0.75rem",
-                                    fontWeight: 700,
-                                    color: sc.barColor,
-                                    minWidth: 30,
-                                    textAlign: "right",
-                                  }}
-                                >
-                                  {proj.progress}%
-                                </span>
-                              </div>
-                            </td>
-                            <td
-                              style={{
-                                padding: "11px 14px",
-                                textAlign: "center",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  fontSize: "0.88rem",
-                                  fontWeight: 700,
-                                  color: "#111827",
-                                }}
-                              >
-                                {proj.budget}
-                              </div>
-                              <div
-                                style={{
-                                  fontSize: "0.58rem",
-                                  color: "#9ca3af",
-                                  textTransform: "uppercase",
-                                  marginTop: 2,
-                                }}
-                              >
-                                Budget
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* ── Pagination ── */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {activeProjects.map((p) => {
+              const mockReadiness = 50 + (p.name.length % 40);
+              return (
                 <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    padding: "11px 16px",
-                    borderTop: "1px solid #e8eaed",
-                    background: "#f8f9fb",
-                  }}
+                  key={p.id}
+                  onClick={() => navigate(`/projects/${p.id}`, { state: { from: "dashboard" } })}
+                  className="glass-card p-5 hover:border-[#F5C518] hover:shadow-md transition duration-300 cursor-pointer flex flex-col justify-between group relative min-h-75"
                 >
-                  {/* Info */}
-                  <span style={{ fontSize: "0.72rem", color: "#6b7280" }}>
-                    Showing{" "}
-                    <strong style={{ color: "#111827" }}>
-                      {(page - 1) * PAGE_SIZE + 1}–
-                      {Math.min(page * PAGE_SIZE, allProjects.length)}
-                    </strong>{" "}
-                    of{" "}
-                    <strong style={{ color: "#111827" }}>
-                      {allProjects.length}
-                    </strong>{" "}
-                    projects
-                  </span>
-
-                  {/* Page controls */}
-                  <div
-                    style={{ display: "flex", alignItems: "center", gap: 4 }}
-                  >
-                    {/* Prev */}
-                    <button
-                      onClick={() => setPage((p) => Math.max(1, p - 1))}
-                      disabled={page === 1}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        width: 30,
-                        height: 30,
-                        borderRadius: 7,
-                        border: "1px solid #e2e8f0",
-                        background: page === 1 ? "#f8f9fb" : "#fff",
-                        color: page === 1 ? "#d1d5db" : "#374151",
-                        cursor: page === 1 ? "default" : "pointer",
-                        transition: "all 0.15s",
-                      }}
-                    >
-                      <ChevronLeft size={14} />
-                    </button>
-
-                    {/* Page numbers */}
-                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(
-                      (p) => (
-                        <button
-                          key={p}
-                          onClick={() => setPage(p)}
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            width: 30,
-                            height: 30,
-                            borderRadius: 7,
-                            border:
-                              p === page
-                                ? "1.5px solid #16a34a"
-                                : "1px solid #e2e8f0",
-                            background:
-                              p === page ? "rgba(22,163,74,0.08)" : "#fff",
-                            color: p === page ? "#16a34a" : "#374151",
-                            fontWeight: p === page ? 700 : 500,
-                            fontSize: "0.76rem",
-                            cursor: "pointer",
-                            transition: "all 0.15s",
-                            fontFamily: "inherit",
-                          }}
-                        >
-                          {p}
-                        </button>
-                      ),
-                    )}
-
-                    {/* Next */}
-                    <button
-                      onClick={() =>
-                        setPage((p) => Math.min(totalPages, p + 1))
-                      }
-                      disabled={page === totalPages}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        width: 30,
-                        height: 30,
-                        borderRadius: 7,
-                        border: "1px solid #e2e8f0",
-                        background: page === totalPages ? "#f8f9fb" : "#fff",
-                        color: page === totalPages ? "#d1d5db" : "#374151",
-                        cursor: page === totalPages ? "default" : "pointer",
-                        transition: "all 0.15s",
-                      }}
-                    >
-                      <ChevronRight size={14} />
-                    </button>
-                  </div>
-
-                  {/* View all link */}
-                  <button
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 5,
-                      color: "#2563eb",
-                      fontSize: "0.76rem",
-                      fontWeight: 600,
-                      background: "none",
-                      border: "none",
-                      cursor: "pointer",
-                      fontFamily: "inherit",
-                    }}
-                  >
-                    View all <ArrowRight size={12} />
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Right column */}
-            <div>
-              {/* Health trend */}
-              <div className="glass-card p-5" style={{ marginBottom: 14 }}>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "flex-start",
-                    justifyContent: "space-between",
-                    marginBottom: 14,
-                  }}
-                >
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-radial from-[#F5C518]/5 to-transparent pointer-events-none rounded-bl-3xl"></div>
                   <div>
-                    <div
-                      style={{
-                        fontSize: "0.9rem",
-                        fontWeight: 600,
-                        color: "#111827",
-                      }}
-                    >
-                      Project health trend
-                    </div>
-                    <div
-                      style={{
-                        fontSize: "0.7rem",
-                        color: "#6b7280",
-                        marginTop: 2,
-                      }}
-                    >
-                      All {data.kpi.activeProjects} projects · 6-month portfolio
-                      view
-                    </div>
-                  </div>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 5,
-                      background: "rgba(22,163,74,0.08)",
-                      border: "1px solid rgba(22,163,74,0.2)",
-                      borderRadius: 999,
-                      padding: "3px 10px",
-                    }}
-                  >
-                    <div
-                      className="animate-pulse"
-                      style={{
-                        width: 6,
-                        height: 6,
-                        borderRadius: "50%",
-                        background: "#16a34a",
-                      }}
-                    />
-                    <span
-                      style={{
-                        fontSize: "0.62rem",
-                        color: "#16a34a",
-                        fontWeight: 700,
-                      }}
-                    >
-                      LIVE
-                    </span>
-                  </div>
-                </div>
-                <ResponsiveContainer width="100%" height={190}>
-                  <AreaChart
-                    data={data.healthTrend}
-                    margin={{ top: 5, right: 5, left: -25, bottom: 0 }}
-                  >
-                    <defs>
-                      <linearGradient id="gHealth" x1="0" y1="0" x2="0" y2="1">
-                        <stop
-                          offset="5%"
-                          stopColor="#16a34a"
-                          stopOpacity={0.15}
-                        />
-                        <stop
-                          offset="95%"
-                          stopColor="#16a34a"
-                          stopOpacity={0}
-                        />
-                      </linearGradient>
-                      <linearGradient id="gRisk" x1="0" y1="0" x2="0" y2="1">
-                        <stop
-                          offset="5%"
-                          stopColor="#dc2626"
-                          stopOpacity={0.1}
-                        />
-                        <stop
-                          offset="95%"
-                          stopColor="#dc2626"
-                          stopOpacity={0}
-                        />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      stroke="rgba(0,0,0,0.05)"
-                      vertical={false}
-                    />
-                    <XAxis
-                      dataKey="month"
-                      tick={{ fill: "#9ca3af", fontSize: 10 }}
-                      axisLine={false}
-                      tickLine={false}
-                    />
-                    <YAxis
-                      domain={[0, 100]}
-                      tick={{ fill: "#9ca3af", fontSize: 10 }}
-                      axisLine={false}
-                      tickLine={false}
-                    />
-                    <Tooltip content={<ChartTooltip />} />
-                    <Area
-                      type="monotone"
-                      dataKey="health"
-                      name="Health score"
-                      stroke="#16a34a"
-                      strokeWidth={2}
-                      fill="url(#gHealth)"
-                      dot={false}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="risk"
-                      name="Risk Index"
-                      stroke="#dc2626"
-                      strokeWidth={1.5}
-                      fill="url(#gRisk)"
-                      strokeDasharray="5 4"
-                      dot={false}
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-                <div style={{ display: "flex", gap: 16, marginTop: 6 }}>
-                  {[
-                    { color: "#16a34a", label: "Health score", dashed: false },
-                    { color: "#dc2626", label: "Risk Index", dashed: true },
-                  ].map(({ color, label, dashed }) => (
-                    <div
-                      key={label}
-                      style={{ display: "flex", alignItems: "center", gap: 6 }}
-                    >
-                      <div
+                    <div className="flex justify-between items-start mb-3.5">
+                      <span
+                        className="status-badge text-[9px] font-black uppercase"
                         style={{
-                          width: 20,
-                          height: 2,
-                          borderRadius: 2,
-                          background: dashed
-                            ? `repeating-linear-gradient(90deg,${color} 0,${color} 4px,transparent 4px,transparent 8px)`
-                            : color,
+                          backgroundColor: "#dcfce7",
+                          color: "#16a34a",
+                          border: "1px solid #bbf7d0",
                         }}
-                      />
-                      <span style={{ fontSize: "0.7rem", color: "#6b7280" }}>
-                        {label}
+                      >
+                        ● {p.status}
+                      </span>
+                      <span className="text-xs font-bold text-stone-800 font-mono bg-stone-50 border border-stone-200 px-2 py-0.5 rounded-md">
+                        {p.budget}
                       </span>
                     </div>
-                  ))}
+                    <div className="space-y-1.5">
+                      <h3 className="text-sm font-black text-stone-900 tracking-tight group-hover:text-[#E2B30D] transition-colors leading-snug line-clamp-1">
+                        {p.name}
+                      </h3>
+                      <p className="text-[11px] text-stone-400 font-semibold flex items-center gap-1">
+                        <MapPin className="w-3 h-3 text-stone-400" />
+                        {p.location}
+                      </p>
+                      <p className="text-[11px] text-stone-500 leading-relaxed line-clamp-3 pt-1">
+                        {p.description}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-5 pt-4 border-t border-stone-100 space-y-3.5">
+                    <div className="grid grid-cols-2 gap-2 text-center text-[10px] text-stone-600">
+                      <div className="bg-stone-50 px-2 py-1.5 rounded-lg border border-stone-100">
+                        <span className="text-[9px] text-stone-400 block">
+                          Integration progress
+                        </span>
+                        <span className="font-bold text-stone-900 font-mono text-xs">
+                          {p.progress}%
+                        </span>
+                      </div>
+                      <div className="bg-stone-50 px-2 py-1.5 rounded-lg border border-stone-100">
+                        <span className="text-[9px] text-stone-400 block">
+                          Site Readiness
+                        </span>
+                        <span className="font-bold text-[#E2B30D] font-mono text-xs">
+                          {mockReadiness}%
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex justify-between items-center text-xs font-bold text-stone-800 group-hover:text-[#E2B30D] transition-colors pt-1">
+                      <span>Open Project Workspace</span>
+                      <ArrowRight className="w-4 h-4 translate-x-0 group-hover:translate-x-1 transition-transform" />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          <div className="pl-1">
+            <h2 className="text-lg font-black text-stone-800 tracking-tight">
+              Active Platform Telemetry
+            </h2>
+            <p className="text-xs text-stone-400">
+              Core autonomous monitoring loops status
+            </p>
+          </div>
+
+          <div
+            className="bg-[#1a2035] text-white p-5 shadow-xl space-y-4 border border-stone-700/30 flex flex-col justify-between min-h-95"
+            style={{ borderRadius: 12 }}
+          >
+            <div className="space-y-4">
+              <div className="flex justify-between items-center pb-3 border-b border-white/5">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-zinc-100">
+                  <span className="w-2 h-2 rounded-full bg-[#F5C518] animate-ping"></span>
+                  Global Log Stream
                 </div>
               </div>
-
-              {/* Risk distribution */}
-              <div className="glass-card p-5">
-                <div style={{ marginBottom: 14 }}>
-                  <div
-                    style={{
-                      fontSize: "0.9rem",
-                      fontWeight: 600,
-                      color: "#111827",
-                    }}
-                  >
-                    Risk distribution
-                  </div>
-                  <div
-                    style={{
-                      fontSize: "0.7rem",
-                      color: "#6b7280",
-                      marginTop: 2,
-                    }}
-                  >
-                    All projects · {data.kpi.openRisks} open risks
-                  </div>
+              <div className="font-mono text-[10px] leading-relaxed space-y-2.5 text-stone-300">
+                <div className="text-emerald-400">
+                  ✔️ CORE COMPILER BOOT: SUCCESSFUL
                 </div>
-                <div
-                  style={{ display: "flex", flexDirection: "column", gap: 11 }}
-                >
-                  {data.riskDistribution.map((item) => (
-                    <div
-                      key={item.name}
-                      style={{ display: "flex", alignItems: "center", gap: 10 }}
-                    >
-                      <div
-                        style={{
-                          width: 7,
-                          height: 7,
-                          borderRadius: "50%",
-                          background: item.color,
-                          flexShrink: 0,
-                        }}
-                      />
-                      <span
-                        style={{
-                          fontSize: "0.76rem",
-                          color: "#374151",
-                          width: 105,
-                          flexShrink: 0,
-                        }}
-                      >
-                        {item.name}
-                      </span>
-                      <div
-                        style={{
-                          flex: 1,
-                          height: 5,
-                          background: "#f0f2f5",
-                          borderRadius: 999,
-                          overflow: "hidden",
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: `${item.value * 2.8}%`,
-                            height: "100%",
-                            background: item.color,
-                            borderRadius: 999,
-                          }}
-                        />
-                      </div>
-                      <span
-                        style={{
-                          fontSize: "0.76rem",
-                          fontWeight: 700,
-                          color: item.color,
-                          width: 32,
-                          textAlign: "right",
-                        }}
-                      >
-                        {item.value}%
-                      </span>
-                    </div>
-                  ))}
+                <div className="text-[#F5C518]">
+                  [SYSTEM ACTIVE]: Monitoring {activeProjects.length} sites
+                </div>
+                <div className="text-stone-400 bg-white/5 p-2 px-2.5 rounded-lg border border-white/5 leading-normal">
+                  Agent ScheduleAgent optimizing site milestones...
+                </div>
+                <div className="text-zinc-500">
+                  · System state: LOOP_STATE_OK
+                </div>
+                <div className="text-zinc-500">
+                  · Available compute strength: 14.2 GFLOPs
+                </div>
+                <div className="text-zinc-500">
+                  · Active submittals tracked: 4 municipalities
                 </div>
               </div>
             </div>
+            <div className="bg-[#f0f2f5]/5 border border-white/5 p-3 rounded-2xl space-y-2">
+              <div className="flex items-center gap-2 text-xs font-black text-[#F5C518]">
+                <AlertTriangle className="w-4 h-4" />
+                ZONING SAFETY ALERTS
+              </div>
+              <p className="text-[10px] text-stone-400 leading-normal">
+                Apex Structural Core warns: Seattle extension reports
+                continuous heavy rain forecasts starting June 14. Planning
+                agents auto-scheduling concrete retarder delays.
+              </p>
+            </div>
           </div>
-        </>
-      )}
+
+          <div className="glass-card p-5 space-y-4">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-stone-400 pl-1">
+              Compliance Health Index
+            </h3>
+            <div className="space-y-3.5">
+              <div>
+                <div className="flex justify-between text-[11px] mb-1 font-semibold text-stone-700">
+                  <span>Average Contract Verified Score</span>
+                  <span>78%</span>
+                </div>
+                <div className="progress-bar">
+                  <div
+                    className="progress-fill"
+                    style={{ width: "78%" }}
+                  ></div>
+                </div>
+              </div>
+              <div>
+                <div className="flex justify-between text-[11px] mb-1 font-semibold text-stone-700">
+                  <span>Average Blueprint Safety Compliance</span>
+                  <span>68%</span>
+                </div>
+                <div className="progress-bar">
+                  <div
+                    className="progress-fill"
+                    style={{ width: "68%", backgroundColor: "#F5C518" }}
+                  ></div>
+                </div>
+              </div>
+              <div className="pt-2 text-[10px] text-stone-400 text-center italic">
+                Autonomous review cycles occur every 12 hrs.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

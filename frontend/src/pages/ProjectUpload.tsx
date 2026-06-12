@@ -101,16 +101,22 @@ const agentSteps = [
     duration: 1800,
   },
   {
-    id: "risk",
-    name: "Risk Agent",
-    description: "Computing risk vectors & probabilities",
-    duration: 6200,
+    id: "schedule",
+    name: "Schedule Agent",
+    description: "Optimizing project timeline",
+    duration: 1800,
   },
   {
-    id: "recovery",
-    name: "Recovery Agent",
-    description: "Generating recovery strategies",
-    duration: 3400,
+    id: "supplier",
+    name: "Supplier Agent",
+    description: "Evaluating material supply chain",
+    duration: 2000,
+  },
+  {
+    id: "crew",
+    name: "Crew Agent",
+    description: "Assessing workforce requirements",
+    duration: 1400,
   },
 ];
 

@@ -5,6 +5,18 @@
 
 // ── Shared Primitives ────────────────────────────────────────
 
+export interface Project {
+  id: string;
+  name: string;
+  description: string;
+  budget: string;
+  status: 'LIVE' | 'PENDING' | 'UPCOMING';
+  progress: number;
+  location: string;
+  createdAt: string;
+  leadIcon: string;
+}
+
 export type Severity = 'critical' | 'high' | 'medium' | 'low' | 'info'
 export type Status   = 'pending' | 'running' | 'complete' | 'error' | 'warning'
 export type BadgeVariant = 'blue' | 'green' | 'red' | 'orange' | 'yellow' | 'purple' | 'gray'

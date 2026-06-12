@@ -97,7 +97,7 @@ export default function AgentInsights() {
         </div>
         <div className="flex items-center gap-2">
           <Badge variant="blue" dot pulse>
-            5 Agents Active
+            6 Agents Active
           </Badge>
           <Badge variant="green">System Healthy</Badge>
         </div>

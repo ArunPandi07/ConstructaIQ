@@ -11,7 +11,7 @@ import type { ApiResponse } from '../types'
 // ── Config ───────────────────────────────────────────────────
 
 /** Switch to your FastAPI server URL in production */
-const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000/api/v1'
+const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000/api'
 
 /** Default timeout in ms */
 const DEFAULT_TIMEOUT = 30_000
