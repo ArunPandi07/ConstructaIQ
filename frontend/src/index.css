@@ -387,6 +387,11 @@ thead tr th {
   --crew-gantt-text: #78716c;
 }
 
+.crew-gantt-inner {
+  width: 100%;
+  min-height: 220px;
+}
+
 .crew-gantt-wrap ._3_ygE,
 .crew-gantt-wrap ._2dZTy,
 .crew-gantt-wrap ._3ZbQT {
