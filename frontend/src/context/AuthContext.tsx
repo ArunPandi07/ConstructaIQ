@@ -4,8 +4,8 @@ import {
   useState,
   useCallback,
   useEffect,
-  ReactNode,
 } from 'react'
+import type { ReactNode } from 'react'
 import type { User } from '../types'
 import { login as apiLogin, logout as apiLogout, getCurrentUser } from '../services/authApi'
 

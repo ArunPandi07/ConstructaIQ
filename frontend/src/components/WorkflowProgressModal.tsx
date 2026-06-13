@@ -156,6 +156,7 @@ export function WorkflowProgressModal({
             ...a,
             status: 'completed' as AgentStatus,
             output: matchedKey ? resultRecord[matchedKey] : null,
+            startedAt: completionTime,
             completedAt: completionTime,
           };
         }),
@@ -395,15 +396,15 @@ export function WorkflowProgressModal({
           Until approved, generated changes remain in review state.
         </p>
 
-        {apiResult?.blueprintSummary && (
+        {!!apiResult?.blueprintSummary && (
           <div className="p-3 space-y-2 text-xs" style={{ background: 'var(--bg3)', borderRadius: 8 }}>
-            {(apiResult.blueprintSummary as Record<string, unknown>)?.revised_blueprint_summary && (
+            {!!(apiResult.blueprintSummary as Record<string, unknown>)?.revised_blueprint_summary && (
               <div>
                 <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>Summary: </span>
                 <span style={{ color: 'var(--text-secondary)' }}>{String((apiResult.blueprintSummary as Record<string, unknown>).revised_blueprint_summary)}</span>
               </div>
             )}
-            {(apiResult.blueprintSummary as Record<string, unknown>)?.modifications_made && (
+            {!!(apiResult.blueprintSummary as Record<string, unknown>)?.modifications_made && (
               <div>
                 <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>Modifications: </span>
                 <span style={{ color: 'var(--text-secondary)' }}>
@@ -467,7 +468,7 @@ function AgentResultCard({
             <span className="text-xs" style={{ color: 'var(--text-muted)' }}>✓ {agent.completedAt}</span>
           </div>
           <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{agent.description}</p>
-          {agent.output && (
+          {!!agent.output && (
             <div className="flex items-center gap-1 mt-1">
               <span className="text-xs" style={{ color: 'var(--blue-primary)' }}>
                 {expanded ? 'Hide details' : 'View details'}
@@ -475,13 +476,13 @@ function AgentResultCard({
             </div>
           )}
         </div>
-        {agent.output && (
+        {!!agent.output && (
           <div style={{ color: 'var(--text-muted)' }}>
             {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </div>
         )}
       </div>
-      {expanded && agent.output && (
+      {expanded && !!agent.output && (
         <div className="px-4 pb-3 pt-1">
           <pre
             className="text-xs p-3 overflow-x-auto whitespace-pre-wrap"
