@@ -3,6 +3,8 @@
 // Designed to mirror FastAPI Pydantic response schemas exactly.
 // ─────────────────────────────────────────────────────────────
 
+export type { BuildingDefinition } from "./building";
+
 // ── Shared Primitives ────────────────────────────────────────
 
 export interface Project {
@@ -147,6 +149,116 @@ export interface ProjectPhase {
   startDate: string
   endDate:   string
   progress:  number   // 0–100
+  isCritical?: boolean
+}
+
+export interface BudgetBreakdown {
+  total: string
+  material: string
+  labor: string
+  equipment: string
+  contingency: string
+  totalRaw?: number
+  materialRaw?: number
+  laborRaw?: number
+  equipmentRaw?: number
+  contingencyRaw?: number
+}
+
+export interface ScheduleDependency {
+  predecessor: string
+  successor: string
+  lagDays?: number
+}
+
+export interface ScheduleMaterial {
+  name: string
+  materialName?: string
+  category?: string
+  quantity?: number | string | null
+  unit?: string
+  unitCost?: number | null
+  totalCost?: number | null
+  supplierRecordId?: number | null
+}
+
+export interface Material {
+  material_name?: string
+  materialName?: string
+  name?: string
+  category?: string
+  quantity?: number | string | null
+  unit?: string | null
+  unit_cost?: number | string | null
+  unitCost?: number | null
+  total_cost?: number | string | null
+  totalCost?: number | null
+}
+
+export interface ProjectSupplierRow {
+  supplier_record_id?: number
+  supplier_name?: string | null
+  material_name?: string | null
+  quantity?: number | string | null
+  unit_price?: number | string | null
+  delivery_date?: string | null
+  total_cost?: number | string | null
+  [key: string]: unknown
+}
+
+export interface Recommendation {
+  id: number
+  sourceAgent: string
+  agentVersion?: string
+  category: string
+  title: string
+  description: string
+  priority: "High" | "Medium" | "Low"
+  status: "new" | "in_progress" | "completed"
+  actionUrl?: string
+}
+
+export interface InspectionItem {
+  name: string
+  phase: string
+  status: string
+  date: string
+}
+
+export interface ProjectRiskItem {
+  id: number
+  title: string
+  severity: string
+  detail: string
+  status: string
+  sourceAgent: string
+  category: string
+}
+
+export interface ReadinessMetrics {
+  agentCompletionPct: number
+  permitReadinessPct: number
+  phaseProgressPct: number
+  procurementReadinessPct: number
+  workforceReadinessPct: number
+  overallReadinessPct: number
+  documentsPct: number
+  permitsPct: number
+  crewPlanPct: number
+  hasBudgetBreakdown?: boolean
+}
+
+export interface BlueprintSummaryData {
+  construction_type?: string
+  stories_above_grade?: number
+  structural_steel_tons?: number
+  concrete_cy?: number
+  curtain_wall_sf?: number
+  lateral_system?: string
+  mep_highlights?: Record<string, unknown>
+  building_features?: unknown
+  likely_structural_details?: unknown
+  [key: string]: unknown
 }
 
 export interface ProjectIntelligenceData {
@@ -159,12 +271,23 @@ export interface ProjectIntelligenceData {
   startDate:         string
   endDate:           string
   floors:            number
-  complexity:        'Low' | 'Medium' | 'High' | 'Very High'
+  complexity:        string
   type:              string
   squareFootage:     string
   requiredPermits:   Permit[]
   crewRequirements:  CrewRequirement[]
   phases:            ProjectPhase[]
+  budgetBreakdown?:  BudgetBreakdown | null
+  dependencies?:     ScheduleDependency[]
+  materials?:        ScheduleMaterial[]
+  criticalPathPhases?: string[]
+  inspections?:      InspectionItem[]
+  supplyChainRisks?: ProjectRiskItem[]
+  workforceGaps?:    ProjectRiskItem[]
+  blueprintSummary?: BlueprintSummaryData | null
+  buildingDefinition?: import("./building").BuildingDefinition | null
+  readiness?:        ReadinessMetrics
+  recommendations?:  Recommendation[]
 }
 
 // ── Risk Intelligence ────────────────────────────────────────
@@ -423,7 +546,7 @@ export interface ProjectSummaryResponse {
 
 export interface ProjectSuppliersResponse {
   project_id: number
-  suppliers: Array<Record<string, unknown>>
+  suppliers: ProjectSupplierRow[]
 }
 
 export interface CrewPlanRead {
@@ -434,6 +557,8 @@ export interface CrewPlanRead {
   labor_cost?: number | string | null
   start_date?: string | null
   end_date?: string | null
+  headcount?: number | null
+  skill_type?: string | null
   created_at?: string
 }
 

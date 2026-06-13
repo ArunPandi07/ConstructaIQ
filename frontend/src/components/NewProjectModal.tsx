@@ -7,8 +7,6 @@ import {
   FileText,
   UploadCloud,
   Upload,
-  Bot,
-  Cpu,
   CheckCircle2,
   Loader2,
   FileCheck2,

@@ -22,6 +22,20 @@ class ProjectSupplierRepository(BaseRepository[ProjectSupplier]):
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
 
+    async def list_by_projects(
+        self, project_ids: list[int], *, limit: int = 5000
+    ) -> list[ProjectSupplier]:
+        if not project_ids:
+            return []
+        stmt = (
+            select(ProjectSupplier)
+            .where(ProjectSupplier.project_id.in_(project_ids))
+            .order_by(ProjectSupplier.project_id, ProjectSupplier.supplier_record_id)
+            .limit(limit)
+        )
+        result = await self.session.execute(stmt)
+        return list(result.scalars().all())
+
     async def delete_by_project(self, project_id: int) -> int:
         stmt = delete(ProjectSupplier).where(ProjectSupplier.project_id == project_id)
         result = await self.session.execute(stmt)

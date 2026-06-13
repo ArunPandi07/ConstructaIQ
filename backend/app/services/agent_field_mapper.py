@@ -5,6 +5,33 @@ from typing import Any
 AGENT_CONTRACT = "ContractAgent"
 AGENT_BLUEPRINT = "BlueprintAgent"
 AGENT_PERMIT = "PermitAgent"
+AGENT_SUPPLIER = "SupplierAgent"
+
+PROCUREMENT_ROW_ALIASES: dict[str, tuple[str, ...]] = {
+    "material_name": (
+        "material_name",
+        "MaterialName",
+        "material",
+        "item_name",
+        "name",
+    ),
+    "supplier_name": (
+        "supplier_name",
+        "SupplierName",
+        "vendor",
+        "supplier",
+        "Vendor",
+    ),
+    "quantity": ("quantity", "Quantity", "qty", "Qty"),
+    "unit_price": ("unit_price", "UnitPrice", "unit_cost", "UnitCost", "price"),
+    "delivery_date": (
+        "delivery_date",
+        "DeliveryDate",
+        "delivery",
+        "expected_delivery",
+    ),
+    "total_cost": ("total_cost", "TotalCost", "cost", "total"),
+}
 
 CONTRACT_FIELD_ALIASES: dict[str, tuple[str, ...]] = {
     "project_name": ("project_name", "ProjectName"),
@@ -57,6 +84,21 @@ CONTRACT_FIELD_ALIASES: dict[str, tuple[str, ...]] = {
     ),
     "complexity_level": ("complexity_level", "complexity", "Complexity", "ComplexityLevel"),
 }
+
+BLUEPRINT_PRESERVED_KEYS: tuple[str, ...] = (
+    "building_definition",
+    "buildingDefinition",
+    "facade",
+    "stories_above_grade",
+    "construction_type",
+    "structural_steel_tons",
+    "concrete_cy",
+    "curtain_wall_sf",
+    "lateral_system",
+    "mep_highlights",
+    "building_features",
+    "likely_structural_details",
+)
 
 BLUEPRINT_FIELD_ALIASES: dict[str, tuple[str, ...]] = {
     "project_name": ("project_name", "ProjectName"),
@@ -220,7 +262,20 @@ def normalize_contract_agent(data: dict[str, Any]) -> dict[str, Any]:
 
 def normalize_blueprint_agent(data: dict[str, Any]) -> dict[str, Any]:
     """Map BlueprintAgent Foundry keys to canonical snake_case."""
-    return _normalize_fields(data, BLUEPRINT_FIELD_ALIASES)
+    flat = _flatten_agent_payload(data)
+    result = _normalize_fields(data, BLUEPRINT_FIELD_ALIASES)
+
+    for key in BLUEPRINT_PRESERVED_KEYS:
+        value = _first_present(flat, key)
+        if not _is_empty(value):
+            result[key] = value
+
+    building_definition = result.get("building_definition") or result.get("buildingDefinition")
+    if isinstance(building_definition, dict):
+        result["building_definition"] = building_definition
+        result.pop("buildingDefinition", None)
+
+    return result
 
 
 def _normalize_permit_item(
@@ -268,6 +323,61 @@ def _normalize_permit_item(
         or default_documents,
     }
     return {k: v for k, v in row.items() if not _is_empty(v)}
+
+
+def _normalize_procurement_row(row: Any) -> dict[str, Any] | None:
+    if isinstance(row, str):
+        text = row.strip()
+        return {"material_name": text} if text else None
+    if not isinstance(row, dict):
+        return None
+
+    normalized: dict[str, Any] = {}
+    for canonical, aliases in PROCUREMENT_ROW_ALIASES.items():
+        value = _first_present(row, *aliases)
+        if not _is_empty(value):
+            normalized[canonical] = value
+
+    if not normalized.get("material_name") and not normalized.get("supplier_name"):
+        return None
+    return normalized
+
+
+def normalize_supplier_agent(data: dict[str, Any]) -> dict[str, Any]:
+    """Normalize SupplierAgent output; map procurement_plan field aliases."""
+    if not isinstance(data, dict):
+        return {}
+
+    flat = _flatten_agent_payload(data)
+    result: dict[str, Any] = {}
+
+    procurement_raw = _first_present(
+        flat,
+        "procurement_plan",
+        "ProcurementPlan",
+        "procurement",
+        "procurement_items",
+    )
+    if isinstance(procurement_raw, list):
+        normalized_rows: list[dict[str, Any]] = []
+        for item in procurement_raw:
+            row = _normalize_procurement_row(item)
+            if row:
+                normalized_rows.append(row)
+        if normalized_rows:
+            result["procurement_plan"] = normalized_rows
+
+    for key in (
+        "supply_chain_risks",
+        "recommended_suppliers",
+        "supply_chain_recommendations",
+        "procurement_recommendations",
+    ):
+        value = flat.get(key)
+        if not _is_empty(value):
+            result[key] = value
+
+    return result
 
 
 def normalize_permit_agent(data: dict[str, Any]) -> dict[str, Any]:
@@ -347,4 +457,6 @@ def normalize_agent_output(agent_name: str, data: dict[str, Any]) -> dict[str, A
         return normalize_blueprint_agent(data)
     if agent_name == AGENT_PERMIT:
         return normalize_permit_agent(data)
+    if agent_name == AGENT_SUPPLIER:
+        return normalize_supplier_agent(data)
     return data if isinstance(data, dict) else {}

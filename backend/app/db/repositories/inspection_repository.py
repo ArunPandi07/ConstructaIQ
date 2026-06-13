@@ -22,6 +22,20 @@ class InspectionRepository(BaseRepository[Inspection]):
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
 
+    async def list_by_projects(
+        self, project_ids: list[int], *, limit: int = 5000
+    ) -> list[Inspection]:
+        if not project_ids:
+            return []
+        stmt = (
+            select(Inspection)
+            .where(Inspection.project_id.in_(project_ids))
+            .order_by(Inspection.project_id, Inspection.inspection_id)
+            .limit(limit)
+        )
+        result = await self.session.execute(stmt)
+        return list(result.scalars().all())
+
     async def delete_by_project(self, project_id: int) -> int:
         stmt = delete(Inspection).where(Inspection.project_id == project_id)
         result = await self.session.execute(stmt)

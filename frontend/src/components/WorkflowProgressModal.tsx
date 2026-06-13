@@ -1,17 +1,24 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   X, CheckCircle2, Circle, Loader2, AlertCircle, HardHat,
-  Upload, FileText, ThumbsUp, ThumbsDown, Bot, Clock,
+  Upload, ThumbsUp, ThumbsDown, Bot,
   ChevronDown, ChevronUp,
 } from 'lucide-react';
 import type { Project } from '../types';
+import {
+  uploadProjectPdfs,
+  startAnalyze,
+  pollAnalyzeUntilComplete,
+  mapBackendProjectToUI,
+} from '../services/projectApi';
+import { useAppContext } from '../context/AppContext';
 
 interface WorkflowProgressModalProps {
   projectName: string;
   requirementsFile: File | null;
   blueprintFile: File | null;
   onClose: () => void;
-  onComplete: (project: Project, telemetry?: any) => void;
+  onComplete: (project: Project, telemetry?: unknown) => void;
 }
 
 type AgentStatus = 'pending' | 'in_progress' | 'completed' | 'failed';
@@ -22,7 +29,7 @@ interface AgentStepData {
   name: string;
   description: string;
   status: AgentStatus;
-  output: any;
+  output: unknown;
   startedAt: string;
   completedAt: string;
 }
@@ -56,6 +63,25 @@ const STATUS_ICON: Record<AgentStatus, React.ReactNode> = {
   failed:      <AlertCircle className="w-5 h-5" style={{ color: 'var(--red-primary)' }} />,
 };
 
+function updateAgentsFromProgressStep(
+  prev: AgentStepData[],
+  progressStep: string | null | undefined,
+  now: string,
+): AgentStepData[] {
+  if (!progressStep) return prev;
+  const runningIdx = prev.findIndex((a) => a.name === progressStep);
+  if (runningIdx < 0) return prev;
+  return prev.map((a, i) => {
+    if (i < runningIdx) {
+      return a.status === 'completed' ? a : { ...a, status: 'completed', completedAt: now };
+    }
+    if (i === runningIdx) {
+      return a.status === 'in_progress' ? a : { ...a, status: 'in_progress', startedAt: now };
+    }
+    return a.status === 'pending' ? a : { ...a, status: 'pending' };
+  });
+}
+
 export function WorkflowProgressModal({
   projectName,
   requirementsFile,
@@ -63,6 +89,7 @@ export function WorkflowProgressModal({
   onClose,
   onComplete,
 }: WorkflowProgressModalProps) {
+  const { setAnalyzeJobId, refreshProjects } = useAppContext();
   const [phase, setPhase] = useState<WorkflowPhase>('uploading');
   const [agents, setAgents] = useState<AgentStepData[]>(() =>
     AGENT_DEFS.map((a) => ({
@@ -73,13 +100,13 @@ export function WorkflowProgressModal({
       completedAt: '',
     })),
   );
-  const [apiResult, setApiResult] = useState<any>(null);
+  const [apiResult, setApiResult] = useState<Record<string, unknown> | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
-  const [revealedCount, setRevealedCount] = useState(0);
-  const [approved, setApproved] = useState(false);
+  const [overallPct, setOverallPct] = useState(0);
 
   const startTimeRef = useRef<string>('');
   const mountedRef = useRef(true);
+  const projectIdRef = useRef<number | null>(null);
 
   const startApiCall = useCallback(async () => {
     if (!requirementsFile && !blueprintFile) {
@@ -89,65 +116,60 @@ export function WorkflowProgressModal({
     }
 
     startTimeRef.current = formatTime(new Date());
-    setPhase('processing');
-    setAgents((prev) =>
-      prev.map((a) => ({
-        ...a,
-        status: 'in_progress' as AgentStatus,
-        startedAt: startTimeRef.current,
-      })),
-    );
+    setPhase('uploading');
 
     try {
-      const formData = new FormData();
-      formData.append('project_name', projectName.trim());
-      if (requirementsFile) formData.append('project_requirements', requirementsFile);
-      if (blueprintFile) formData.append('blueprint', blueprintFile);
+      const upload = await uploadProjectPdfs(
+        projectName.trim(),
+        requirementsFile ? [requirementsFile] : [],
+        blueprintFile ? [blueprintFile] : [],
+      );
+      if (!mountedRef.current) return;
 
-      const response = await fetch('/api/analyze/blueprint-revision', {
-        method: 'POST',
-        body: formData,
+      projectIdRef.current = upload.project_id;
+      setPhase('processing');
+
+      const job = await startAnalyze(upload.project_id);
+      if (!mountedRef.current) return;
+      setAnalyzeJobId(job.job_id);
+
+      const result = await pollAnalyzeUntilComplete(upload.project_id, job.job_id, {
+        onProgress: (status) => {
+          if (!mountedRef.current) return;
+          setOverallPct(status.overall_pct ?? 0);
+          setAgents((prev) =>
+            updateAgentsFromProgressStep(prev, status.progress_step, formatTime(new Date())),
+          );
+        },
       });
 
-      if (!response.ok) {
-        const errBody = await response.json().catch(() => ({}));
-        throw new Error(errBody.detail || `HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const result = await response.json();
       if (!mountedRef.current) return;
 
       const completionTime = formatTime(new Date());
+      const resultRecord = result as unknown as Record<string, unknown>;
+      setApiResult(resultRecord);
 
-      setApiResult(result);
-
-      const updatedAgents = agents.map((a) => {
-        const matchedKey = Object.entries(AGENT_KEY_MAP).find(([, v]) => v === a.id)?.[0];
-        return {
-          ...a,
-          status: 'completed' as AgentStatus,
-          output: matchedKey ? result[matchedKey] : null,
-          completedAt: completionTime,
-        };
-      });
-      setAgents(updatedAgents);
+      setAgents(
+        AGENT_DEFS.map((a) => {
+          const matchedKey = Object.entries(AGENT_KEY_MAP).find(([, v]) => v === a.id)?.[0];
+          return {
+            ...a,
+            status: 'completed' as AgentStatus,
+            output: matchedKey ? resultRecord[matchedKey] : null,
+            completedAt: completionTime,
+          };
+        }),
+      );
+      setOverallPct(100);
       setPhase('completed');
-
-      let count = 0;
-      const interval = setInterval(() => {
-        count++;
-        setRevealedCount(count);
-        if (count >= AGENT_DEFS.length) clearInterval(interval);
-      }, 250);
-    } catch (err: any) {
+      void refreshProjects(true);
+    } catch (err: unknown) {
       if (!mountedRef.current) return;
       setPhase('error');
-      setErrorMessage(err.message || 'An unexpected error occurred during analysis.');
-      setAgents((prev) =>
-        prev.map((a) => ({ ...a, status: 'failed' as AgentStatus })),
-      );
+      setErrorMessage(err instanceof Error ? err.message : 'An unexpected error occurred during analysis.');
+      setAgents((prev) => prev.map((a) => ({ ...a, status: 'failed' as AgentStatus })));
     }
-  }, [projectName, requirementsFile, blueprintFile, agents]);
+  }, [projectName, requirementsFile, blueprintFile, setAnalyzeJobId, refreshProjects]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -156,37 +178,36 @@ export function WorkflowProgressModal({
   }, []);
 
   const handleApprove = () => {
-    setApproved(true);
     setPhase('approved');
 
-    const result = apiResult;
-    const ps = result?.projectSummary || {};
-    const bs = result?.blueprintSummary || {};
+    const ps = (apiResult?.projectSummary as Record<string, unknown> | undefined) ?? {};
+    const bs = (apiResult?.blueprintSummary as Record<string, unknown> | undefined) ?? {};
 
-    const newProj: Project = {
-      id: 'proj-' + Date.now(),
-      name: projectName,
-      description: bs?.revised_blueprint_summary || `Revised blueprint from ${requirementsFile?.name || 'requirements'} + ${blueprintFile?.name || 'blueprint'}`,
-      budget: ps?.budget || '$2.5M',
-      status: 'LIVE',
-      progress: 20,
-      location: ps?.location || 'Austin, TX',
-      createdAt: new Date().toLocaleDateString('en-US', {
-        month: 'short', day: 'numeric', year: 'numeric',
-      }),
-      leadIcon: 'DraftingCompass',
-    };
+    const projectId = projectIdRef.current;
+    const newProj: Project = projectId != null
+      ? mapBackendProjectToUI({ project_id: projectId, project_name: projectName }, 100)
+      : {
+          id: 'proj-' + Date.now(),
+          name: projectName,
+          description: String(bs?.revised_blueprint_summary ?? `Revised blueprint from ${requirementsFile?.name ?? 'requirements'}`),
+          budget: String(ps?.budget ?? '$2.5M'),
+          status: 'LIVE',
+          progress: 100,
+          location: String(ps?.location ?? 'Austin, TX'),
+          createdAt: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+          leadIcon: 'DraftingCompass',
+        };
 
     setTimeout(() => {
-      onComplete(newProj, result);
+      onComplete(newProj, apiResult);
     }, 1200);
   };
 
   const handleRetry = () => {
     setErrorMessage('');
     setApiResult(null);
+    setOverallPct(0);
     setPhase('uploading');
-    setRevealedCount(0);
     setAgents(AGENT_DEFS.map((a) => ({
       ...a,
       status: 'pending' as AgentStatus,
@@ -201,8 +222,6 @@ export function WorkflowProgressModal({
     onClose();
   };
 
-  // ── Shared modal wrapper ────────────────────────────────────
-
   const modalFrame = (body: React.ReactNode) => (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
       <div
@@ -216,7 +235,6 @@ export function WorkflowProgressModal({
           maxHeight: '85vh',
         }}
       >
-        {/* Header */}
         <div
           className="text-white p-5 flex justify-between items-center shrink-0"
           style={{ background: '#242445' }}
@@ -234,7 +252,7 @@ export function WorkflowProgressModal({
               </h2>
               <p className="text-xs" style={{ color: 'var(--sidebar-text)' }}>
                 {phase === 'uploading' && 'Uploading documents...'}
-                {phase === 'processing' && 'AI agents processing...'}
+                {phase === 'processing' && `AI agents processing… ${overallPct > 0 ? `${overallPct}%` : ''}`}
                 {phase === 'completed' && 'All agents completed'}
                 {phase === 'approved' && 'Approved ✓'}
                 {phase === 'error' && 'Workflow failed'}
@@ -248,7 +266,6 @@ export function WorkflowProgressModal({
           )}
         </div>
 
-        {/* Body */}
         <div className="p-5 overflow-y-auto flex-1">
           {body}
         </div>
@@ -256,15 +273,13 @@ export function WorkflowProgressModal({
     </div>
   );
 
-  // ── Phase: Uploading ────────────────────────────────────────
-
   if (phase === 'uploading') {
     return modalFrame(
       <div className="flex flex-col items-center justify-center py-10 text-center">
         <Upload className="w-12 h-12 mb-4 animate-pulse" style={{ color: 'var(--blue-primary)' }} />
         <h3 className="text-base font-bold mb-1" style={{ color: 'var(--text-primary)' }}>Uploading Documents</h3>
         <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-          Sending {requirementsFile?.name || 'requirements'} and {blueprintFile?.name || 'blueprint'} to analysis pipeline...
+          Sending {requirementsFile?.name ?? 'requirements'} and {blueprintFile?.name ?? 'blueprint'} to analysis pipeline...
         </p>
         <div className="w-full max-w-xs progress-bar mt-5">
           <div className="progress-fill animate-pulse" style={{ width: '60%', background: 'var(--blue-primary)' }} />
@@ -272,8 +287,6 @@ export function WorkflowProgressModal({
       </div>,
     );
   }
-
-  // ── Phase: Error ────────────────────────────────────────────
 
   if (phase === 'error') {
     return modalFrame(
@@ -294,8 +307,6 @@ export function WorkflowProgressModal({
     );
   }
 
-  // ── Phase: Approved ─────────────────────────────────────────
-
   if (phase === 'approved') {
     return modalFrame(
       <div className="flex flex-col items-center justify-center py-10 text-center">
@@ -310,18 +321,15 @@ export function WorkflowProgressModal({
     );
   }
 
-  // ── Phase: Processing ───────────────────────────────────────
-
-  const allPending = agents.every((a) => a.status === 'pending' || a.status === 'in_progress');
-
   if (phase === 'processing') {
     return modalFrame(
       <div className="space-y-4">
-        {phase === 'processing' && (
-          <div className="w-full progress-bar mb-2">
-            <div className="progress-fill animate-pulse" style={{ width: '90%', background: 'var(--blue-primary)' }} />
-          </div>
-        )}
+        <div className="w-full progress-bar mb-2">
+          <div
+            className="progress-fill transition-all duration-500"
+            style={{ width: `${overallPct}%`, background: 'var(--blue-primary)' }}
+          />
+        </div>
 
         <p className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
           Started at {startTimeRef.current || '...'}
@@ -356,36 +364,26 @@ export function WorkflowProgressModal({
     );
   }
 
-  // ── Phase: Completed ────────────────────────────────────────
-
   return modalFrame(
     <div className="space-y-5">
-      {/* Overall status badge */}
       <div className="flex items-center gap-2 px-4 py-2.5" style={{ background: 'var(--green-bg)', borderRadius: 10, border: '1px solid var(--green-border)' }}>
         <CheckCircle2 className="w-5 h-5 shrink-0" style={{ color: 'var(--green-primary)' }} />
         <span className="text-sm font-semibold" style={{ color: 'var(--green-primary)' }}>All agents completed successfully</span>
       </div>
 
-      {/* Agent results */}
       <div className="space-y-1">
         {agents.map((agent, idx) => (
           <AgentResultCard
             key={agent.id}
             agent={agent}
             index={idx}
-            isRevealed={idx < revealedCount}
           />
         ))}
       </div>
 
-      {/* ── Human Verification ──────────────────────────────── */}
       <div
         className="p-5 space-y-4"
-        style={{
-          background: 'var(--card)',
-          borderRadius: 12,
-          border: '2px solid var(--amber-border)',
-        }}
+        style={{ background: 'var(--card)', borderRadius: 12, border: '2px solid var(--amber-border)' }}
       >
         <div className="flex items-center gap-2">
           <HardHat className="w-5 h-5" style={{ color: 'var(--amber)' }} />
@@ -399,19 +397,19 @@ export function WorkflowProgressModal({
 
         {apiResult?.blueprintSummary && (
           <div className="p-3 space-y-2 text-xs" style={{ background: 'var(--bg3)', borderRadius: 8 }}>
-            {apiResult.blueprintSummary.revised_blueprint_summary && (
+            {(apiResult.blueprintSummary as Record<string, unknown>)?.revised_blueprint_summary && (
               <div>
                 <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>Summary: </span>
-                <span style={{ color: 'var(--text-secondary)' }}>{apiResult.blueprintSummary.revised_blueprint_summary}</span>
+                <span style={{ color: 'var(--text-secondary)' }}>{String((apiResult.blueprintSummary as Record<string, unknown>).revised_blueprint_summary)}</span>
               </div>
             )}
-            {apiResult.blueprintSummary.modifications_made && (
+            {(apiResult.blueprintSummary as Record<string, unknown>)?.modifications_made && (
               <div>
                 <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>Modifications: </span>
                 <span style={{ color: 'var(--text-secondary)' }}>
-                  {Array.isArray(apiResult.blueprintSummary.modifications_made)
-                    ? apiResult.blueprintSummary.modifications_made.join('; ')
-                    : apiResult.blueprintSummary.modifications_made}
+                  {Array.isArray((apiResult.blueprintSummary as Record<string, unknown>).modifications_made)
+                    ? ((apiResult.blueprintSummary as Record<string, unknown>).modifications_made as string[]).join('; ')
+                    : String((apiResult.blueprintSummary as Record<string, unknown>).modifications_made)}
                 </span>
               </div>
             )}
@@ -441,27 +439,17 @@ export function WorkflowProgressModal({
   );
 }
 
-// ── Agent Result Card ───────────────────────────────────────────
-
 function AgentResultCard({
   agent,
   index,
-  isRevealed,
 }: {
   agent: AgentStepData;
   index: number;
-  isRevealed: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div
-      className="transition-all duration-300"
-      style={{
-        opacity: isRevealed ? 1 : 0,
-        transform: isRevealed ? 'translateY(0)' : 'translateY(8px)',
-      }}
-    >
+    <div>
       <div
         className="flex items-start gap-3 px-4 py-3 cursor-pointer"
         style={{

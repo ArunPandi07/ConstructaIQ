@@ -22,6 +22,20 @@ class CrewPlanRepository(BaseRepository[CrewPlan]):
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
 
+    async def list_by_projects(
+        self, project_ids: list[int], *, limit: int = 5000
+    ) -> list[CrewPlan]:
+        if not project_ids:
+            return []
+        stmt = (
+            select(CrewPlan)
+            .where(CrewPlan.project_id.in_(project_ids))
+            .order_by(CrewPlan.project_id, CrewPlan.crew_plan_id)
+            .limit(limit)
+        )
+        result = await self.session.execute(stmt)
+        return list(result.scalars().all())
+
     async def delete_by_project(self, project_id: int) -> int:
         stmt = delete(CrewPlan).where(CrewPlan.project_id == project_id)
         result = await self.session.execute(stmt)

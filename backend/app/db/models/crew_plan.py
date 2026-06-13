@@ -4,7 +4,7 @@ from datetime import date
 from decimal import Decimal
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import BigInteger, Date, ForeignKey, Identity, Numeric, String
+from sqlalchemy import BigInteger, Date, ForeignKey, Identity, Integer, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -28,5 +28,7 @@ class CrewPlan(Base, CreatedAtMixin):
     labor_cost: Mapped[Optional[Decimal]] = mapped_column(Numeric(18, 2))
     start_date: Mapped[Optional[date]] = mapped_column(Date)
     end_date: Mapped[Optional[date]] = mapped_column(Date)
+    headcount: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    skill_type: Mapped[Optional[str]] = mapped_column(String(255))
 
     project: Mapped[Project] = relationship(back_populates="crew_plans")

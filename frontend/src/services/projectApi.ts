@@ -152,7 +152,7 @@ export async function pollAnalyzeUntilComplete(
   jobId: string,
   options: PollAnalyzeOptions = {},
 ): Promise<AnalyzePipelineResult> {
-  const { intervalMs = 5000, maxAttempts = 72, onProgress } = options
+  const { intervalMs = 1000, maxAttempts = 120, onProgress } = options
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const status = await getAnalyzeStatus(projectId, jobId)

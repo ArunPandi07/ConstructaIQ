@@ -379,7 +379,14 @@ thead tr th {
   padding: 8px !important;
 }
 
-/* Crew plan Gantt — align with ConstructaIQ palette */
+/* Crew plan Gantt — ConstructaIQ palette */
+.crew-gantt-wrap {
+  --crew-gantt-today: rgba(245, 197, 24, 0.12);
+  --crew-gantt-header-bg: #f5c51840;
+  --crew-gantt-grid: #e7e5e4;
+  --crew-gantt-text: #78716c;
+}
+
 .crew-gantt-wrap ._3_ygE,
 .crew-gantt-wrap ._2dZTy,
 .crew-gantt-wrap ._3ZbQT {
@@ -387,10 +394,19 @@ thead tr th {
 }
 
 .crew-gantt-wrap svg text {
-  fill: #78716c;
+  fill: var(--crew-gantt-text);
   font-size: 11px;
 }
 
 .crew-gantt-wrap ._3lLk3 {
-  stroke: #e7e5e4;
+  stroke: var(--crew-gantt-grid);
+}
+
+.crew-gantt-wrap thead tr th {
+  background: var(--crew-gantt-header-bg) !important;
+}
+
+.crew-gantt-wrap ._2B2zv,
+.crew-gantt-wrap ._3eULf {
+  border-color: var(--crew-gantt-grid);
 }

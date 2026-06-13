@@ -3,6 +3,7 @@ from app.schemas.agent_execution import (
     AgentExecutionRead,
     AgentExecutionUpdate,
 )
+from app.schemas.building_definition import BuildingDefinition
 from app.schemas.budget import BudgetCreate, BudgetRead, BudgetUpdate
 from app.schemas.crew_master import CrewMasterCreate, CrewMasterRead, CrewMasterUpdate
 from app.schemas.crew_plan import CrewPlanCreate, CrewPlanRead, CrewPlanUpdate
@@ -31,6 +32,7 @@ __all__ = [
     "AgentExecutionCreate",
     "AgentExecutionRead",
     "AgentExecutionUpdate",
+    "BuildingDefinition",
     "BudgetCreate",
     "BudgetRead",
     "BudgetUpdate",

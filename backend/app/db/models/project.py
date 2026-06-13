@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from app.db.models.document import Document
     from app.db.models.inspection import Inspection
     from app.db.models.permit import Permit
+    from app.db.models.project_risk import ProjectRisk
     from app.db.models.project_supplier import ProjectSupplier
     from app.db.models.schedule import Schedule
 
@@ -64,5 +65,8 @@ class Project(Base):
         back_populates="project", cascade="all, delete-orphan"
     )
     budgets: Mapped[list[Budget]] = relationship(
+        back_populates="project", cascade="all, delete-orphan"
+    )
+    project_risks: Mapped[list[ProjectRisk]] = relationship(
         back_populates="project", cascade="all, delete-orphan"
     )

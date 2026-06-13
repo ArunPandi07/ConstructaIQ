@@ -1,7 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import {
   Building2,
-  HardHat,
   AlertTriangle,
   ArrowRight,
   MapPin,
@@ -45,6 +44,10 @@ export default function Dashboard() {
 
   const activeCount =
     dashboard?.kpi.activeProjects ?? activeProjects.length;
+  const openRisks = dashboard?.kpi.openRisks ?? 0;
+  const riskProjects = dashboard?.kpi.riskProjects ?? 0;
+  const recoveryPlans = dashboard?.kpi.recoveryPlans ?? 0;
+  const riskDistribution = dashboard?.riskDistribution ?? [];
 
   const recentActivities = dashboard?.recentActivities ?? [];
   const totalTokens = dashboard?.totalTokensRecent ?? 0;
@@ -118,7 +121,7 @@ export default function Dashboard() {
         </div>
         <div className="mt-6 pt-5 border-t border-stone-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-3 text-xs text-stone-500">
           <span className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
             6 Autonomous Coordinator Agents analyzing {activeCount}{" "}
             active construction sites in parallel
           </span>
@@ -135,6 +138,33 @@ export default function Dashboard() {
             <Plus className="w-4 h-4" style={{ color: "#000" }} />
             On Board New Project
           </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="glass-card p-4 text-center">
+          <p className="text-[10px] text-stone-400 font-bold uppercase">Open Risks</p>
+          <p className="text-2xl font-black text-rose-600 mt-1 font-mono">
+            {isLoading ? "—" : openRisks}
+          </p>
+        </div>
+        <div className="glass-card p-4 text-center">
+          <p className="text-[10px] text-stone-400 font-bold uppercase">At-Risk Projects</p>
+          <p className="text-2xl font-black text-amber-600 mt-1 font-mono">
+            {isLoading ? "—" : riskProjects}
+          </p>
+        </div>
+        <div className="glass-card p-4 text-center">
+          <p className="text-[10px] text-stone-400 font-bold uppercase">Recovery Plans</p>
+          <p className="text-2xl font-black text-stone-900 mt-1 font-mono">
+            {isLoading ? "—" : recoveryPlans}
+          </p>
+        </div>
+        <div className="glass-card p-4 text-center">
+          <p className="text-[10px] text-stone-400 font-bold uppercase">On Time</p>
+          <p className="text-2xl font-black text-emerald-600 mt-1 font-mono">
+            {isLoading ? "—" : dashboard?.kpi.onTimeProjects ?? 0}
+          </p>
         </div>
       </div>
 
@@ -255,7 +285,7 @@ export default function Dashboard() {
             <div className="space-y-4">
               <div className="flex justify-between items-center pb-3 border-b border-white/5">
                 <div className="flex items-center gap-1.5 text-xs font-bold text-zinc-100">
-                  <span className="w-2 h-2 rounded-full bg-[#F5C518] animate-ping"></span>
+                  <span className="w-2 h-2 rounded-full bg-[#F5C518]"></span>
                   Global Log Stream
                 </div>
               </div>
@@ -325,6 +355,22 @@ export default function Dashboard() {
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+
+          {riskDistribution.length > 0 && (
+            <div className="glass-card p-5 space-y-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-stone-400">
+                Risk by Category
+              </h3>
+              {riskDistribution.map((item) => (
+                <div key={item.name} className="flex justify-between text-xs">
+                  <span className="text-stone-600">{item.name}</span>
+                  <span className="font-bold font-mono text-stone-900">
+                    {item.value}
+                  </span>
+                </div>
+              ))}
             </div>
           )}
 

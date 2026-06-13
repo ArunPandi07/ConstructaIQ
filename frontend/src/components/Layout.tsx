@@ -97,7 +97,7 @@ export default function Layout() {
               className="p-2.5 rounded-full hover:bg-stone-100 text-stone-500 transition relative shrink-0"
               aria-label="Notifications"
             >
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-600 rounded-full animate-bounce"></span>
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-600 rounded-full"></span>
               <Bell className="w-5 h-5" />
             </button>
 

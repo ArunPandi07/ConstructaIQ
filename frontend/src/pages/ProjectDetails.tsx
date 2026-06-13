@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, lazy, Suspense } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {
   Building2,
@@ -19,17 +19,23 @@ import {
   mapBackendProjectToUI,
   PIPELINE_AGENT_NAMES,
 } from "../services/projectApi";
+const Blueprint3DTab = lazy(() => import("../components/Blueprint3DTab"));
+const BuildingPreviewCarousel = lazy(() => import("../components/BuildingPreviewCarousel"));
+const BuildingSnapshotCapture = lazy(() => import("../components/building3d/BuildingSnapshotCapture"));
+import BlueprintSummaryPanel from "../components/BlueprintSummaryPanel";
+import BudgetBreakdownPanel from "../components/BudgetBreakdownPanel";
 import CrewPlanGantt from "../components/CrewPlanGantt";
-import type { CrewPlanRead, Project } from "../types";
+import InspectionChecklist from "../components/InspectionChecklist";
+import MaterialsPanel from "../components/MaterialsPanel";
+import ProjectRisksPanel from "../components/ProjectRisksPanel";
+import RecommendationsPanel from "../components/RecommendationsPanel";
+import SchedulePanel from "../components/SchedulePanel";
+import type { CrewPlanRead, Project, ProjectSupplierRow } from "../types";
 import {
-  agentIcon,
-  agentStatusLabel,
-  agentStatusStyle,
-  aggregateAgentUsage,
   countCompletedAgents,
   latestByAgent,
-  summarizeOutputJson,
 } from "../utils/agentHelpers";
+import { useBuildingSnapshots } from "../hooks/useBuildingSnapshots";
 
 export default function ProjectDetails() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -46,7 +52,7 @@ export default function ProjectDetails() {
     error: intelligenceError,
   } = useProjectIntelligence(projectId ?? "");
   const {
-    data: agentExecutions = [],
+    data: agentExecutions,
     loading: agentsLoading,
     error: agentsError,
   } = useProjectAgents(projectId ?? "");
@@ -55,9 +61,46 @@ export default function ProjectDetails() {
   const [projectLoading, setProjectLoading] = useState(false);
   const [projectError, setProjectError] = useState<string | null>(null);
   const [supplierCount, setSupplierCount] = useState(0);
-  const [crewCount, setCrewCount] = useState(0);
-  const [suppliers, setSuppliers] = useState<Array<Record<string, unknown>>>([]);
+  const [suppliers, setSuppliers] = useState<ProjectSupplierRow[]>([]);
   const [crewPlans, setCrewPlans] = useState<CrewPlanRead[]>([]);
+  type TabId =
+    | "overview"
+    | "budget"
+    | "schedule"
+    | "materials"
+    | "inspections"
+    | "risks"
+    | "recommendations"
+    | "blueprint"
+    | "3d_view";
+  const [activeTab, setActiveTab] = useState<TabId>("overview");
+  const [activatedTabs, setActivatedTabs] = useState<Set<TabId>>(
+    () => new Set(["overview"] as TabId[]),
+  );
+
+  function handleTabChange(tabId: TabId) {
+    setActiveTab(tabId);
+    setActivatedTabs((prev) => {
+      if (prev.has(tabId)) return prev;
+      return new Set([...prev, tabId]);
+    });
+  }
+
+  const deferSnapshotCapture = activeTab === "3d_view";
+  const {
+    shots: snapshotShots,
+    status: snapshotStatus,
+    progress: snapshotProgress,
+    shouldCapture,
+    regenerate: regenerateSnapshots,
+    onCaptureComplete,
+    onCaptureProgress,
+    onCaptureError,
+  } = useBuildingSnapshots({
+    projectId,
+    buildingDefinition: intelligence?.buildingDefinition,
+    deferCapture: deferSnapshotCapture,
+  });
 
   useEffect(() => {
     if (projectId && isBackendProjectId(projectId)) {
@@ -80,29 +123,30 @@ export default function ProjectDetails() {
   }, [projectId, project]);
 
   useEffect(() => {
+    if (!activatedTabs.has("materials")) return;
     if (!projectId || !isBackendProjectId(projectId)) return;
-    const id = Number(projectId);
-    getProjectSuppliers(id)
+    getProjectSuppliers(Number(projectId))
       .then((res) => {
         setSupplierCount(res.suppliers.length);
         setSuppliers(res.suppliers);
       })
       .catch(() => undefined);
-    getProjectCrew(id)
-      .then((res) => {
-        setCrewCount(res.crew_plans.length);
-        setCrewPlans(res.crew_plans);
-      })
-      .catch(() => undefined);
-  }, [projectId]);
+  }, [activatedTabs, projectId]);
 
-  const executionList = agentExecutions ?? [];
+  useEffect(() => {
+    if (!activatedTabs.has("schedule")) return;
+    if (!projectId || !isBackendProjectId(projectId)) return;
+    getProjectCrew(Number(projectId))
+      .then((res) => setCrewPlans(res.crew_plans))
+      .catch(() => undefined);
+  }, [activatedTabs, projectId]);
+
+  const executionList = useMemo(() => agentExecutions ?? [], [agentExecutions]);
   const byAgent = useMemo(
     () => latestByAgent(executionList),
     [executionList],
   );
   const completedAgentCount = countCompletedAgents(byAgent);
-  const agentUsage = aggregateAgentUsage(executionList);
 
   const pageLoading =
     (projectLoading || intelligenceLoading || agentsLoading) && !selectedProj;
@@ -138,74 +182,37 @@ export default function ProjectDetails() {
     );
   }
 
-  const progress = selectedProj.progress;
   const permitList = intelligence?.requiredPermits ?? [];
   const phaseList = intelligence?.phases ?? [];
-  const telemetry = {
-    contractAnalysisScore: progress,
-    blueprintReviewScore: Math.min(progress + 5, 100),
-    permitRequiredCount: permitList.length || 0,
-    budgetScore: progress,
-    siteReadiness: {
-      documents: progress,
-      permits: permitList.length
-        ? Math.round(
-            (permitList.filter((p) => p.status === "Approved").length /
-              permitList.length) *
-              100,
-          )
-        : 0,
-      crewPlan: crewCount > 0 ? Math.min(50 + crewCount * 10, 100) : 0,
-    },
-    contractSummaryText: intelligence?.client
-      ? `Client: ${intelligence.client}. ${intelligence.duration} duration at ${intelligence.location}.`
-      : selectedProj.description || "No contract summary until analyze completes.",
-    blueprintAnalysisText: intelligence?.squareFootage
-      ? `${intelligence.floors} floors, ${intelligence.squareFootage} SF, ${intelligence.complexity} complexity.`
-      : "Blueprint details populate after BlueprintAgent runs.",
-    permitStatusText:
-      permitList.length > 0
-        ? permitList.map((p) => `${p.name} (${p.status})`).join("; ")
-        : "No permits persisted yet.",
-    budgetBreakdownText: intelligence?.budget
-      ? `Contract budget: ${intelligence.budget}. ${supplierCount} supplier row(s), ${crewCount} crew plan(s) in database.`
-      : "Budget breakdown available after analyze persistence.",
-  };
+  const readiness = intelligence?.readiness;
 
-  const siteReadiness = telemetry.siteReadiness;
-  const overallReadiness = Math.round(
-    (siteReadiness.documents + siteReadiness.permits + siteReadiness.crewPlan) /
-      3,
-  );
-  const contractScore = telemetry.contractAnalysisScore;
-  const blueprintScore = telemetry.blueprintReviewScore;
-  const permitsCount =
-    intelligence?.requiredPermits?.length ?? telemetry.permitRequiredCount;
-  const permitsScore = permitList.length
-    ? Math.round(
-        (permitList.filter((p) => p.status === "Approved").length /
-          permitList.length) *
-          100,
-      )
-    : 0;
-  const supplierMetric = supplierCount > 0 ? Math.min(60 + supplierCount * 8, 95) : 0;
-  const crewMetric = crewCount > 0 ? Math.min(60 + crewCount * 6, 95) : 0;
-  const phaseProgressAvg =
-    phaseList.length > 0
-      ? Math.round(
-          phaseList.reduce((acc, ph) => acc + (ph.progress ?? 0), 0) /
-            phaseList.length,
-        )
-      : 0;
-  const timelineScore = phaseProgressAvg || Math.round((completedAgentCount / 6) * 100);
+  const overallReadiness = readiness?.overallReadinessPct ?? selectedProj.progress;
+  const siteReadiness = {
+    documents: readiness?.documentsPct ?? readiness?.agentCompletionPct ?? 0,
+    permits: readiness?.permitsPct ?? readiness?.permitReadinessPct ?? 0,
+    crewPlan: readiness?.crewPlanPct ?? readiness?.workforceReadinessPct ?? 0,
+  };
+  const permitsCount = permitList.length;
 
   const agentMetrics = [
-    { label: "Contract", icon: "📜", val: Math.min(contractScore, 95) },
-    { label: "Blueprint", icon: "📐", val: Math.min(blueprintScore, 90) },
-    { label: "Permits", icon: "🏛️", val: Math.min(permitsScore, 95) },
-    { label: "Timeline", icon: "🗓️", val: timelineScore },
-    { label: "Suppliers", icon: "🚚", val: supplierMetric },
-    { label: "Crew Ops", icon: "👷", val: crewMetric },
+    { label: "Contract", icon: "📜", val: readiness?.agentCompletionPct ?? 0 },
+    { label: "Blueprint", icon: "📐", val: readiness?.agentCompletionPct ?? 0 },
+    { label: "Permits", icon: "🏛️", val: readiness?.permitReadinessPct ?? 0 },
+    { label: "Timeline", icon: "🗓️", val: readiness?.phaseProgressPct ?? 0 },
+    { label: "Suppliers", icon: "🚚", val: readiness?.procurementReadinessPct ?? 0 },
+    { label: "Crew Ops", icon: "👷", val: readiness?.workforceReadinessPct ?? 0 },
+  ];
+
+  const detailTabs = [
+    { id: "overview" as const, label: "Overview" },
+    { id: "budget" as const, label: "Budget" },
+    { id: "schedule" as const, label: "Schedule" },
+    { id: "materials" as const, label: "Materials" },
+    { id: "inspections" as const, label: "Inspections" },
+    { id: "risks" as const, label: "Risks" },
+    { id: "recommendations" as const, label: "Recommendations" },
+    { id: "blueprint" as const, label: "Blueprint" },
+    { id: "3d_view" as const, label: "3D View" },
   ];
 
   const pendingPermits = permitList.filter((p) => p.status !== "Approved");
@@ -367,67 +374,29 @@ export default function ProjectDetails() {
           </div>
         </div>
 
-        {/* AGENT REALTIME MONITOR ACTIONS BARS CHART */}
-        <div className="glass-card p-6 flex flex-col justify-between xl:col-span-8 w-full min-h-[380px]">
-          <div className="flex-1 flex flex-col">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-sm font-bold text-stone-900 tracking-tight flex items-center gap-2">
-                <Bot className="w-4 h-4 text-[#F5C518]" />
-                Focused Agent Activities
-              </h3>
+        {/* 3D BUILDING PREVIEW CAROUSEL */}
+        <div className="glass-card p-6 flex flex-col xl:col-span-8 w-full min-h-[380px]">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-sm font-bold text-stone-900 tracking-tight flex items-center gap-2">
+              <Building2 className="w-4 h-4 text-[#F5C518]" />
+              3D Building Previews
+            </h3>
+            {snapshotStatus === "ready" && snapshotShots.length > 0 && (
               <span className="text-[9px] bg-stone-100 text-stone-500 font-bold px-2 py-0.5 rounded-md font-mono uppercase">
-                {completedAgentCount}/{PIPELINE_AGENT_NAMES.length} complete
+                {snapshotShots.length} views
               </span>
-            </div>
-            <div className="grid grid-cols-6 gap-3 flex-1 min-h-[200px] items-end pt-4 pb-2 border-b border-stone-100">
-              {agentMetrics.map((agent) => (
-                <div
-                  key={agent.label}
-                  className="flex flex-col items-center h-full justify-end group/bar relative min-w-0"
-                >
-                  <div className="absolute -top-7 hidden group-hover/bar:block bg-[#1B1B1C] text-white text-[9px] px-1.5 py-0.5 rounded-sm whitespace-nowrap z-30 shadow-md">
-                    {agent.label}: {agent.val}%
-                  </div>
-                  <div className="w-full bg-stone-100 rounded-t-lg h-[160px] flex items-end overflow-hidden">
-                    <div
-                      className="bg-[#F5C518] hover:bg-[#E2B30D] w-full rounded-t-lg transition-all duration-1000 relative"
-                      style={{ height: `${Math.max(agent.val, 4)}%` }}
-                    />
-                  </div>
-                  <span className="text-[10px] mt-2 font-bold text-stone-500 truncate w-full text-center">
-                    {agent.label}
-                  </span>
-                  <span className="text-base -mt-0.5">{agent.icon}</span>
-                </div>
-              ))}
-            </div>
+            )}
           </div>
-          <div className="grid grid-cols-3 gap-3 text-center pt-4 w-full">
-            <div className="bg-stone-50 p-3 rounded-xl">
-              <p className="text-[9px] text-stone-400 font-medium uppercase tracking-wide">
-                Site Scores Avg
-              </p>
-              <p className="text-sm font-black text-stone-900 mt-0.5">
-                {Math.round((contractScore + blueprintScore) / 2)}%
-              </p>
-            </div>
-            <div className="bg-stone-50 p-3 rounded-xl">
-              <p className="text-[9px] text-stone-400 font-medium uppercase tracking-wide">
-                Agent Loops
-              </p>
-              <p className="text-sm font-black text-stone-900 mt-0.5">
-                {completedAgentCount} / {PIPELINE_AGENT_NAMES.length}
-              </p>
-            </div>
-            <div className="bg-stone-50 p-3 rounded-xl">
-              <p className="text-[9px] text-stone-400 font-medium uppercase tracking-wide">
-                Permits Filed
-              </p>
-              <p className="text-sm font-black text-rose-600 mt-0.5">
-                {permitsCount}
-              </p>
-            </div>
-          </div>
+          <Suspense fallback={<div className="h-64 rounded-2xl skeleton" />}>
+            <BuildingPreviewCarousel
+              shots={snapshotShots}
+              status={snapshotStatus}
+              progress={snapshotProgress}
+              embedded
+              onOpen3DTab={() => handleTabChange("3d_view")}
+              onRegenerate={regenerateSnapshots}
+            />
+          </Suspense>
         </div>
       </div>
 
@@ -739,6 +708,82 @@ export default function ProjectDetails() {
         </div>
       </div> */}
 
+      {/* DETAIL TABS */}
+      <div className="glass-card p-4">
+        <div className="flex flex-wrap gap-2 border-b border-stone-100 pb-3 mb-4">
+          {detailTabs.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => handleTabChange(tab.id)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                activeTab === tab.id
+                  ? "bg-[#1a2035] text-white"
+                  : "bg-stone-100 text-stone-600 hover:bg-stone-200"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+        {activeTab === "budget" && intelligence && (
+          <BudgetBreakdownPanel
+            intelligence={intelligence}
+            supplierRows={suppliers}
+          />
+        )}
+        {activeTab === "schedule" && intelligence && (
+          <SchedulePanel intelligence={intelligence} />
+        )}
+        {activeTab === "materials" && (
+          <MaterialsPanel
+            materials={intelligence?.materials ?? []}
+            supplierRows={suppliers}
+          />
+        )}
+        {activeTab === "inspections" && (
+          <InspectionChecklist inspections={intelligence?.inspections ?? []} />
+        )}
+        {activeTab === "risks" && (
+          <ProjectRisksPanel
+            supplyChainRisks={intelligence?.supplyChainRisks ?? []}
+            workforceGaps={intelligence?.workforceGaps ?? []}
+          />
+        )}
+        {activeTab === "recommendations" && (
+          <RecommendationsPanel
+            recommendations={intelligence?.recommendations ?? []}
+            agentExecutions={executionList}
+          />
+        )}
+        {activeTab === "blueprint" && intelligence && (
+          <BlueprintSummaryPanel
+            summary={intelligence.blueprintSummary}
+            floors={intelligence.floors}
+            squareFootage={intelligence.squareFootage}
+            complexity={intelligence.complexity}
+          />
+        )}
+        {activeTab === "3d_view" && intelligence && (
+          <Suspense fallback={<div className="flex items-center justify-center h-64 text-stone-400 text-sm">Loading 3D view…</div>}>
+            <Blueprint3DTab
+              summary={intelligence.blueprintSummary}
+              buildingDefinition={intelligence.buildingDefinition}
+              floors={intelligence.floors}
+              squareFootage={intelligence.squareFootage}
+              complexity={intelligence.complexity}
+            />
+          </Suspense>
+        )}
+        {activeTab === "overview" && (
+          <p className="text-sm text-stone-500">
+            Use the tabs above for budget, schedule, materials, risks, and the
+            interactive 3D viewer. Building previews are shown at the top of this
+            page.
+          </p>
+        )}
+      </div>
+
       {/* SUPPLIERS & CREW FROM API */}
       {(suppliers.length > 0 || crewPlans.length > 0) && (
         <div className="grid grid-cols-1 gap-6 w-full">
@@ -766,9 +811,79 @@ export default function ProjectDetails() {
               </div>
             </div>
           )}
-          {crewPlans.length > 0 && <CrewPlanGantt plans={crewPlans} />}
+          {crewPlans.length > 0 && (
+            <CrewPlanGantt
+              plans={crewPlans}
+              phases={intelligence?.phases}
+              criticalPathPhases={intelligence?.criticalPathPhases}
+              onOpenScheduleTab={() => handleTabChange("schedule")}
+            />
+          )}
         </div>
       )}
+
+      {/* FOCUSED AGENT ACTIVITIES — bottom of page */}
+      <div className="glass-card p-6 flex flex-col justify-between w-full min-h-[320px]">
+        <div className="flex-1 flex flex-col">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-sm font-bold text-stone-900 tracking-tight flex items-center gap-2">
+              <Bot className="w-4 h-4 text-[#F5C518]" />
+              Focused Agent Activities
+            </h3>
+            <span className="text-[9px] bg-stone-100 text-stone-500 font-bold px-2 py-0.5 rounded-md font-mono uppercase">
+              {completedAgentCount}/{PIPELINE_AGENT_NAMES.length} complete
+            </span>
+          </div>
+          <div className="grid grid-cols-6 gap-3 flex-1 min-h-[200px] items-end pt-4 pb-2 border-b border-stone-100">
+            {agentMetrics.map((agent) => (
+              <div
+                key={agent.label}
+                className="flex flex-col items-center h-full justify-end group/bar relative min-w-0"
+              >
+                <div className="absolute -top-7 hidden group-hover/bar:block bg-[#1B1B1C] text-white text-[9px] px-1.5 py-0.5 rounded-sm whitespace-nowrap z-30 shadow-md">
+                  {agent.label}: {agent.val}%
+                </div>
+                <div className="w-full bg-stone-100 rounded-t-lg h-[160px] flex items-end overflow-hidden">
+                  <div
+                    className="bg-[#F5C518] hover:bg-[#E2B30D] w-full rounded-t-lg transition-all duration-1000 relative"
+                    style={{ height: `${Math.max(agent.val, 4)}%` }}
+                  />
+                </div>
+                <span className="text-[10px] mt-2 font-bold text-stone-500 truncate w-full text-center">
+                  {agent.label}
+                </span>
+                <span className="text-base -mt-0.5">{agent.icon}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="grid grid-cols-3 gap-3 text-center pt-4 w-full">
+          <div className="bg-stone-50 p-3 rounded-xl">
+            <p className="text-[9px] text-stone-400 font-medium uppercase tracking-wide">
+              Site Scores Avg
+            </p>
+            <p className="text-sm font-black text-stone-900 mt-0.5">
+              {overallReadiness}%
+            </p>
+          </div>
+          <div className="bg-stone-50 p-3 rounded-xl">
+            <p className="text-[9px] text-stone-400 font-medium uppercase tracking-wide">
+              Agent Loops
+            </p>
+            <p className="text-sm font-black text-stone-900 mt-0.5">
+              {completedAgentCount} / {PIPELINE_AGENT_NAMES.length}
+            </p>
+          </div>
+          <div className="bg-stone-50 p-3 rounded-xl">
+            <p className="text-[9px] text-stone-400 font-medium uppercase tracking-wide">
+              Permits Filed
+            </p>
+            <p className="text-sm font-black text-rose-600 mt-0.5">
+              {permitsCount}
+            </p>
+          </div>
+        </div>
+      </div>
 
       {/* AI USAGE SUMMARY */}
       {/* <div className="glass-card p-6 w-full">
@@ -810,6 +925,16 @@ export default function ProjectDetails() {
           </div>
         </div>
       </div> */}
+      {shouldCapture && intelligence?.buildingDefinition && (
+        <Suspense fallback={null}>
+          <BuildingSnapshotCapture
+            definition={intelligence.buildingDefinition}
+            onProgress={onCaptureProgress}
+            onComplete={onCaptureComplete}
+            onError={onCaptureError}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }

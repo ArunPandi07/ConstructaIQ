@@ -5,7 +5,7 @@ import { fetchProjectIntelligence } from "../services/api";
 import { fetchRiskIntelligence } from "../services/api";
 import { fetchRecoveryStrategies } from "../services/api";
 import { analyzeChangeImpact } from "../services/api";
-import { fetchAgentInsights } from "../services/api";
+import { buildAgentInsightsData } from "../services/api";
 import { getProjectAgents, isBackendProjectId } from "../services/projectApi";
 import type { RecoveryCenterData } from "../services/api";
 import type {
@@ -21,6 +21,13 @@ import type {
 // One hook per page — each wraps useAsync with the correct fetcher.
 // When FastAPI is live, only the service functions need changing.
 // ─────────────────────────────────────────────────────────────
+
+const intelligenceCache = new Map<string, { data: ProjectIntelligenceData; at: number }>()
+const INTEL_TTL_MS = 5 * 60_000
+
+export function clearIntelligenceCache(projectId: string) {
+  intelligenceCache.delete(projectId)
+}
 
 /** Hydrated project list from AppContext */
 export function useProjects() {
@@ -41,9 +48,17 @@ export function useDashboard() {
 /** Project intelligence — permits, crew, phases */
 export function useProjectIntelligence(projectId: string) {
   return useAsync<ProjectIntelligenceData>(
-    () => fetchProjectIntelligence(projectId),
+    async () => {
+      const cached = intelligenceCache.get(projectId)
+      if (cached && Date.now() - cached.at < INTEL_TTL_MS) {
+        return { data: cached.data }
+      }
+      const res = await fetchProjectIntelligence(projectId)
+      intelligenceCache.set(projectId, { data: res.data, at: Date.now() })
+      return res
+    },
     [projectId],
-  );
+  )
 }
 
 /** Risk score, heatmap, reasoning chain, top risks */
@@ -71,10 +86,35 @@ export function useChangeImpact(projectId: string) {
   );
 }
 
-/** Agent insights — agent cards + timeline */
+/** Agent insights — agent cards + timeline + raw executions (single fetch) */
 export function useAgentInsights(projectId: string) {
-  return useAsync<AgentInsightsData>(
-    () => fetchAgentInsights(projectId),
+  return useAsync<{ insights: AgentInsightsData; executions: AgentExecutionRead[] }>(
+    async () => {
+      if (!isBackendProjectId(projectId)) {
+        return {
+          data: {
+            insights: {
+              agents: [],
+              timeline: [],
+              summary: {
+                totalRuns: 0,
+                avgConfidence: 0,
+                totalFindings: 0,
+                processingTime: "0s",
+              },
+            },
+            executions: [],
+          },
+        };
+      }
+      const agentsRes = await getProjectAgents(Number(projectId));
+      return {
+        data: {
+          insights: buildAgentInsightsData(agentsRes.agents),
+          executions: agentsRes.agents,
+        },
+      };
+    },
     [projectId],
   );
 }
