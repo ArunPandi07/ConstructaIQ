@@ -134,12 +134,11 @@ export default function ProjectDetails() {
   }, [activatedTabs, projectId]);
 
   useEffect(() => {
-    if (!activatedTabs.has("schedule")) return;
     if (!projectId || !isBackendProjectId(projectId)) return;
     getProjectCrew(Number(projectId))
       .then((res) => setCrewPlans(res.crew_plans))
       .catch(() => undefined);
-  }, [activatedTabs, projectId]);
+  }, [projectId]);
 
   const executionList = useMemo(() => agentExecutions ?? [], [agentExecutions]);
   const byAgent = useMemo(
