@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: constructaiq-backend
+    runtime: python
+    plan: free
+    region: singapore
+    buildCommand: cd backend && pip install --upgrade pip && pip install -r requirements.txt
+    startCommand: cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11
+      - key: DATABASE_URL
+        sync: false
+      - key: AZURE_OPENAI_ENDPOINT
+        sync: false
+      - key: AZURE_OPENAI_API_KEY
+        sync: false
+      - key: AZURE_OPENAI_API_VERSION
+        sync: false
+      - key: AZURE_OPENAI_DEPLOYMENT_NAME
+        sync: false
+      - key: AZURE_AI_FOUNDRY_PROJECT_CONNECTION_STRING
+        sync: false
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: JWT_ALGORITHM
+        value: HS256
+      - key: JWT_ACCESS_TOKEN_EXPIRE_HOURS
+        value: 24
+    healthCheckPath: /healthz
