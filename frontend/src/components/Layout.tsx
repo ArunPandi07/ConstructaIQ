@@ -1,4 +1,4 @@
-import { Outlet, NavLink, useLocation } from "react-router-dom";
+import { Outlet, NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
   Building2,
@@ -6,9 +6,12 @@ import {
   HardHat,
   Bell,
   Plus,
+  User as UserIcon,
+  LogOut,
 } from "lucide-react";
 // import { NewProjectModal } from "./NewProjectModal";
 import { useAppContext } from "../context/AppContext";
+import { useAuth } from "../context/AuthContext";
 import NewProjectModal from "./NewProjectModal";
 
 const navItems = [
@@ -19,11 +22,18 @@ const navItems = [
 
 export default function Layout() {
   const location = useLocation();
+  const navigate = useNavigate();
   const {
     isModalOpen,
     setIsModalOpen,
     // , handleProjectCreated
   } = useAppContext();
+  const { user, logout } = useAuth();
+
+  const handleLogout = async () => {
+    await logout();
+    navigate("/login");
+  };
 
   const isActive = (path: string) => {
     // Dashboard
@@ -101,10 +111,22 @@ export default function Layout() {
               <Bell className="w-5 h-5" />
             </button>
 
-            <div className="hidden sm:flex items-center gap-2 border bg-stone-50 hover:bg-stone-100 transition border-stone-200/80 px-4 py-2 rounded-xl text-xs text-stone-600 cursor-pointer h-10 font-bold">
-              <span>👤 Madhesh</span>
+            <button
+              onClick={() => navigate("/profile")}
+              className="hidden sm:flex items-center gap-2 border bg-stone-50 hover:bg-stone-100 transition border-stone-200/80 px-4 py-2 rounded-xl text-xs text-stone-600 cursor-pointer h-10 font-bold"
+            >
+              <UserIcon className="w-4 h-4" />
+              <span>{user?.full_name || "User"}</span>
               <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
-            </div>
+            </button>
+
+            <button
+              onClick={handleLogout}
+              className="hidden sm:flex items-center gap-2 border bg-white hover:bg-stone-50 transition border-stone-200/80 px-3 py-2 rounded-xl text-xs text-stone-600 cursor-pointer h-10"
+              title="Logout"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
 
             {/* Mobile nav */}
             <div className="xl:hidden flex gap-1">

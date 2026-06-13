@@ -27,6 +27,7 @@ from app.schemas.supplier_material import (
     SupplierMaterialRead,
     SupplierMaterialUpdate,
 )
+from app.schemas.user import Token, TokenData, UserCreate, UserRead, UserUpdate
 
 __all__ = [
     "AgentExecutionCreate",
@@ -66,4 +67,9 @@ __all__ = [
     "SupplierMaterialCreate",
     "SupplierMaterialRead",
     "SupplierMaterialUpdate",
+    "Token",
+    "TokenData",
+    "UserCreate",
+    "UserRead",
+    "UserUpdate",
 ]
