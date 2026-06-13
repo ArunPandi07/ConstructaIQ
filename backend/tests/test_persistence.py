@@ -42,8 +42,13 @@ async def test_persist_analysis_outputs_counts():
             "estimated_duration_days": 365,
             "project_phases": [{"name": "Foundation", "status": "pending"}],
             "inspection_stages": ["Foundation Inspection"],
+            "dependencies": [{"predecessor": "A", "successor": "B"}],
+            "materials": [{"material_name": "Steel", "quantity": 10}],
         },
         "supplierAnalysis": {
+            "supply_chain_risks": [
+                {"risk": "Lead time", "severity": "high", "mitigation": "Order early"}
+            ],
             "procurement_plan": [
                 {
                     "material_name": "Steel",
@@ -53,6 +58,7 @@ async def test_persist_analysis_outputs_counts():
             ]
         },
         "crewAnalysis": {
+            "workforce_gaps": [{"role": "Electrician", "shortage": "3 workers"}],
             "crew_allocations": [
                 {
                     "phase_name": "Foundation",
@@ -84,7 +90,9 @@ async def test_persist_analysis_outputs_counts():
         "app.services.agent_persistence_service.ProjectSupplierRepository"
     ) as supplier_repo_cls, patch(
         "app.services.agent_persistence_service.CrewPlanRepository"
-    ) as crew_repo_cls:
+    ) as crew_repo_cls, patch(
+        "app.services.agent_persistence_service.ProjectRiskRepository"
+    ) as risk_repo_cls:
         project_repo = project_repo_cls.return_value
         project_repo.get_by_id = AsyncMock(return_value=project)
         project_repo.update = AsyncMock(return_value=project)
@@ -96,6 +104,7 @@ async def test_persist_analysis_outputs_counts():
             inspection_repo_cls,
             supplier_repo_cls,
             crew_repo_cls,
+            risk_repo_cls,
         ):
             instance = repo.return_value
             instance.delete_by_project = AsyncMock(return_value=0)
@@ -123,6 +132,13 @@ async def test_persist_analysis_outputs_counts():
     assert summary["project_suppliers_created"] == 1
     assert summary["crew_plans_created"] == 1
     assert summary["agent_executions_created"] == 1
+    assert summary["risks_created"] == 2
+    schedule_create = schedule_repo_cls.return_value.create.await_args.args[0]
+    import json
+
+    wp = json.loads(schedule_create.work_packages)
+    assert len(wp["dependencies"]) == 1
+    assert len(wp["materials"]) == 1
     session.commit.assert_awaited_once()
 
 
@@ -157,7 +173,9 @@ async def test_persist_chennai_project_summary_fields():
         "app.services.agent_persistence_service.ProjectSupplierRepository"
     ) as supplier_repo_cls, patch(
         "app.services.agent_persistence_service.CrewPlanRepository"
-    ) as crew_repo_cls:
+    ) as crew_repo_cls, patch(
+        "app.services.agent_persistence_service.ProjectRiskRepository"
+    ) as risk_repo_cls:
         project_repo = project_repo_cls.return_value
         project_repo.get_by_id = AsyncMock(return_value=project)
         project_repo.update = AsyncMock(return_value=project)
@@ -169,6 +187,7 @@ async def test_persist_chennai_project_summary_fields():
             inspection_repo_cls,
             supplier_repo_cls,
             crew_repo_cls,
+            risk_repo_cls,
         ):
             instance = repo.return_value
             instance.delete_by_project = AsyncMock(return_value=0)
@@ -230,7 +249,9 @@ async def test_persist_nested_contract_summary_fields():
         "app.services.agent_persistence_service.ProjectSupplierRepository"
     ) as supplier_repo_cls, patch(
         "app.services.agent_persistence_service.CrewPlanRepository"
-    ) as crew_repo_cls:
+    ) as crew_repo_cls, patch(
+        "app.services.agent_persistence_service.ProjectRiskRepository"
+    ) as risk_repo_cls:
         project_repo = project_repo_cls.return_value
         project_repo.get_by_id = AsyncMock(return_value=project)
         project_repo.update = AsyncMock(return_value=project)
@@ -242,6 +263,7 @@ async def test_persist_nested_contract_summary_fields():
             inspection_repo_cls,
             supplier_repo_cls,
             crew_repo_cls,
+            risk_repo_cls,
         ):
             instance = repo.return_value
             instance.delete_by_project = AsyncMock(return_value=0)
@@ -292,7 +314,9 @@ async def test_persist_string_permit_list():
         "app.services.agent_persistence_service.ProjectSupplierRepository"
     ) as supplier_repo_cls, patch(
         "app.services.agent_persistence_service.CrewPlanRepository"
-    ) as crew_repo_cls:
+    ) as crew_repo_cls, patch(
+        "app.services.agent_persistence_service.ProjectRiskRepository"
+    ) as risk_repo_cls:
         project_repo = project_repo_cls.return_value
         project_repo.get_by_id = AsyncMock(return_value=project)
         project_repo.update = AsyncMock(return_value=project)
@@ -304,6 +328,7 @@ async def test_persist_string_permit_list():
             inspection_repo_cls,
             supplier_repo_cls,
             crew_repo_cls,
+            risk_repo_cls,
         ):
             instance = repo.return_value
             instance.delete_by_project = AsyncMock(return_value=0)
@@ -315,3 +340,73 @@ async def test_persist_string_permit_list():
 
     assert summary["permits_created"] == 2
     permit_repo_cls.return_value.create.assert_awaited()
+
+
+@pytest.mark.asyncio
+async def test_persist_crew_allocations_with_headcount_and_skill():
+    pipeline_result = {
+        "projectSummary": {"project_name": "Tower"},
+        "permitAssessment": {},
+        "projectPlan": {"inspection_stages": []},
+        "supplierAnalysis": {"procurement_plan": []},
+        "crewAnalysis": {
+            "crew_allocations": [
+                {
+                    "phase_name": "Steel",
+                    "crew_name": "Gang A",
+                    "headcount": 24,
+                    "skill_type": "Ironworker Local 40",
+                    "labor_cost": 120000,
+                    "start_date": "2026-04-01",
+                    "end_date": "2026-08-01",
+                }
+            ]
+        },
+    }
+
+    session = AsyncMock()
+    project = MagicMock()
+    project.start_date = date(2026, 1, 1)
+
+    with patch(
+        "app.services.agent_persistence_service.ProjectRepository"
+    ) as project_repo_cls, patch(
+        "app.services.agent_persistence_service.PermitRepository"
+    ) as permit_repo_cls, patch(
+        "app.services.agent_persistence_service.ScheduleRepository"
+    ) as schedule_repo_cls, patch(
+        "app.services.agent_persistence_service.BudgetRepository"
+    ) as budget_repo_cls, patch(
+        "app.services.agent_persistence_service.InspectionRepository"
+    ) as inspection_repo_cls, patch(
+        "app.services.agent_persistence_service.AgentExecutionRepository"
+    ) as execution_repo_cls, patch(
+        "app.services.agent_persistence_service.ProjectSupplierRepository"
+    ) as supplier_repo_cls, patch(
+        "app.services.agent_persistence_service.CrewPlanRepository"
+    ) as crew_repo_cls, patch(
+        "app.services.agent_persistence_service.ProjectRiskRepository"
+    ) as risk_repo_cls:
+        project_repo_cls.return_value.get_by_id = AsyncMock(return_value=project)
+        project_repo_cls.return_value.update = AsyncMock(return_value=project)
+
+        for repo in (
+            permit_repo_cls,
+            schedule_repo_cls,
+            budget_repo_cls,
+            inspection_repo_cls,
+            supplier_repo_cls,
+            crew_repo_cls,
+            risk_repo_cls,
+        ):
+            instance = repo.return_value
+            instance.delete_by_project = AsyncMock(return_value=0)
+            instance.create = AsyncMock()
+
+        execution_repo_cls.return_value.create = AsyncMock()
+
+        await persist_analysis_outputs(session, project_id=1, pipeline_result=pipeline_result)
+
+    crew_create = crew_repo_cls.return_value.create.await_args.args[0]
+    assert crew_create.headcount == 24
+    assert crew_create.skill_type == "Ironworker Local 40"
