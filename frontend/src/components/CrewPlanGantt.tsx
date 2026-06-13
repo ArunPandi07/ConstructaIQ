@@ -111,9 +111,11 @@ export default function CrewPlanGantt({
 
   const { tasks, unscheduled, summary, warnings, legend, planByTaskId } = model
 
+  const ganttBodyHeight = Math.max(tasks.length * ROW_HEIGHT, ROW_HEIGHT)
+
   const chartHeight = Math.min(
     MAX_CHART_HEIGHT,
-    Math.max(HEADER_HEIGHT + tasks.length * ROW_HEIGHT + 16, 220),
+    Math.max(HEADER_HEIGHT + ganttBodyHeight + 16, 220),
   )
 
   const columnWidth =
@@ -320,11 +322,12 @@ export default function CrewPlanGantt({
           className="crew-gantt-wrap w-full overflow-auto rounded-xl border border-stone-200 bg-white"
           style={{ maxHeight: MAX_CHART_HEIGHT }}
         >
-          <div style={{ minWidth: 720, height: chartHeight }}>
+          <div className="crew-gantt-inner" style={{ minWidth: 720, height: chartHeight }}>
             <Gantt
               tasks={tasks}
               viewMode={viewMode}
               viewDate={summary.timelineStart ?? undefined}
+              ganttHeight={ganttBodyHeight}
               onClick={handleTaskClick}
               onExpanderClick={handleExpanderClick}
               listCellWidth="220px"
