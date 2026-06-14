@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { motion } from "framer-motion";
 import { AlertTriangle, Users } from "lucide-react";
 import type { ProjectRiskItem } from "../types";
 
@@ -64,7 +65,13 @@ export default function ProjectRisksPanel({
   workforceGaps,
 }: Props) {
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-40px" }}
+      transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
+      className="grid grid-cols-1 lg:grid-cols-2 gap-6"
+    >
       <RiskList
         title="Supply Chain Risks"
         icon={<AlertTriangle className="w-4 h-4 text-[#F5C518]" />}
@@ -75,6 +82,6 @@ export default function ProjectRisksPanel({
         icon={<Users className="w-4 h-4 text-[#F5C518]" />}
         items={workforceGaps}
       />
-    </div>
+    </motion.div>
   );
 }

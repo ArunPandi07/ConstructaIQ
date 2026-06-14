@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { HardHat } from "lucide-react";
+import { Skeleton } from "./Skeleton";
 
 const statusMessages = [
   "Initializing agent pipelines",
@@ -117,13 +118,11 @@ export function FullscreenLoader({
                   {rotateMessages ? (
                     <RotatingMessage messages={statusMessages} />
                   ) : (
-                    <>
-                      {message}
-                      <StatusDots />
-                    </>
+                    <span>{message}<StatusDots /></span>
                   )}
                 </p>
               ) : null}
+              <p className="text-[10px] text-stone-400 font-mono font-medium">ConstructaIQ · v1.0</p>
             </div>
           </div>
         </motion.div>
@@ -137,13 +136,68 @@ export function LoadingBar({ show }: { show: boolean }) {
     <AnimatePresence>
       {show && (
         <motion.div
-          initial={{ scaleX: 0, opacity: 0 }}
-          animate={{ scaleX: 1, opacity: 1 }}
-          exit={{ scaleX: 0, opacity: 0 }}
-          transition={{ duration: 0.4, ease: "easeInOut" }}
-          className="fixed top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-[#F5C518] via-[#FCD34D] to-[#E2B30D] z-[99] origin-left shadow-glow"
-        />
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.15 }}
+          className="fixed top-0 left-0 right-0 z-[110] h-1 overflow-hidden"
+          role="progressbar"
+          aria-label="Page loading"
+        >
+          <motion.div
+            className="h-full w-full bg-gradient-to-r from-[#FCD34D] via-[#F5C518] to-[#E2B30D]"
+            animate={{ x: ["-100%", "100%"] }}
+            transition={{ repeat: Infinity, duration: 1.2, ease: "linear" }}
+          />
+        </motion.div>
       )}
     </AnimatePresence>
+  );
+}
+
+export function ContentSkeleton({ variant = "card", count = 1 }: { variant?: "card" | "kpi" | "text"; count?: number }) {
+  if (variant === "kpi") {
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {Array.from({ length: count }).map((_, i) => (
+          <div key={i} className="kpi-card p-4 space-y-3">
+            <Skeleton style={{ height: 12, width: "40%" }} />
+            <Skeleton style={{ height: 28, width: "60%" }} />
+            <Skeleton style={{ height: 10, width: "80%" }} />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (variant === "text") {
+    return (
+      <div className="space-y-3">
+        {Array.from({ length: count }).map((_, i) => (
+          <Skeleton key={i} style={{ height: 12, width: `${60 + (i % 3) * 15}%` }} />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} className="glass-card p-5 space-y-4 animate-fade-in-up" style={{ animationDelay: `${i * 0.05}s` }}>
+          <div className="flex items-center gap-3">
+            <Skeleton rounded="lg" style={{ width: 40, height: 40 }} />
+            <div className="flex-1 space-y-2">
+              <Skeleton style={{ height: 14, width: "50%" }} />
+              <Skeleton style={{ height: 10, width: "30%" }} />
+            </div>
+          </div>
+          <div className="space-y-2.5">
+            <Skeleton style={{ height: 10 }} />
+            <Skeleton style={{ height: 10, width: "85%" }} />
+            <Skeleton style={{ height: 10, width: "65%" }} />
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
