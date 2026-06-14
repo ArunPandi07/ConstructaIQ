@@ -1,36 +1,53 @@
+import { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { AppProvider } from "./context/AppContext";
+import { AppProvider, useAppContext } from "./context/AppContext";
+import { AuthProvider } from "./context/AuthContext";
+import { LoadingProvider } from "./context/LoadingContext";
+import { ProtectedRoute } from "./components/ProtectedRoute";
 import Layout from "./components/Layout";
-import Dashboard from "./pages/Dashboard";
-import ProjectUpload from "./pages/ProjectUpload";
-import ProjectIntelligence from "./pages/ProjectIntelligence";
-import RiskIntelligence from "./pages/RiskIntelligence";
-import RecoveryCenter from "./pages/RecoveryCenter";
-import ChangeImpact from "./pages/ChangeImpact";
-import AgentInsights from "./pages/AgentInsights";
-import Settings from "./pages/Settings";
-import "./index.css";
+import { Login } from "./pages/Login";
+import { isBackendProjectId } from "./services/projectApi";
+
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Projects = lazy(() => import("./pages/Projects"));
+const ProjectDetails = lazy(() => import("./pages/ProjectDetails"));
+const AIInsights = lazy(() => import("./pages/AIInsights"));
+const Profile = lazy(() => import("./pages/Profile").then(m => ({ default: m.Profile })));
+// import Settings from "./pages/Settings";
+
+function IntelligenceRedirect() {
+  const { activeProjectId } = useAppContext();
+  if (isBackendProjectId(activeProjectId)) {
+    return <Navigate to={`/projects/${activeProjectId}`} replace />;
+  }
+  return <Navigate to="/projects" replace />;
+}
 
 export default function App() {
   return (
-    <AppProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Layout />}>
-            <Route index element={<Navigate to="/dashboard" replace />} />
-            <Route path="dashboard" element={<Dashboard />} />
-            <Route path="upload" element={<ProjectUpload />} />
-            <Route path="intelligence" element={<ProjectIntelligence />} />
-            <Route path="risk" element={<RiskIntelligence />} />
-            <Route path="recovery" element={<RecoveryCenter />} />
-            <Route path="change-impact" element={<ChangeImpact />} />
-            <Route path="agents" element={<AgentInsights />} />
-            <Route path="settings" element={<Settings />} />
-          </Route>
-          {/* Catch-all */}
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
-        </Routes>
-      </BrowserRouter>
-    </AppProvider>
+    <AuthProvider>
+      <AppProvider>
+        <BrowserRouter>
+          <LoadingProvider>
+          <Suspense fallback={null}>
+            <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/" element={<ProtectedRoute element={<Layout />} />}>
+              <Route index element={<Navigate to="/dashboard" replace />} />
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/projects" element={<Projects />} />
+              <Route path="/projects/:projectId" element={<ProjectDetails />} />
+              <Route path="/ai-insights" element={<AIInsights />} />
+              <Route path="/profile" element={<Profile />} />
+              <Route path="/intelligence" element={<IntelligenceRedirect />} />
+              {/* <Route path="settings" element={<Settings />} /> */}
+            </Route>
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            </Routes>
+          </Suspense>
+          </LoadingProvider>
+        </BrowserRouter>
+      </AppProvider>
+    </AuthProvider>
   );
 }

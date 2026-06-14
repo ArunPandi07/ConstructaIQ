@@ -1,9 +1,14 @@
+import asyncio
 import httpx
 from typing import Optional
+
 from app.config.settings import settings
 from app.services.logging_service import get_logger
 
 logger = get_logger("FoundryService")
+
+MAX_RATE_LIMIT_RETRIES = 3
+RATE_LIMIT_BASE_WAIT_SEC = 5
 
 
 def _parse_foundry_response(res_json: dict) -> Optional[str]:
@@ -64,21 +69,44 @@ class FoundryService:
         payload = self._build_payload(text, agent_name, version)
         headers = self._build_headers()
 
-        logger.info(f"POST {endpoint_url} → agent='{agent_name}' v{version}")
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            response = await client.post(endpoint_url, json=payload, headers=headers)
+        logger.info(f"POST {endpoint_url} -> agent='{agent_name}' v{version}")
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            for attempt in range(MAX_RATE_LIMIT_RETRIES + 1):
+                response = await client.post(endpoint_url, json=payload, headers=headers)
+                if response.status_code == 200:
+                    res_json = response.json()
+                    text_out = _parse_foundry_response(res_json)
+                    if text_out is not None:
+                        logger.info(f"Response received from agent '{agent_name}'.")
+                        return text_out
+                    raise ValueError(
+                        f"Unexpected response format. Keys: {list(res_json.keys())}"
+                    )
 
-        if response.status_code == 200:
-            res_json = response.json()
-            text_out = _parse_foundry_response(res_json)
-            if text_out is not None:
-                logger.info(f"Response received from agent '{agent_name}'.")
-                return text_out
-            raise ValueError(f"Unexpected response format. Keys: {list(res_json.keys())}")
-        else:
-            raise ValueError(
-                f"Agent call failed [{response.status_code}]: {response.text}"
-            )
+                if response.status_code == 429 and attempt < MAX_RATE_LIMIT_RETRIES:
+                    wait_sec = RATE_LIMIT_BASE_WAIT_SEC * (attempt + 1)
+                    retry_after = response.headers.get("Retry-After")
+                    if retry_after:
+                        try:
+                            wait_sec = max(wait_sec, int(float(retry_after)))
+                        except (TypeError, ValueError):
+                            pass
+                    logger.warning(
+                        "Rate limit for agent '%s' v%s — retry %d/%d in %ds",
+                        agent_name,
+                        version,
+                        attempt + 1,
+                        MAX_RATE_LIMIT_RETRIES,
+                        wait_sec,
+                    )
+                    await asyncio.sleep(wait_sec)
+                    continue
+
+                raise ValueError(
+                    f"Agent call failed [{response.status_code}]: {response.text}"
+                )
+
+        raise ValueError(f"Agent call failed for '{agent_name}' after retries.")
 
     async def call_llm(self, prompt: str, agent_name: str, version: str = "1") -> str:
         """

@@ -1,98 +1,193 @@
-import { Outlet, NavLink, useLocation } from "react-router-dom";
+import { Outlet, NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
-  LayoutDashboard, Upload, Brain, ShieldAlert,
-  RefreshCw, GitBranch, Bot, Settings, Activity,
+  LayoutDashboard,
+  Building2,
+  Bot,
+  HardHat,
+  Bell,
+  Plus,
+  User as UserIcon,
+  LogOut,
 } from "lucide-react";
+// import { NewProjectModal } from "./NewProjectModal";
+import { useAppContext } from "../context/AppContext";
+import { useAuth } from "../context/AuthContext";
+import { useLoading } from "../context/LoadingContext";
+import { FullscreenLoader, LoadingBar } from "./Loader";
+import NewProjectModal from "./NewProjectModal";
 
 const navItems = [
-  { path: "/dashboard",    label: "Dashboard",            icon: LayoutDashboard },
-  { path: "/upload",       label: "Project Upload",        icon: Upload },
-  { path: "/intelligence", label: "Project Intelligence",  icon: Brain },
-  { path: "/risk",         label: "Risk Intelligence",     icon: ShieldAlert },
-  { path: "/recovery",     label: "Recovery Center",       icon: RefreshCw },
-  { path: "/change-impact",label: "Change Impact",         icon: GitBranch },
-  { path: "/agents",       label: "Agent Insights",        icon: Bot },
+  { path: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { path: "/projects", label: "Projects", icon: Building2 },
+  { path: "/ai-insights", label: "AI Insights", icon: Bot },
 ];
 
 export default function Layout() {
   const location = useLocation();
-  const currentPage = navItems.find((i) => i.path === location.pathname);
+  const navigate = useNavigate();
+  const {
+    isModalOpen,
+    setIsModalOpen,
+    // , handleProjectCreated
+  } = useAppContext();
+  const { user, logout } = useAuth();
+
+  const handleLogout = async () => {
+    await logout();
+    navigate("/login");
+  };
+
+  const isActive = (path: string) => {
+    // Dashboard
+    if (path === "/dashboard") {
+      return (
+        location.pathname === "/dashboard" ||
+        (location.pathname.startsWith("/projects/") &&
+          location.state?.from === "dashboard")
+      );
+    }
+
+    // Projects
+    if (path === "/projects") {
+      return (
+        location.pathname === "/projects" ||
+        (location.pathname.startsWith("/projects/") &&
+          location.state?.from === "projects")
+      );
+    }
+
+    // AI Insights
+    return location.pathname === path;
+  };
+
+  const { hasFullscreenLoader, routeTransition } = useLoading();
 
   return (
-    <div className="flex h-screen overflow-hidden" style={{ background: "var(--bg)" }}>
+    <>
+      <LoadingBar show={routeTransition} />
+      <FullscreenLoader show={hasFullscreenLoader} rotateMessages />
 
-      {/* ── Sidebar ── */}
-      <aside className="flex flex-col shrink-0" style={{ width: 220, background: "var(--sidebar-bg)" }}>
-
-        {/* Logo */}
-        <div className="flex items-center gap-2.5 px-4 py-4" style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
-          <div className="flex items-center justify-center rounded-lg shrink-0" style={{ width: 34, height: 34, background: "#2563eb" }}>
-            <svg width="18" height="18" viewBox="0 0 16 16" fill="none">
-              <rect x="1" y="9" width="3" height="6" rx="1" fill="#fff" />
-              <rect x="6.5" y="5" width="3" height="10" rx="1" fill="#fff" />
-              <rect x="12" y="2" width="3" height="13" rx="1" fill="#fff" />
-            </svg>
-          </div>
-          <div>
-            <div className="font-bold" style={{ fontSize: "0.85rem", color: "#ffffff" }}>ConstructaIQ</div>
-            <div style={{ fontSize: "0.6rem", color: "rgba(255,255,255,0.4)", marginTop: 1, letterSpacing: "0.04em" }}>Intelligence Platform</div>
-          </div>
-        </div>
-
-        {/* Nav */}
-        <nav className="flex-1 px-3 py-3 overflow-y-auto space-y-0.5">
-          <div style={{ fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(255,255,255,0.25)", padding: "2px 8px 8px" }}>Navigation</div>
-          {navItems.map(({ path, label, icon: Icon }) => {
-            const active = location.pathname === path;
-            return (
-              <NavLink key={path} to={path} className={`sidebar-item ${active ? "active" : ""}`}>
-                <Icon size={14} style={{ flexShrink: 0 }} />
-                <span className="flex-1 truncate">{label}</span>
-                {active && <div className="rounded-full shrink-0" style={{ width: 6, height: 6, background: "#6395ff" }} />}
-              </NavLink>
-            );
-          })}
-        </nav>
-
-        {/* Footer */}
-        <div className="px-3 pb-3" style={{ borderTop: "1px solid rgba(255,255,255,0.07)", paddingTop: 10 }}>
-          <NavLink to="/settings" className={({ isActive }) => `sidebar-item w-full${isActive ? " active" : ""}`}>
-            <Settings size={14} />
-            <span>Settings</span>
-          </NavLink>
-          <div className="flex items-center gap-2 px-3 py-2 mt-1.5 rounded-lg" style={{ background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.2)" }}>
-            <Activity size={10} className="animate-pulse" style={{ color: "#22c55e" }} />
-            <span style={{ fontSize: "0.62rem", color: "#22c55e", fontWeight: 700, letterSpacing: "0.05em" }}>5 AGENTS ACTIVE</span>
-          </div>
-        </div>
-      </aside>
-
-      {/* ── Main ── */}
-      <div className="flex flex-col flex-1 overflow-hidden">
-
-        {/* Topbar */}
-        <header className="flex items-center justify-between shrink-0 px-6" style={{ height: 56, background: "#ffffff", borderBottom: "1px solid var(--border)" }}>
-          <div>
-            <div className="flex items-center gap-1" style={{ fontSize: "0.68rem", color: "var(--text-muted)" }}>
-              <span style={{ color: "var(--text-secondary)" }}>ConstructaIQ</span>
-              <span style={{ color: "var(--border2)", margin: "0 2px" }}>/</span>
-              <span style={{ color: "var(--blue-primary)", fontWeight: 600 }}>{currentPage?.label ?? "Dashboard"}</span>
-            </div>
-            <div className="font-semibold" style={{ fontSize: "1rem", color: "var(--text-primary)", marginTop: 1 }}>
-              {currentPage?.label ?? "Dashboard"}
-            </div>
-          </div>
-          <div className="rounded-full flex items-center justify-center font-bold text-white shrink-0"
-            style={{ width: 36, height: 36, background: "#16a34a", fontSize: "0.72rem" }}>
-            JD
-          </div>
-        </header>
-
-        {/* Page content */}
-        <main className="flex-1 p-5 overflow-y-auto" style={{ background: "var(--bg)" }}>
-          <Outlet />
-        </main>
+      <div className="min-h-screen bg-[#FAF9F6] text-[#1A1A1A] font-sans antialiased relative pb-16 flex flex-col">
+      {/* Background decoration */}
+      <div className="absolute top-0 right-0 w-80 h-80 opacity-[0.02] pointer-events-none select-none overflow-hidden text-[#1A1A1A]">
+        <HardHat className="w-full h-full rotate-15 translate-x-12 -translate-y-12" />
       </div>
+
+      {/* TOP NAVIGATION BAR */}
+      <header className="bg-white border-b border-stone-200/80 sticky top-0 z-40 shadow-xs backdrop-blur-md">
+        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-10 h-18 flex items-center justify-between gap-4">
+          {/* Logo */}
+          <div className="flex items-center gap-3 shrink-0">
+            <div className="w-10 h-10 rounded-xl bg-[#F5C518] text-[#1A1A1A] flex items-center justify-center shadow-xs">
+              <HardHat className="w-5.5 h-5.5 stroke-2" />
+            </div>
+            <div>
+              <span className="text-lg font-black tracking-tight text-stone-950 block leading-tight font-sans">
+                ConstructaIQ
+              </span>
+              <span className="text-[10px] text-stone-400 font-bold uppercase tracking-wider block leading-none">
+                Intelligence Platform
+              </span>
+            </div>
+          </div>
+
+          {/* Navigation Pill Tabs */}
+          <nav className="hidden xl:flex bg-stone-100 p-1 rounded-full border border-stone-200 gap-1 text-xs">
+            {navItems.map(({ path, label, icon: Icon }) => (
+              <NavLink
+                key={path}
+                to={path}
+                className={`px-4 py-2 rounded-full font-bold transition flex items-center gap-1.5 ${
+                  isActive(path)
+                    ? "bg-[#F5C518] text-[#1A1A1A] shadow-xs"
+                    : "text-stone-500 hover:text-stone-900"
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5" />
+                {label}
+              </NavLink>
+            ))}
+          </nav>
+
+          {/* Right controls */}
+          <div className="flex items-center gap-3">
+            <button
+              className="p-2.5 rounded-full hover:bg-stone-100 text-stone-500 transition relative shrink-0"
+              aria-label="Notifications"
+            >
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-600 rounded-full"></span>
+              <Bell className="w-5 h-5" />
+            </button>
+
+            <button
+              onClick={() => navigate("/profile")}
+              className="hidden sm:flex items-center gap-2 border bg-stone-50 hover:bg-stone-100 transition border-stone-200/80 px-4 py-2 rounded-xl text-xs text-stone-600 cursor-pointer h-10 font-bold"
+            >
+              <UserIcon className="w-4 h-4" />
+              <span>{user?.full_name || "User"}</span>
+              <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
+            </button>
+
+            <button
+              onClick={handleLogout}
+              className="hidden sm:flex items-center gap-2 border bg-white hover:bg-stone-50 transition border-stone-200/80 px-3 py-2 rounded-xl text-xs text-stone-600 cursor-pointer h-10"
+              title="Logout"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+
+            {/* Mobile nav */}
+            <div className="xl:hidden flex gap-1">
+              <select
+                value={
+                  location.pathname.startsWith("/projects/")
+                    ? "/projects"
+                    : location.pathname
+                }
+                onChange={(e) => {
+                  window.location.href = e.target.value;
+                }}
+                className="bg-stone-100 hover:bg-stone-200 text-[#1A1A1A] text-xs font-bold px-3 py-2 rounded-xl focus:outline-hidden border border-stone-300"
+              >
+                {navItems.map(({ path, label }) => (
+                  <option key={path} value={path}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Main content */}
+      <main className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-10 pt-8 flex-1 w-full">
+        <Outlet />
+      </main>
+
+      {/* New Project FAB */}
+      <button
+        onClick={() => setIsModalOpen(true)}
+        className="fixed bottom-6 right-6 bg-[#F5C518] hover:bg-[#E2B30D] text-[#1A1A1A] p-4 rounded-full shadow-2xl hover:scale-105 transition duration-300 z-30 font-black flex items-center justify-center gap-2 hover:shadow-xl border border-amber-400"
+        title="Onboard New Project"
+        style={{
+          cursor: "pointer",
+        }}
+      >
+        <Plus className="w-5 h-5 stroke-3" />
+        <span className="text-xs font-sans font-bold select-none pr-1">
+          New Build Onboard
+        </span>
+      </button>
+
+      {isModalOpen && (
+        <NewProjectModal
+          onClose={() => setIsModalOpen(false)}
+          open={isModalOpen}
+          // onProjectCreated={handleProjectCreated}
+        />
+      )}
     </div>
+    </>
   );
 }

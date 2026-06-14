@@ -7,6 +7,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import type { ApiResponse } from '../types'
+import { dedupeAsync } from './requestDedupe'
 
 // ── Config ───────────────────────────────────────────────────
 
@@ -62,12 +63,19 @@ class ApiClient {
 
   private async handleResponse<T>(res: Response): Promise<ApiResponse<T>> {
     if (!res.ok) {
-      const errorBody = await res.json().catch(() => ({}))
-      throw new ApiError(
-        errorBody.message ?? `HTTP ${res.status}: ${res.statusText}`,
-        res.status,
-        errorBody,
-      )
+      const errorBody = await res.json().catch(() => ({})) as {
+        message?: string
+        detail?: string | Array<{ msg?: string }>
+      }
+      const detail = errorBody.detail
+      const message =
+        errorBody.message ??
+        (typeof detail === 'string'
+          ? detail
+          : Array.isArray(detail)
+            ? detail.map((d) => d.msg ?? '').filter(Boolean).join('; ') || `HTTP ${res.status}`
+            : `HTTP ${res.status}: ${res.statusText}`)
+      throw new ApiError(message, res.status, errorBody)
     }
     return res.json()
   }
@@ -76,11 +84,14 @@ class ApiClient {
     const url = new URL(`${this.baseUrl}${path}`)
     if (params) Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v))
 
-    const res = await fetchWithTimeout(url.toString(), {
-      method: 'GET',
-      headers: this.buildHeaders(),
+    const requestKey = url.toString()
+    return dedupeAsync(requestKey, async () => {
+      const res = await fetchWithTimeout(requestKey, {
+        method: 'GET',
+        headers: this.buildHeaders(),
+      })
+      return this.handleResponse<T>(res)
     })
-    return this.handleResponse<T>(res)
   }
 
   async post<T>(path: string, body?: unknown): Promise<ApiResponse<T>> {
