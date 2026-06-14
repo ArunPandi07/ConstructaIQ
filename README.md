@@ -73,7 +73,7 @@ ConstructaIQ provides an end-to-end construction intelligence platform that:
 
 ## AI Reasoning Engine
 
-<img width="1536" height="1024" alt="image" src="https://github.com/user-attachments/assets/548e92cd-57ec-4090-8891-1341d3a4025b" />
+<img width="1672" height="941" alt="image" src="https://github.com/user-attachments/assets/e2028b42-143d-4f1e-8434-ef46b0bde4ec" />
 
 
 Each agent reasons independently and passes structured outputs to downstream agents.
