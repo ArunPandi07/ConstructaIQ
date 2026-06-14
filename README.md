@@ -75,7 +75,6 @@ ConstructaIQ provides an end-to-end construction intelligence platform that:
 
 <img width="1536" height="1024" alt="image" src="https://github.com/user-attachments/assets/548e92cd-57ec-4090-8891-1341d3a4025b" />
 
-ConstructaIQ is not a chatbot.
 
 Each agent reasons independently and passes structured outputs to downstream agents.
 
