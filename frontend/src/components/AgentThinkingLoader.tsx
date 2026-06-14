@@ -95,17 +95,18 @@ export const AGENT_STEPS: AgentStep[] = [
 const TOTAL_WEIGHT = AGENT_STEPS.reduce((s, a) => s + a.weight, 0);
 
 // Cumulative progress threshold (0–1) at which each agent STARTS
-const AGENT_START_AT = AGENT_STEPS.reduce<number[]>((acc, step, i) => {
+const AGENT_START_AT = AGENT_STEPS.reduce<number[]>((acc, _step, i) => {
   if (i === 0) return [0];
   return [...acc, acc[i - 1] + AGENT_STEPS[i - 1].weight / TOTAL_WEIGHT];
 }, []);
 
 // Cumulative progress threshold at which each agent would normally END
 // Animation caps below 100% until the live analyze job signals resolved=true
-const RUNDOWN_CAP = 0.88; // animation never auto-advances past this
-const FLUSH_INTERVAL_MS = 200; // ms between agents completing during flush phase
+const RUNDOWN_CAP = 0.88; // fallback simulated cap when no live progress yet
+const FLUSH_INTERVAL_MS = 50; // fast completion sweep after job resolves
 const TICK_MS = 80; // animation tick rate
-const SIMULATED_TOTAL_MS = 34000; // reference timeline (doesn't need to match real time)
+const SIMULATED_TOTAL_MS = 14000; // fallback only before first status poll
+const LIVE_PROGRESS_STEP = 100 / AGENT_STEPS.length;
 
 type AgentStatus = "pending" | "thinking" | "done" | "error";
 type LoaderPhase = "running" | "flushing" | "done" | "error";
@@ -155,7 +156,7 @@ interface Props {
 export default function AgentThinkingLoader({
   visible,
   projectName,
-  mode,
+  mode: _mode,
   resolved,
   error,
   progressStep,
@@ -195,9 +196,9 @@ export default function AgentThinkingLoader({
     }
   }, [visible]);
 
-  /* ── Main proportional tick animation ── */
+  /* ── Fallback tick — only when live pipeline progress is not available ── */
   useEffect(() => {
-    if (!visible || phase !== "running") return;
+    if (!visible || phase !== "running" || progressStep) return;
 
     startTimeRef.current = Date.now();
 
@@ -207,11 +208,9 @@ export default function AgentThinkingLoader({
       const elapsed = Date.now() - (startTimeRef.current ?? Date.now());
       setElapsedMs(elapsed);
 
-      // Progress ratio — capped at RUNDOWN_CAP until the job completes
       const rawProgress = Math.min(elapsed / SIMULATED_TOTAL_MS, 1);
       const progress = Math.min(rawProgress, RUNDOWN_CAP);
 
-      // Which agent should be ACTIVE?
       let targetIdx = 0;
       for (let i = AGENT_STEPS.length - 1; i >= 0; i--) {
         if (progress >= AGENT_START_AT[i]) { targetIdx = i; break; }
@@ -221,18 +220,15 @@ export default function AgentThinkingLoader({
 
       setStatuses((prev) => {
         const next = [...prev];
-        // Mark all before targetIdx as done
         for (let i = 0; i < targetIdx; i++) {
           if (next[i] === "pending" || next[i] === "thinking") next[i] = "done";
         }
-        // Mark targetIdx as thinking (unless already done/error)
         if (next[targetIdx] !== "done" && next[targetIdx] !== "error") {
           next[targetIdx] = "thinking";
         }
         return next;
       });
 
-      // Cycle thinking lines proportionally within the active agent
       const agentStart = AGENT_START_AT[targetIdx];
       const agentEnd = targetIdx < AGENT_STEPS.length - 1
         ? AGENT_START_AT[targetIdx + 1]
@@ -246,13 +242,15 @@ export default function AgentThinkingLoader({
     }, TICK_MS);
 
     return () => { if (tickRef.current) clearInterval(tickRef.current); };
-  }, [visible, phase]);
+  }, [visible, phase, progressStep]);
 
   /* ── Sync agent statuses from live poll progress ── */
   useEffect(() => {
     if (!visible || !progressStep) return;
     const idx = AGENT_STEPS.findIndex((step) => step.name === progressStep);
     if (idx === -1) return;
+
+    if (tickRef.current) clearInterval(tickRef.current);
 
     setActiveIdx(idx);
     setStatuses((prev) => {
@@ -262,7 +260,20 @@ export default function AgentThinkingLoader({
       for (let i = idx + 1; i < next.length; i++) next[i] = "pending";
       return next;
     });
-  }, [progressStep, visible]);
+
+    const lineCount = AGENT_STEPS[idx].thinkingLines.length;
+    if (overallPct != null && lineCount > 0) {
+      const stepStart = idx * LIVE_PROGRESS_STEP;
+      const stepEnd = (idx + 1) * LIVE_PROGRESS_STEP;
+      const within = Math.min(
+        1,
+        Math.max(0, (overallPct - stepStart) / Math.max(stepEnd - stepStart, 1)),
+      );
+      setThinkingLineIdx(
+        Math.min(lineCount - 1, Math.floor(within * lineCount)),
+      );
+    }
+  }, [progressStep, overallPct, visible]);
 
   /* ── Handle error ── */
   useEffect(() => {
@@ -277,19 +288,16 @@ export default function AgentThinkingLoader({
     });
   }, [error, visible]);
 
-  /* ── Handle resolved: flush remaining agents ── */
+  /* ── Handle resolved: fast flush remaining agents ── */
   useEffect(() => {
     if (!resolved || !visible || phase === "error" || phase === "done" || phase === "flushing") return;
 
-    // Stop the tick
     if (tickRef.current) clearInterval(tickRef.current);
     setPhase("flushing");
 
-    // Find the first non-done agent and flush from there
     let flushIdx = statuses.findIndex((s) => s !== "done");
     if (flushIdx === -1) flushIdx = AGENT_STEPS.length;
 
-    // Flush each remaining agent in sequence
     let i = flushIdx;
     flushRef.current = setInterval(() => {
       if (!mountedRef.current) return;
@@ -299,23 +307,18 @@ export default function AgentThinkingLoader({
         setActiveIdx(capturedI);
         setStatuses((prev) => {
           const next = [...prev];
-          if (capturedI > 0 && next[capturedI - 1] !== "done") next[capturedI - 1] = "done";
+          for (let j = 0; j < capturedI; j++) next[j] = "done";
           next[capturedI] = "thinking";
           return next;
         });
         i++;
       } else {
-        // Mark last agent done, finish
         if (flushRef.current) clearInterval(flushRef.current);
-        setStatuses((prev) => {
-          const next = [...prev];
-          next[AGENT_STEPS.length - 1] = "done";
-          return next;
-        });
+        setStatuses(AGENT_STEPS.map(() => "done"));
         setPhase("done");
         setTimeout(() => {
           if (mountedRef.current) onFlushComplete?.();
-        }, 600);
+        }, 280);
       }
     }, FLUSH_INTERVAL_MS);
 
@@ -328,7 +331,7 @@ export default function AgentThinkingLoader({
   const typedLine = useTypingText(
     currentLine,
     visible && statuses[activeIdx] === "thinking",
-    22
+    14,
   );
 
   const doneCount = statuses.filter((s) => s === "done").length;

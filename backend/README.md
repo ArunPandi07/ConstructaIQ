@@ -41,6 +41,27 @@ Revisions:
 
 - `001_baseline` — empty baseline
 - `002_add_core_tables` — 12 tables from the ConstructaIQ database design
+- `003_add_project_risks` — supply-chain and workforce risk rows from Supplier/Crew agents
+
+### Bootstrap catalogs (before first analyze)
+
+```bash
+cd backend
+python scripts/bootstrap.py
+```
+
+Runs idempotent seeds for `supplier_master` / `crew_master` catalogs used by SupplierAgent and CrewAgent.
+
+### Demo data (5 test projects)
+
+Wipes all **project-scoped** tables (projects, permits, schedules, budgets, risks, etc.) while preserving `supplier_master`, `supplier_materials`, and `crew_master`. Then seeds 5 fully-populated demo projects for dashboard and project UI testing.
+
+```bash
+cd backend
+python scripts/bootstrap.py                        # once, if catalogs are empty
+python scripts/seed_demo_projects.py --confirm     # destructive reset + seed
+python scripts/seed_demo_projects.py --confirm --skip-reset   # seed only (empty tables)
+```
 
 Create new migrations after changing SQLAlchemy models:
 
@@ -62,6 +83,7 @@ python -m alembic upgrade head
 | `crew_plans` | `CrewPlan` | Crew allocation by phase |
 | `inspections` | `Inspection` | Inspection records |
 | `budgets` | `Budget` | Cost breakdown |
+| `project_risks` | `ProjectRisk` | Supply-chain and workforce risks from agents |
 | `supplier_master` | `SupplierMaster` | Supplier directory |
 | `supplier_materials` | `SupplierMaterial` | Supplier catalog items |
 | `crew_master` | `CrewMaster` | Crew/employee directory |

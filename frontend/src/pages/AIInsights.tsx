@@ -1,10 +1,25 @@
+<<<<<<< HEAD
 import { useEffect, useMemo } from "react";
 import { Bot, Building2, Clock, Activity, AlertCircle } from "lucide-react";
+=======
+import { useEffect, useMemo, useState } from "react";
+import { Bot, ExternalLink } from "lucide-react";
+import { Link } from "react-router-dom";
+>>>>>>> 6e84e374aae6fa0583c5dc8c7c9abceff753715d
 import Badge from "../components/Badge";
+import AgentDetailPanel from "../components/agentInsights/AgentDetailPanel";
+import AgentExecutionTimeline from "../components/agentInsights/AgentExecutionTimeline";
+import AgentInsightsKpiRow from "../components/agentInsights/AgentInsightsKpiRow";
+import AgentMasterList from "../components/agentInsights/AgentMasterList";
+import AgentPipelineStrip from "../components/agentInsights/AgentPipelineStrip";
 import { useAppContext } from "../context/AppContext";
+<<<<<<< HEAD
 import { useLoading } from "../context/LoadingContext";
 import { useProjectAgents, useProjects } from "../hooks/usePageData";
 import { ContentSkeleton } from "../components/Loader";
+=======
+import { useAgentInsights, useProjects } from "../hooks/usePageData";
+>>>>>>> 6e84e374aae6fa0583c5dc8c7c9abceff753715d
 import {
   isBackendProjectId,
   PIPELINE_AGENT_NAMES,
@@ -12,19 +27,21 @@ import {
 import {
   aggregateAgentUsage,
   countCompletedAgents,
+  countErrorAgents,
+  isAgentComplete,
+  lastCompletedAt,
   latestByAgent,
-  summarizeOutputJson,
 } from "../utils/agentHelpers";
 import { useStaggeredAnimation } from "../hooks/useScrollAnimation";
 
-const statusCfg = {
-  complete: { label: "Completed", variant: "green" as const },
-  completed: { label: "Completed", variant: "green" as const },
-  success: { label: "Completed", variant: "green" as const },
-  running: { label: "Running", variant: "blue" as const },
-  error: { label: "Error", variant: "red" as const },
-  failed: { label: "Error", variant: "red" as const },
-};
+function defaultSelectedAgent(
+  byAgent: Record<string, import("../types").AgentExecutionRead>,
+): string {
+  const completed = PIPELINE_AGENT_NAMES.find((name) =>
+    isAgentComplete(byAgent[name]?.status),
+  );
+  return completed ?? PIPELINE_AGENT_NAMES[0];
+}
 
 interface KpiDef {
   key: string;
@@ -48,20 +65,30 @@ export default function AIInsights() {
   const project = projects.find((p) => p.id === selectedId);
 
   const {
-    data: executions = [],
-    loading: agentsLoading,
+    data,
+    loading: insightsLoading,
     error,
-  } = useProjectAgents(selectedId);
+  } = useAgentInsights(selectedId);
 
-  const executionList = executions ?? [];
+  const executions = data?.executions ?? [];
+  const executionList = executions;
   const byAgent = useMemo(() => latestByAgent(executionList), [executionList]);
   const completedCount = countCompletedAgents(byAgent);
   const usage = aggregateAgentUsage(executionList);
+  const errorCount = countErrorAgents(byAgent);
+  const lastRun = lastCompletedAt(executionList);
+
+  const [selectedAgent, setSelectedAgent] = useState<string>(PIPELINE_AGENT_NAMES[0]);
+
+  useEffect(() => {
+    setSelectedAgent(defaultSelectedAgent(byAgent));
+  }, [selectedId, byAgent]);
 
   const handleProjectChange = (id: string) => {
     setActiveProjectId(id);
   };
 
+<<<<<<< HEAD
   useEffect(() => {
     setLoading("ai-insights", agentsLoading && isBackendProjectId(selectedId),
       agentsLoading && isBackendProjectId(selectedId) ? { message: "Loading agent executions" } : undefined,
@@ -77,6 +104,9 @@ export default function AIInsights() {
 
   const kpiAnim = useStaggeredAnimation(kpis.length, { baseDelay: 100 });
   const agentAnim = useStaggeredAnimation(PIPELINE_AGENT_NAMES.length, { baseDelay: 80 });
+=======
+  const selectedRun = byAgent[selectedAgent];
+>>>>>>> 6e84e374aae6fa0583c5dc8c7c9abceff753715d
 
   return (
     <div className="space-y-6 animate-fade-in-up">
@@ -85,6 +115,9 @@ export default function AIInsights() {
           <h2 className="text-lg font-bold gradient-text">AI Insights</h2>
           <p className="text-sm mt-0.5 text-stone-500">
             Agent execution audit for the active project pipeline
+            {!projectsLoading && projects.length > 0 && (
+              <span className="text-stone-400"> · {projects.length} projects loaded</span>
+            )}
           </p>
         </div>
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
@@ -104,6 +137,7 @@ export default function AIInsights() {
           <Badge variant="blue" dot>
             {completedCount}/{PIPELINE_AGENT_NAMES.length} agents run
           </Badge>
+<<<<<<< HEAD
         </div>
       </div>
 
@@ -119,6 +153,18 @@ export default function AIInsights() {
             </div>
           </div>
         ))}
+=======
+          {isBackendProjectId(selectedId) && (
+            <Link
+              to={`/projects/${selectedId}`}
+              className="inline-flex items-center justify-center gap-1.5 text-xs font-bold text-stone-700 bg-stone-100 hover:bg-[#F5C518]/20 border border-stone-200 rounded-xl px-3 py-2 transition-colors"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              View project
+            </Link>
+          )}
+        </div>
+>>>>>>> 6e84e374aae6fa0583c5dc8c7c9abceff753715d
       </div>
 
       {!isBackendProjectId(selectedId) && (
@@ -144,14 +190,20 @@ export default function AIInsights() {
         </div>
       )}
 
+<<<<<<< HEAD
       {agentsLoading && isBackendProjectId(selectedId) && (
         <div className="pt-2">
           <ContentSkeleton variant="card" count={3} />
         </div>
+=======
+      {insightsLoading && isBackendProjectId(selectedId) && (
+        <div className="text-sm text-stone-500">Loading agent executions…</div>
+>>>>>>> 6e84e374aae6fa0583c5dc8c7c9abceff753715d
       )}
 
-      {isBackendProjectId(selectedId) && !agentsLoading && (
+      {isBackendProjectId(selectedId) && !insightsLoading && (
         <>
+<<<<<<< HEAD
           <div className="flex items-center gap-2 text-xs text-stone-500">
             <span>
               Viewing: <strong>{project?.name ?? selectedId}</strong>
@@ -222,7 +274,46 @@ export default function AIInsights() {
                 </div>
               );
             })}
+=======
+          <AgentPipelineStrip
+            byAgent={byAgent}
+            selectedAgent={selectedAgent}
+            onSelect={setSelectedAgent}
+          />
+
+          <AgentInsightsKpiRow
+            completedCount={completedCount}
+            totalDurationSeconds={usage.totalDuration}
+            lastRun={lastRun}
+            errorCount={errorCount}
+          />
+
+          <p className="text-xs text-stone-500">
+            Viewing: <strong>{project?.name ?? selectedId}</strong>
+            {usage.avgDuration > 0 && ` · avg duration ${usage.avgDuration}s per run`}
+          </p>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            <div className="lg:col-span-4 space-y-4">
+              <AgentMasterList
+                byAgent={byAgent}
+                selectedAgent={selectedAgent}
+                onSelect={setSelectedAgent}
+              />
+              <AgentExecutionTimeline executions={executionList} />
+            </div>
+            <div className="lg:col-span-8">
+              <AgentDetailPanel agentName={selectedAgent} run={selectedRun} />
+            </div>
+>>>>>>> 6e84e374aae6fa0583c5dc8c7c9abceff753715d
           </div>
+
+          {executionList.length === 0 && (
+            <div className="glass-card p-6 text-center text-sm text-stone-500 flex items-center justify-center gap-2">
+              <Bot className="w-4 h-4 text-stone-400" />
+              No agent executions logged for this project yet.
+            </div>
+          )}
         </>
       )}
     </div>

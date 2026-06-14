@@ -3,6 +3,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import type {
+  AgentExecutionRead,
   AgentInsightsData,
   ApiResponse,
   ChangeImpactData,
@@ -25,6 +26,66 @@ import { ApiError } from './apiClient'
 
 function ok<T>(data: T): ApiResponse<T> {
   return { data, status: 'success', timestamp: new Date().toISOString() }
+}
+
+/** Build insights view-model from already-fetched execution rows (no extra network). */
+export function buildAgentInsightsData(agents: AgentExecutionRead[]): AgentInsightsData {
+  const totalRuns = agents.length
+  const totalDuration = agents.reduce(
+    (sum, a) => sum + (a.duration_seconds ?? 0),
+    0,
+  )
+  const totalTokens = agents.reduce((sum, a) => sum + (a.tokens_used ?? 0), 0)
+  const completed = agents.filter((a) => {
+    const s = (a.status ?? '').toLowerCase()
+    return s === 'complete' || s === 'completed' || s === 'success'
+  }).length
+
+  return {
+    agents: PIPELINE_AGENT_NAMES.map((name) => {
+      const latest = [...agents]
+        .filter((a) => a.agent_name === name)
+        .sort((a, b) => (b.execution_id ?? 0) - (a.execution_id ?? 0))[0]
+      return {
+        id: name,
+        name,
+        icon: 'Bot',
+        status: (latest?.status?.toLowerCase() === 'error'
+          ? 'error'
+          : latest?.status?.toLowerCase() === 'running'
+            ? 'running'
+            : 'complete') as 'complete' | 'running' | 'error' | 'warning',
+        confidence: latest ? 85 : 0,
+        processingTime: latest?.duration_seconds
+          ? `${latest.duration_seconds}s`
+          : '—',
+        model: latest?.agent_version ?? 'default',
+        latestFindings: latest?.error_message
+          ? [latest.error_message]
+          : latest?.output_json
+            ? [latest.output_json.slice(0, 200)]
+            : [],
+        metrics: {
+          tokens: latest?.tokens_used ?? 0,
+          duration: latest?.duration_seconds ?? 0,
+        },
+      }
+    }),
+    timeline: agents.slice(0, 20).map((a) => ({
+      time: a.completed_at ?? a.started_at ?? '',
+      agent: a.agent_name ?? 'Agent',
+      event: a.status ?? 'unknown',
+      type: (a.status?.toLowerCase() === 'error' ? 'critical' : 'success') as
+        | 'success'
+        | 'critical',
+    })),
+    summary: {
+      totalRuns,
+      avgConfidence: completed > 0 ? Math.round((completed / PIPELINE_AGENT_NAMES.length) * 100) : 0,
+      totalFindings: totalTokens,
+      processingTime: totalDuration > 0 ? `${totalDuration}s` : '0s',
+    },
+  }
 }
 
 function mapDashboardResponse(raw: DashboardApiResponse): DashboardData {
@@ -165,63 +226,7 @@ export async function fetchAgentInsights(
     throw new ApiError('Invalid project id', 400)
   }
   const res = await getProjectAgents(Number(projectId))
-  const agents = res.agents
-  const totalRuns = agents.length
-  const totalDuration = agents.reduce(
-    (sum, a) => sum + (a.duration_seconds ?? 0),
-    0,
-  )
-  const totalTokens = agents.reduce((sum, a) => sum + (a.tokens_used ?? 0), 0)
-  const completed = agents.filter((a) => {
-    const s = (a.status ?? '').toLowerCase()
-    return s === 'complete' || s === 'completed' || s === 'success'
-  }).length
-
-  return ok({
-    agents: PIPELINE_AGENT_NAMES.map((name) => {
-      const latest = [...agents]
-        .filter((a) => a.agent_name === name)
-        .sort((a, b) => (b.execution_id ?? 0) - (a.execution_id ?? 0))[0]
-      return {
-        id: name,
-        name,
-        icon: 'Bot',
-        status: (latest?.status?.toLowerCase() === 'error'
-          ? 'error'
-          : latest?.status?.toLowerCase() === 'running'
-            ? 'running'
-            : 'complete') as 'complete' | 'running' | 'error' | 'warning',
-        confidence: latest ? 85 : 0,
-        processingTime: latest?.duration_seconds
-          ? `${latest.duration_seconds}s`
-          : '—',
-        model: latest?.agent_version ?? 'default',
-        latestFindings: latest?.error_message
-          ? [latest.error_message]
-          : latest?.output_json
-            ? [latest.output_json.slice(0, 200)]
-            : [],
-        metrics: {
-          tokens: latest?.tokens_used ?? 0,
-          duration: latest?.duration_seconds ?? 0,
-        },
-      }
-    }),
-    timeline: agents.slice(0, 20).map((a) => ({
-      time: a.completed_at ?? a.started_at ?? '',
-      agent: a.agent_name ?? 'Agent',
-      event: a.status ?? 'unknown',
-      type: (a.status?.toLowerCase() === 'error' ? 'critical' : 'success') as
-        | 'success'
-        | 'critical',
-    })),
-    summary: {
-      totalRuns,
-      avgConfidence: completed > 0 ? Math.round((completed / PIPELINE_AGENT_NAMES.length) * 100) : 0,
-      totalFindings: totalTokens,
-      processingTime: totalDuration > 0 ? `${totalDuration}s` : '0s',
-    },
-  })
+  return ok(buildAgentInsightsData(res.agents))
 }
 
 export async function uploadProjectFiles(): Promise<

@@ -1,5 +1,6 @@
 import type { AgentExecutionRead } from '../types'
 import { PIPELINE_AGENT_NAMES } from '../services/projectApi'
+import { buildOutputSummaryText } from './agentOutputSummaries'
 
 const COMPLETE = new Set(['complete', 'completed', 'success'])
 const ERROR = new Set(['error', 'failed'])
@@ -58,11 +59,30 @@ export function agentStatusStyle(status: string | null | undefined) {
   }
 }
 
-export function countCompletedAgents(byAgent: Record<string, AgentExecutionRead>): number {
+export function countErrorAgents(byAgent: Record<string, AgentExecutionRead>): number {
   return PIPELINE_AGENT_NAMES.filter((name) => {
     const s = byAgent[name]?.status?.toLowerCase()
-    return s != null && COMPLETE.has(s)
+    return s != null && ERROR.has(s)
   }).length
+}
+
+export function lastCompletedAt(agents: AgentExecutionRead[]): string | null {
+  let latest: string | null = null
+  for (const a of agents) {
+    const t = a.completed_at ?? a.started_at
+    if (!t) continue
+    if (!latest || new Date(t) > new Date(latest)) latest = t
+  }
+  return latest
+}
+
+export function isAgentComplete(status: string | null | undefined): boolean {
+  const s = (status ?? '').toLowerCase()
+  return COMPLETE.has(s)
+}
+
+export function countCompletedAgents(byAgent: Record<string, AgentExecutionRead>): number {
+  return PIPELINE_AGENT_NAMES.filter((name) => isAgentComplete(byAgent[name]?.status)).length
 }
 
 export function aggregateAgentUsage(agents: AgentExecutionRead[]) {
@@ -88,13 +108,5 @@ export function agentIcon(name: string): string {
 }
 
 export function summarizeOutputJson(raw: string | null | undefined, max = 120): string {
-  if (!raw) return 'Awaiting agent output…'
-  try {
-    const parsed = JSON.parse(raw) as Record<string, unknown>
-    const keys = Object.keys(parsed).slice(0, 3)
-    if (keys.length === 0) return raw.slice(0, max)
-    return keys.map((k) => `${k}: ${String(parsed[k]).slice(0, 40)}`).join(' · ')
-  } catch {
-    return raw.slice(0, max)
-  }
+  return buildOutputSummaryText(raw, max)
 }

@@ -22,6 +22,20 @@ class BudgetRepository(BaseRepository[Budget]):
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
 
+    async def list_by_projects(
+        self, project_ids: list[int], *, limit: int = 5000
+    ) -> list[Budget]:
+        if not project_ids:
+            return []
+        stmt = (
+            select(Budget)
+            .where(Budget.project_id.in_(project_ids))
+            .order_by(Budget.project_id, Budget.budget_id)
+            .limit(limit)
+        )
+        result = await self.session.execute(stmt)
+        return list(result.scalars().all())
+
     async def delete_by_project(self, project_id: int) -> int:
         stmt = delete(Budget).where(Budget.project_id == project_id)
         result = await self.session.execute(stmt)

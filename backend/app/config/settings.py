@@ -28,6 +28,11 @@ class Settings(BaseSettings):
     DB_MAX_OVERFLOW: int = 10
     DB_ECHO: bool = False
 
+    # JWT Authentication
+    JWT_SECRET_KEY: str = "CHANGE_THIS_TO_RANDOM_SECRET_KEY_IN_PRODUCTION"
+    JWT_ALGORITHM: str = "HS256"
+    JWT_ACCESS_TOKEN_EXPIRE_HOURS: int = 24
+
     model_config = SettingsConfigDict(
         env_file=os.path.join(Path(__file__).resolve().parent.parent.parent, ".env"),
         env_file_encoding="utf-8",

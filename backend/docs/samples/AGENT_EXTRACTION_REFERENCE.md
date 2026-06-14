@@ -42,7 +42,7 @@ OUTPUT
 
 PERSISTENCE (when project_id + DATABASE_URL)
   projects, permits, schedules, budgets, inspections,
-  project_suppliers, crew_plans, agent_executions
+  project_suppliers, crew_plans, project_risks, agent_executions
 ```
 
 ---
@@ -160,13 +160,16 @@ String permits are coerced to `{name, status: "required", estimated_approval_day
 |-----|---------|------------|
 | `project_phases[]` | Named phases with timelines | `schedules.phase_breakdown` |
 | `estimated_duration_days` | Total duration | `schedules.total_duration_days` |
-| `materials[]` | Material takeoff list | `schedules.work_packages` (or dependencies) |
+| `materials[]` | Material takeoff list | `schedules.work_packages.materials` |
 | `crew_requirements[]` | Workforce by trade | Feeds CrewAgent |
 | `inspection_stages[]` | Mandatory inspections | `inspections` rows |
-| `dependencies[]` | Phase/task dependencies | `schedules.work_packages` |
+| `dependencies[]` | Phase/task dependencies | `schedules.work_packages.dependencies` |
+
+`work_packages` is stored as JSON: `{"dependencies": [...], "materials": [...]}`. Legacy rows may be a flat array (dependencies or materials only).
 
 **Orchestrator key:** `projectPlan`  
-**DB tables:** `schedules`, `inspections`
+**DB tables:** `schedules`, `inspections`  
+**Summary API:** `GET /projects/{id}/summary` → `intelligence.phases`, `dependencies`, `materials`, `criticalPathPhases`, `inspections`
 
 ---
 
@@ -180,11 +183,11 @@ String permits are coerced to `{name, status: "required", estimated_approval_day
 | Key | Fields per row | DB table |
 |-----|----------------|----------|
 | `procurement_plan[]` | `material_name`, `supplier_name`, `quantity`, `unit_price`, `delivery_date`, `total_cost` | `project_suppliers` |
-| `supply_chain_risks[]` | risk, severity, mitigation | (not persisted) |
+| `supply_chain_risks[]` | risk, severity, mitigation | `project_risks` (`category=supply_chain`) |
 | `recommended_suppliers[]` | supplier, rationale | (not persisted) |
 
 **Orchestrator key:** `supplierAnalysis`  
-**Note:** Run `python scripts/seed_supplier_master.py` for catalog data.
+**Note:** Run `python scripts/bootstrap.py` (or individual seed scripts) for catalog data.
 
 ---
 
@@ -198,7 +201,7 @@ String permits are coerced to `{name, status: "required", estimated_approval_day
 | Key | Fields per row | DB table |
 |-----|----------------|----------|
 | `crew_allocations[]` | `phase_name`, `crew_name`, `skill_type`, `labor_cost`, `start_date`, `end_date` | `crew_plans` |
-| `workforce_gaps[]` | role, shortage | (not persisted) |
+| `workforce_gaps[]` | role, shortage | `project_risks` (`category=workforce`) |
 | `recommendations[]` | text | (not persisted) |
 
 **Date formats supported in persistence:**

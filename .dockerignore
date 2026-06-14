@@ -1,0 +1,53 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+*.egg-info/
+dist/
+build/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Frontend (not needed in backend Docker image)
+frontend/
+node_modules/
+
+# Documentation
+*.md
+!backend/README.md
+docs/
+
+# Tests
+backend/tests/
+*.test.py
+.pytest_cache/
+
+# Environment files (will be set via Render env vars)
+.env
+.env.local
+.env.*.local
+
+# Alembic (only if you run migrations separately)
+# backend/alembic/
+
+# Scripts (optional - keep if needed for seeding)
+# backend/scripts/

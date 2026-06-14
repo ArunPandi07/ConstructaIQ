@@ -10,12 +10,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.agent_execution import AgentExecution
 from app.db.repositories.agent_execution_repository import AgentExecutionRepository
+from app.db.repositories.budget_repository import BudgetRepository
 from app.db.repositories.crew_plan_repository import CrewPlanRepository
 from app.db.repositories.document_repository import DocumentRepository
+from app.db.repositories.inspection_repository import InspectionRepository
 from app.db.repositories.permit_repository import PermitRepository
 from app.db.repositories.project_repository import ProjectRepository
+from app.db.repositories.project_risk_repository import ProjectRiskRepository
 from app.db.repositories.project_supplier_repository import ProjectSupplierRepository
 from app.db.repositories.schedule_repository import ScheduleRepository
+from app.services.readiness_service import compute_readiness
 from app.schemas.document import DocumentCreate
 from app.schemas.project import ProjectCreate, ProjectRead
 from app.schemas.project_responses import (
@@ -152,6 +156,13 @@ def _format_budget_total(value: Decimal) -> str:
     return f"${value:,.0f}"
 
 
+def _group_by_project_id(rows: list[Any]) -> dict[int, list[Any]]:
+    grouped: dict[int, list[Any]] = {}
+    for row in rows:
+        grouped.setdefault(row.project_id, []).append(row)
+    return grouped
+
+
 async def list_projects(
     session: AsyncSession, *, skip: int = 0, limit: int = 100
 ) -> list[ProjectListItem]:
@@ -170,13 +181,19 @@ async def list_projects(
     executions_by_project: dict[int, list[AgentExecution]] = {}
     for ex in all_executions:
         executions_by_project.setdefault(ex.project_id, []).append(ex)
+    suppliers_by_project = _group_by_project_id(
+        await supplier_repo.list_by_projects(project_ids, limit=5000)
+    )
+    crew_by_project = _group_by_project_id(
+        await crew_repo.list_by_projects(project_ids, limit=5000)
+    )
+    schedules_by_project = _group_by_project_id(
+        await schedule_repo.list_by_projects(project_ids, limit=5000)
+    )
 
     items: list[ProjectListItem] = []
     for project in projects:
         pid = project.project_id
-        suppliers = await supplier_repo.list_by_project(pid, limit=1000)
-        crew_plans = await crew_repo.list_by_project(pid, limit=1000)
-        schedules = await schedule_repo.list_by_project(pid, limit=1)
         base = ProjectRead.model_validate(project)
         items.append(
             ProjectListItem(
@@ -184,9 +201,9 @@ async def list_projects(
                 agent_completed=_count_agent_completed(
                     executions_by_project.get(pid, [])
                 ),
-                supplier_count=len(suppliers),
-                crew_count=len(crew_plans),
-                phase_progress=_avg_phase_progress(schedules),
+                supplier_count=len(suppliers_by_project.get(pid, [])),
+                crew_count=len(crew_by_project.get(pid, [])),
+                phase_progress=_avg_phase_progress(schedules_by_project.get(pid, [])),
             )
         )
     return items
@@ -259,8 +276,12 @@ async def get_dashboard(session: AsyncSession) -> DashboardResponse:
 
     recommendations: list[DashboardRecommendationItem] = []
     rec_id = 1
+    rec_project_ids = [p.project_id for p in projects[:20]]
+    permits_by_project = _group_by_project_id(
+        await permit_repo.list_by_projects(rec_project_ids, limit=1000)
+    )
     for project in projects[:20]:
-        permits = await permit_repo.list_by_project(project.project_id, limit=50)
+        permits = permits_by_project.get(project.project_id, [])
         pending = [
             p
             for p in permits
@@ -282,29 +303,89 @@ async def get_dashboard(session: AsyncSession) -> DashboardResponse:
             )
             rec_id += 1
 
-    permit_status_counts: dict[str, int] = {}
-    for project in projects[:30]:
-        for permit in await permit_repo.list_by_project(project.project_id, limit=50):
-            label = map_permit_status(permit.status)
-            permit_status_counts[label] = permit_status_counts.get(label, 0) + 1
+    risk_repo = ProjectRiskRepository(session)
+    open_risks = await risk_repo.count_open_global()
+    risk_projects = await risk_repo.count_risk_projects_global()
+    recovery_plans = await risk_repo.count_open_with_detail_global()
+    category_counts = await risk_repo.count_by_category_global()
 
     risk_distribution = [
-        {"name": name, "value": count, "color": "#F5C518"}
-        for name, count in sorted(
-            permit_status_counts.items(), key=lambda x: -x[1]
-        )
+        {
+            "name": "Supply Chain" if k == "supply_chain" else "Workforce" if k == "workforce" else k.title(),
+            "value": count,
+            "color": "#F5C518" if k == "supply_chain" else "#E2B30D",
+        }
+        for k, count in sorted(category_counts.items(), key=lambda x: -x[1])
     ]
+
+    health_trend: list[dict[str, Any]] = []
+    if projects:
+        trend_project_ids = [p.project_id for p in projects[:10]]
+        supplier_repo = ProjectSupplierRepository(session)
+        crew_repo = CrewPlanRepository(session)
+        schedule_repo = ScheduleRepository(session)
+        budget_repo = BudgetRepository(session)
+        executions_by_project = _group_by_project_id(
+            await execution_repo.list_by_projects(trend_project_ids, limit=1000)
+        )
+        trend_permits_by_project = permits_by_project
+        missing_permit_ids = [
+            pid for pid in trend_project_ids if pid not in trend_permits_by_project
+        ]
+        if missing_permit_ids:
+            trend_permits_by_project.update(
+                _group_by_project_id(
+                    await permit_repo.list_by_projects(missing_permit_ids, limit=1000)
+                )
+            )
+        schedules_by_project = _group_by_project_id(
+            await schedule_repo.list_by_projects(trend_project_ids, limit=1000)
+        )
+        suppliers_by_project = _group_by_project_id(
+            await supplier_repo.list_by_projects(trend_project_ids, limit=5000)
+        )
+        crew_by_project = _group_by_project_id(
+            await crew_repo.list_by_projects(trend_project_ids, limit=5000)
+        )
+        risks_by_project = _group_by_project_id(
+            await risk_repo.list_by_projects(trend_project_ids, limit=5000)
+        )
+        budgets_by_project = _group_by_project_id(
+            await budget_repo.list_by_projects(trend_project_ids, limit=1000)
+        )
+        for project in projects[:10]:
+            pid = project.project_id
+            readiness = compute_readiness(
+                executions=executions_by_project.get(pid, []),
+                permits=trend_permits_by_project.get(pid, []),
+                schedules=schedules_by_project.get(pid, []),
+                suppliers=suppliers_by_project.get(pid, []),
+                crew_plans=crew_by_project.get(pid, []),
+                risks=risks_by_project.get(pid, []),
+                budgets=budgets_by_project.get(pid, []),
+            )
+            health_trend.append(
+                {
+                    "month": project.project_name[:20],
+                    "health": readiness["overallReadinessPct"],
+                    "risk": min(100, open_risks * 5),
+                    "onTime": 100
+                    if project.target_completion_date
+                    and project.target_completion_date >= today
+                    else 50,
+                }
+            )
 
     return DashboardResponse(
         kpi=DashboardKPI(
             active_projects=len(active_projects),
-            risk_projects=0,
+            risk_projects=risk_projects,
             on_time_projects=len(on_time),
             total_budget=_format_budget_total(total_budget_val),
-            open_risks=0,
-            recovery_plans=0,
+            open_risks=open_risks,
+            recovery_plans=recovery_plans,
         ),
-        health_trend=[],
+        health_trend=health_trend,
         risk_distribution=risk_distribution,
         recent_activities=recent_activities,
         recent_recommendations=recommendations[:10],
@@ -317,7 +398,26 @@ async def get_project_summary(session: AsyncSession, project_id: int) -> dict[st
     permits = await PermitRepository(session).list_by_project(project_id)
     schedules = await ScheduleRepository(session).list_by_project(project_id)
     crew_plans = await CrewPlanRepository(session).list_by_project(project_id)
-    intelligence = map_project_intelligence(project, permits, schedules, crew_plans)
+    budgets = await BudgetRepository(session).list_by_project(project_id)
+    inspections = await InspectionRepository(session).list_by_project(project_id)
+    risks = await ProjectRiskRepository(session).list_by_project(project_id)
+    executions = await AgentExecutionRepository(session).list_by_project(project_id)
+    blueprint_execution = await AgentExecutionRepository(session).get_latest_by_agent(
+        project_id, "BlueprintAgent"
+    )
+    suppliers = await ProjectSupplierRepository(session).list_by_project(project_id)
+    intelligence = map_project_intelligence(
+        project,
+        permits,
+        schedules,
+        crew_plans,
+        budgets=budgets,
+        inspections=inspections,
+        risks=risks,
+        executions=executions,
+        suppliers=suppliers,
+        blueprint_execution=blueprint_execution,
+    )
     return {"project": project, "intelligence": intelligence}
 
 
@@ -349,6 +449,8 @@ async def start_analyze_job(
     contract_filename = None
     blueprint_bytes = None
     blueprint_filename = None
+    existing_blob_paths: dict[str, str] = {}
+    skip_blob_upload = False
 
     if blob_storage_service.is_enabled:
         for doc in documents:
@@ -357,11 +459,15 @@ async def start_analyze_job(
                     await blob_storage_service.download_document(doc.blob_url),
                     doc.file_name,
                 )
+                existing_blob_paths["contract"] = doc.blob_url
+                skip_blob_upload = True
             elif doc.document_type == "blueprint" and doc.blob_url:
                 blueprint_bytes, blueprint_filename = (
                     await blob_storage_service.download_document(doc.blob_url),
                     doc.file_name,
                 )
+                existing_blob_paths["blueprint"] = doc.blob_url
+                skip_blob_upload = True
 
     job = analyze_job_service.create_job(project_id)
     analyze_job_service.enqueue(
@@ -372,6 +478,8 @@ async def start_analyze_job(
         contract_filename=contract_filename,
         blueprint_bytes=blueprint_bytes,
         blueprint_filename=blueprint_filename,
+        skip_blob_upload=skip_blob_upload,
+        existing_blob_paths=existing_blob_paths or None,
     )
     return job
 

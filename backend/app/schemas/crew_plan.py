@@ -2,7 +2,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class CrewPlanCreate(BaseModel):
@@ -12,6 +12,8 @@ class CrewPlanCreate(BaseModel):
     labor_cost: Optional[Decimal] = None
     start_date: Optional[date] = None
     end_date: Optional[date] = None
+    headcount: Optional[int] = Field(default=None, ge=0)
+    skill_type: Optional[str] = None
 
 
 class CrewPlanUpdate(BaseModel):
@@ -20,6 +22,8 @@ class CrewPlanUpdate(BaseModel):
     labor_cost: Optional[Decimal] = None
     start_date: Optional[date] = None
     end_date: Optional[date] = None
+    headcount: Optional[int] = Field(default=None, ge=0)
+    skill_type: Optional[str] = None
 
 
 class CrewPlanRead(CrewPlanCreate):

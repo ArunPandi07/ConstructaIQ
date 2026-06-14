@@ -106,6 +106,8 @@ class AnalyzeJobService:
         contract_filename: str | None = None,
         blueprint_bytes: bytes | None = None,
         blueprint_filename: str | None = None,
+        skip_blob_upload: bool = False,
+        existing_blob_paths: dict[str, str] | None = None,
     ) -> None:
         job.status = "running"
         progress_callback: Callable[[str], None] = lambda step: self._update_progress(
@@ -128,6 +130,8 @@ class AnalyzeJobService:
                         session=session,
                         progress_callback=progress_callback,
                         execution_log=execution_log,
+                        skip_blob_upload=skip_blob_upload,
+                        existing_blob_paths=existing_blob_paths,
                     )
                 else:
                     if not description:

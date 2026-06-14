@@ -15,6 +15,7 @@ from app.db.repositories.crew_plan_repository import CrewPlanRepository
 from app.db.repositories.inspection_repository import InspectionRepository
 from app.db.repositories.permit_repository import PermitRepository
 from app.db.repositories.project_repository import ProjectRepository
+from app.db.repositories.project_risk_repository import ProjectRiskRepository
 from app.db.repositories.project_supplier_repository import ProjectSupplierRepository
 from app.db.repositories.schedule_repository import ScheduleRepository
 from app.schemas.agent_execution import AgentExecutionCreate
@@ -23,9 +24,11 @@ from app.schemas.crew_plan import CrewPlanCreate
 from app.schemas.inspection import InspectionCreate
 from app.schemas.permit import PermitCreate
 from app.schemas.project import ProjectUpdate
+from app.schemas.project_risk import ProjectRiskCreate
 from app.schemas.project_supplier import ProjectSupplierCreate
 from app.schemas.schedule import ScheduleCreate
 from app.services.agent_field_mapper import normalize_permit_agent
+from app.services.material_matcher import align_procurement_plan
 from app.services.logging_service import get_logger
 
 logger = get_logger("AgentPersistenceService")
@@ -158,12 +161,82 @@ def _json_dumps(value: Any) -> str | None:
     return json.dumps(value)
 
 
+def _normalize_severity(value: Any, *, default: str = "medium") -> str:
+    if isinstance(value, str) and value.strip():
+        return value.strip().lower()
+    return default
+
+
+async def _persist_project_risks(
+    risk_repo: ProjectRiskRepository,
+    project_id: int,
+    supplier_data: dict[str, Any],
+    crew_data: dict[str, Any],
+) -> int:
+    created = 0
+    for item in supplier_data.get("supply_chain_risks", []) or []:
+        if not isinstance(item, dict):
+            continue
+        title = item.get("risk") or item.get("title") or item.get("name")
+        if not title:
+            continue
+        await risk_repo.create(
+            ProjectRiskCreate(
+                project_id=project_id,
+                source_agent="SupplierAgent",
+                category="supply_chain",
+                title=str(title),
+                severity=_normalize_severity(item.get("severity")),
+                detail=item.get("mitigation") or item.get("detail"),
+                status="open",
+            )
+        )
+        created += 1
+
+    for item in crew_data.get("workforce_gaps", []) or []:
+        if not isinstance(item, dict):
+            continue
+        role = item.get("role") or item.get("title")
+        if not role:
+            continue
+        shortage = item.get("shortage") or item.get("gap") or item.get("detail")
+        severity = (
+            "high" if shortage and "critical" in str(shortage).lower() else "medium"
+        )
+        await risk_repo.create(
+            ProjectRiskCreate(
+                project_id=project_id,
+                source_agent="CrewAgent",
+                category="workforce",
+                title=str(role),
+                severity=severity,
+                detail=str(shortage) if shortage else None,
+                status="open",
+            )
+        )
+        created += 1
+
+    return created
+
+
 def _extract_permits(permit_data: dict[str, Any]) -> list[dict[str, Any]]:
     normalized = normalize_permit_agent(permit_data)
     items = normalized.get("required_permits")
     if isinstance(items, list):
         return [i for i in items if isinstance(i, dict)]
     return []
+
+
+def _extract_schedule_material_names(plan_data: dict[str, Any]) -> list[str]:
+    names: list[str] = []
+    for material in plan_data.get("materials") or []:
+        if isinstance(material, dict):
+            name = material.get("material_name") or material.get("name")
+            if name and str(name).strip():
+                names.append(str(name).strip())
+        elif isinstance(material, str) and material.strip():
+            names.append(material.strip())
+    return names
 
 
 async def persist_supplier_and_crew_outputs(
@@ -173,6 +246,7 @@ async def persist_supplier_and_crew_outputs(
     crew_data: dict[str, Any],
     *,
     project_start: date | None = None,
+    schedule_materials: list[str] | None = None,
 ) -> dict[str, int]:
     project_repo = ProjectRepository(session)
     project = await project_repo.get_by_id(project_id)
@@ -189,8 +263,17 @@ async def persist_supplier_and_crew_outputs(
     deleted_suppliers = await supplier_repo.delete_by_project(project_id)
     deleted_crew = await crew_repo.delete_by_project(project_id)
 
+    procurement_plan = supplier_data.get("procurement_plan", []) or []
+    if schedule_materials:
+        procurement_plan = align_procurement_plan(
+            procurement_plan,
+            schedule_materials,
+        )
+        supplier_data = dict(supplier_data)
+        supplier_data["procurement_plan"] = procurement_plan
+
     created_suppliers = 0
-    for row in supplier_data.get("procurement_plan", []) or []:
+    for row in procurement_plan:
         if not isinstance(row, dict):
             continue
         material_name = row.get("material_name")
@@ -230,6 +313,8 @@ async def persist_supplier_and_crew_outputs(
                 labor_cost=_parse_decimal(row.get("labor_cost")),
                 start_date=_parse_date(row.get("start_date"), project_start=start),
                 end_date=_parse_date(row.get("end_date"), project_start=start),
+                headcount=_parse_int(row.get("headcount")),
+                skill_type=row.get("skill_type") or row.get("skill"),
             )
         )
         created_crew += 1
@@ -340,7 +425,10 @@ async def persist_analysis_outputs(
         "total_duration_days"
     )
     phase_breakdown = plan_data.get("project_phases") or plan_data.get("phases")
-    work_packages = plan_data.get("dependencies") or plan_data.get("materials")
+    work_packages = {
+        "dependencies": plan_data.get("dependencies") or [],
+        "materials": plan_data.get("materials") or [],
+    }
     await schedule_repo.create(
         ScheduleCreate(
             project_id=project_id,
@@ -389,6 +477,12 @@ async def persist_analysis_outputs(
             )
             created_inspections += 1
         elif isinstance(stage, dict):
+            inspection_date = _parse_date(
+                stage.get("scheduled_date")
+                or stage.get("inspection_date")
+                or stage.get("date"),
+                project_start=project.start_date,
+            )
             await inspection_repo.create(
                 InspectionCreate(
                     project_id=project_id,
@@ -396,10 +490,17 @@ async def persist_analysis_outputs(
                     inspection_phase=stage.get("phase_name")
                     or stage.get("scheduled_phase")
                     or stage.get("phase"),
+                    inspection_date=inspection_date,
                     status=stage.get("status") or "planned",
                 )
             )
             created_inspections += 1
+
+    risk_repo = ProjectRiskRepository(session)
+    deleted_risks = await risk_repo.delete_by_project(project_id)
+    created_risks = await _persist_project_risks(
+        risk_repo, project_id, supplier_data, crew_data
+    )
 
     supplier_crew_summary = await persist_supplier_and_crew_outputs(
         session,
@@ -407,6 +508,7 @@ async def persist_analysis_outputs(
         supplier_data,
         crew_data,
         project_start=project.start_date,
+        schedule_materials=_extract_schedule_material_names(plan_data),
     )
 
     created_executions = 0
@@ -442,6 +544,8 @@ async def persist_analysis_outputs(
         "budgets_deleted": deleted_budgets,
         "inspections_created": created_inspections,
         "inspections_deleted": deleted_inspections,
+        "risks_created": created_risks,
+        "risks_deleted": deleted_risks,
         "agent_executions_created": created_executions,
         **supplier_crew_summary,
     }

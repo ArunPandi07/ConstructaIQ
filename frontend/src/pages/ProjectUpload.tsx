@@ -400,7 +400,7 @@ export default function ProjectUpload() {
     borderBottom: "1px solid var(--border)",
   };
 
-  const iconBox = (c: string, bg: string, bd: string): React.CSSProperties => ({
+  const iconBox = (_c: string, bg: string, bd: string): React.CSSProperties => ({
     width: 28,
     height: 28,
     borderRadius: 8,

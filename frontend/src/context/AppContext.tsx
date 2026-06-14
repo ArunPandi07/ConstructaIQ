@@ -2,6 +2,7 @@ import {
   createContext,
   useContext,
   useState,
+  useRef,
   useCallback,
   useEffect,
 } from 'react'
@@ -39,7 +40,7 @@ interface AppContextValue {
   setProjects: (projects: Project[]) => void
   projectsLoading: boolean
   projectsError: string | null
-  refreshProjects: () => Promise<void>
+  refreshProjects: (force?: boolean) => Promise<void>
   handleProjectCreated: (newProj: Project, addedTelemetry?: unknown) => void
 
   /** Latest async analyze pipeline result (6-agent keys) */
@@ -65,12 +66,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
     useState<AnalyzePipelineResult | null>(null)
   const [analyzeJobId, setAnalyzeJobId] = useState<string | null>(null)
 
-  const refreshProjects = useCallback(async () => {
+  const projectsCacheRef = useRef<{ data: Project[]; at: number } | null>(null)
+  const PROJECTS_TTL_MS = 60_000
+
+  const refreshProjects = useCallback(async (force = false) => {
+    const now = Date.now()
+    if (
+      !force &&
+      projectsCacheRef.current &&
+      now - projectsCacheRef.current.at < PROJECTS_TTL_MS
+    ) {
+      setProjects(projectsCacheRef.current.data)
+      return
+    }
     setProjectsLoading(true)
     setProjectsError(null)
     try {
       const items = await listProjects()
-      setProjects(mapProjectListToUI(items))
+      const mapped = mapProjectListToUI(items)
+      projectsCacheRef.current = { data: mapped, at: Date.now() }
+      setProjects(mapped)
     } catch (e) {
       const message = e instanceof Error ? e.message : 'Failed to load projects'
       setProjectsError(message)
@@ -86,7 +101,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const handleProjectCreated = useCallback(
     (newProj: Project) => {
       setActiveProjectId(newProj.id)
-      void refreshProjects()
+      void refreshProjects(true)
     },
     [refreshProjects],
   )
