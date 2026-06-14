@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from datetime import date
 from decimal import Decimal
@@ -19,7 +20,6 @@ from app.db.repositories.project_repository import ProjectRepository
 from app.db.repositories.project_risk_repository import ProjectRiskRepository
 from app.db.repositories.project_supplier_repository import ProjectSupplierRepository
 from app.db.repositories.schedule_repository import ScheduleRepository
-from app.services.readiness_service import compute_readiness
 from app.schemas.document import DocumentCreate
 from app.schemas.project import ProjectCreate, ProjectRead
 from app.schemas.project_responses import (
@@ -38,6 +38,8 @@ logger = get_logger("ProjectService")
 
 _ACTIVE_STATUSES = frozenset({"active", "live"})
 _COMPLETE_STATUSES = frozenset({"complete", "completed", "success"})
+_RELATED_ROW_LIMIT = 1000
+_DASHBOARD_PROJECT_LIMIT = 100
 
 
 async def _get_project_or_404(session: AsyncSession, project_id: int):
@@ -51,9 +53,12 @@ async def _get_project_or_404(session: AsyncSession, project_id: int):
     return project
 
 
-async def create_project(session: AsyncSession, payload: ProjectCreate):
+async def create_project(session: AsyncSession, payload: ProjectCreate, *, created_by_user_id: int | None = None):
     repo = ProjectRepository(session)
-    project = await repo.create(payload)
+    data = payload.model_dump()
+    if created_by_user_id is not None:
+        data["created_by_user_id"] = created_by_user_id
+    project = await repo.create(data)
     await session.commit()
     return project
 
@@ -64,6 +69,7 @@ async def upload_project_documents(
     project_name: str,
     contract: UploadFile | None,
     blueprint: UploadFile | None,
+    created_by_user_id: int | None = None,
 ) -> tuple[Any, list[Any]]:
     if not contract and not blueprint:
         raise HTTPException(
@@ -72,7 +78,9 @@ async def upload_project_documents(
         )
 
     project = await create_project(
-        session, ProjectCreate(project_name=project_name, status="uploaded")
+        session,
+        ProjectCreate(project_name=project_name, status="uploaded"),
+        created_by_user_id=created_by_user_id,
     )
     doc_repo = DocumentRepository(session)
     documents = []
@@ -150,6 +158,29 @@ def _avg_phase_progress(schedules: list[Any]) -> int | None:
     return round(sum(progresses) / len(progresses))
 
 
+def _count_on_track_projects(
+    active_projects: list[Any],
+    schedules_by_project: dict[int, list[Any]],
+    today: date,
+    *,
+    min_progress: int = 45,
+) -> int:
+    """Active projects on schedule: future target date and healthy phase progress."""
+    on_track = 0
+    for project in active_projects:
+        if (
+            project.target_completion_date is not None
+            and project.target_completion_date < today
+        ):
+            continue
+        progress = _avg_phase_progress(
+            schedules_by_project.get(project.project_id, [])
+        )
+        if progress is not None and progress >= min_progress:
+            on_track += 1
+    return on_track
+
+
 def _format_budget_total(value: Decimal) -> str:
     if value >= 1_000_000:
         return f"${value / 1_000_000:.1f}M"
@@ -163,34 +194,54 @@ def _group_by_project_id(rows: list[Any]) -> dict[int, list[Any]]:
     return grouped
 
 
-async def list_projects(
-    session: AsyncSession, *, skip: int = 0, limit: int = 100
-) -> list[ProjectListItem]:
-    repo = ProjectRepository(session)
-    projects = await repo.list_desc(skip=skip, limit=limit)
-    if not projects:
-        return []
+async def _fetch_project_enrichment(
+    session: AsyncSession,
+    project_ids: list[int],
+) -> tuple[
+    dict[int, list[AgentExecution]],
+    dict[int, list[Any]],
+    dict[int, list[Any]],
+    dict[int, list[Any]],
+]:
+    if not project_ids:
+        return {}, {}, {}, {}
 
-    project_ids = [p.project_id for p in projects]
     execution_repo = AgentExecutionRepository(session)
     supplier_repo = ProjectSupplierRepository(session)
     crew_repo = CrewPlanRepository(session)
     schedule_repo = ScheduleRepository(session)
 
-    all_executions = await execution_repo.list_by_projects(project_ids)
+    (
+        all_executions,
+        suppliers_raw,
+        crew_raw,
+        schedules_raw,
+    ) = await asyncio.gather(
+        execution_repo.list_by_projects(project_ids),
+        supplier_repo.list_by_projects(project_ids, limit=_RELATED_ROW_LIMIT),
+        crew_repo.list_by_projects(project_ids, limit=_RELATED_ROW_LIMIT),
+        schedule_repo.list_by_projects(project_ids, limit=_RELATED_ROW_LIMIT),
+    )
+
     executions_by_project: dict[int, list[AgentExecution]] = {}
     for ex in all_executions:
         executions_by_project.setdefault(ex.project_id, []).append(ex)
-    suppliers_by_project = _group_by_project_id(
-        await supplier_repo.list_by_projects(project_ids, limit=5000)
-    )
-    crew_by_project = _group_by_project_id(
-        await crew_repo.list_by_projects(project_ids, limit=5000)
-    )
-    schedules_by_project = _group_by_project_id(
-        await schedule_repo.list_by_projects(project_ids, limit=5000)
+
+    return (
+        executions_by_project,
+        _group_by_project_id(suppliers_raw),
+        _group_by_project_id(crew_raw),
+        _group_by_project_id(schedules_raw),
     )
 
+
+def _project_list_items_from_enrichment(
+    projects: list[Any],
+    executions_by_project: dict[int, list[AgentExecution]],
+    suppliers_by_project: dict[int, list[Any]],
+    crew_by_project: dict[int, list[Any]],
+    schedules_by_project: dict[int, list[Any]],
+) -> list[ProjectListItem]:
     items: list[ProjectListItem] = []
     for project in projects:
         pid = project.project_id
@@ -207,6 +258,51 @@ async def list_projects(
             )
         )
     return items
+
+
+def _build_health_trend_light(
+    projects: list[Any],
+    schedules_by_project: dict[int, list[Any]],
+    open_risks: int,
+    today: date,
+) -> list[dict[str, Any]]:
+    trend: list[dict[str, Any]] = []
+    for project in projects[:10]:
+        health = _avg_phase_progress(
+            schedules_by_project.get(project.project_id, [])
+        )
+        trend.append(
+            {
+                "month": project.project_name[:20],
+                "health": health,
+                "risk": min(100, open_risks * 5),
+                "onTime": 100
+                if project.target_completion_date
+                and project.target_completion_date >= today
+                else 50,
+            }
+        )
+    return trend
+
+
+async def _build_project_list_items(
+    session: AsyncSession,
+    projects: list[Any],
+) -> list[ProjectListItem]:
+    if not projects:
+        return []
+    enrichment = await _fetch_project_enrichment(
+        session, [p.project_id for p in projects]
+    )
+    return _project_list_items_from_enrichment(projects, *enrichment)
+
+
+async def list_projects(
+    session: AsyncSession, *, skip: int = 0, limit: int = 100
+) -> list[ProjectListItem]:
+    repo = ProjectRepository(session)
+    projects = await repo.list_desc(skip=skip, limit=limit)
+    return await _build_project_list_items(session, projects)
 
 
 def _execution_activity(ex: AgentExecution, project_name: str) -> DashboardActivityItem:
@@ -241,28 +337,76 @@ def _execution_activity(ex: AgentExecution, project_name: str) -> DashboardActiv
     )
 
 
-async def get_dashboard(session: AsyncSession) -> DashboardResponse:
+async def get_dashboard(
+    session: AsyncSession,
+    *,
+    include_projects: bool = False,
+) -> DashboardResponse:
     repo = ProjectRepository(session)
-    projects = await repo.list_desc(skip=0, limit=500)
-    today = date.today()
+    risk_repo = ProjectRiskRepository(session)
+    execution_repo = AgentExecutionRepository(session)
+    permit_repo = PermitRepository(session)
 
+    projects = await repo.list_desc(skip=0, limit=_DASHBOARD_PROJECT_LIMIT)
+
+    today = date.today()
     active_projects = [
         p for p in projects if (p.status or "").lower() in _ACTIVE_STATUSES
     ]
-    on_time = [
-        p
-        for p in projects
-        if p.target_completion_date is not None
-        and p.target_completion_date >= today
-    ]
+    active_ids = [p.project_id for p in active_projects]
     total_budget_val = sum(
         (p.contract_value or Decimal(0)) for p in projects
     )
 
-    execution_repo = AgentExecutionRepository(session)
-    permit_repo = PermitRepository(session)
-    recent_executions = await execution_repo.list_recent_global(limit=15)
+    rec_project_ids = [p.project_id for p in projects[:20]]
+    enrichment_project_ids = (
+        [p.project_id for p in projects]
+        if include_projects
+        else [p.project_id for p in projects[:10]]
+    )
+
+    schedule_repo = ScheduleRepository(session)
+
+    async def _empty_schedules() -> list[Any]:
+        return []
+
+    gather_tasks: list[Any] = [
+        asyncio.gather(
+            risk_repo.count_open_global(),
+            risk_repo.count_risk_projects_global(),
+            risk_repo.count_recovery_plans_global(),
+            risk_repo.count_by_category_global(),
+        ),
+        execution_repo.list_recent_global(limit=15),
+        permit_repo.list_by_projects(rec_project_ids, limit=1000),
+        schedule_repo.list_by_projects(active_ids, limit=_RELATED_ROW_LIMIT)
+        if active_ids
+        else _empty_schedules(),
+    ]
+    if enrichment_project_ids:
+        gather_tasks.append(
+            _fetch_project_enrichment(session, enrichment_project_ids)
+        )
+
+    gather_results = await asyncio.gather(*gather_tasks)
+    (
+        open_risks,
+        risk_projects,
+        recovery_plans,
+        category_counts,
+    ) = gather_results[0]
+    recent_executions = gather_results[1]
+    permits_raw = gather_results[2]
+    schedules_active_raw = gather_results[3]
+    enrichment = gather_results[4] if enrichment_project_ids else None
+
+    schedules_by_active = _group_by_project_id(schedules_active_raw)
+    on_time_projects = _count_on_track_projects(
+        active_projects, schedules_by_active, today
+    )
+
     project_names = {p.project_id: p.project_name for p in projects}
+    permits_by_project = _group_by_project_id(permits_raw)
 
     recent_activities = [
         _execution_activity(
@@ -276,10 +420,6 @@ async def get_dashboard(session: AsyncSession) -> DashboardResponse:
 
     recommendations: list[DashboardRecommendationItem] = []
     rec_id = 1
-    rec_project_ids = [p.project_id for p in projects[:20]]
-    permits_by_project = _group_by_project_id(
-        await permit_repo.list_by_projects(rec_project_ids, limit=1000)
-    )
     for project in projects[:20]:
         permits = permits_by_project.get(project.project_id, [])
         pending = [
@@ -303,12 +443,6 @@ async def get_dashboard(session: AsyncSession) -> DashboardResponse:
             )
             rec_id += 1
 
-    risk_repo = ProjectRiskRepository(session)
-    open_risks = await risk_repo.count_open_global()
-    risk_projects = await risk_repo.count_risk_projects_global()
-    recovery_plans = await risk_repo.count_open_with_detail_global()
-    category_counts = await risk_repo.count_by_category_global()
-
     risk_distribution = [
         {
             "name": "Supply Chain" if k == "supply_chain" else "Workforce" if k == "workforce" else k.title(),
@@ -318,69 +452,23 @@ async def get_dashboard(session: AsyncSession) -> DashboardResponse:
         for k, count in sorted(category_counts.items(), key=lambda x: -x[1])
     ]
 
+    project_list_items: list[ProjectListItem] = []
     health_trend: list[dict[str, Any]] = []
-    if projects:
-        trend_project_ids = [p.project_id for p in projects[:10]]
-        supplier_repo = ProjectSupplierRepository(session)
-        crew_repo = CrewPlanRepository(session)
-        schedule_repo = ScheduleRepository(session)
-        budget_repo = BudgetRepository(session)
-        executions_by_project = _group_by_project_id(
-            await execution_repo.list_by_projects(trend_project_ids, limit=1000)
-        )
-        trend_permits_by_project = permits_by_project
-        missing_permit_ids = [
-            pid for pid in trend_project_ids if pid not in trend_permits_by_project
-        ]
-        if missing_permit_ids:
-            trend_permits_by_project.update(
-                _group_by_project_id(
-                    await permit_repo.list_by_projects(missing_permit_ids, limit=1000)
-                )
+    if enrichment is not None:
+        exec_by, sup_by, crew_by, sch_by = enrichment
+        if include_projects:
+            project_list_items = _project_list_items_from_enrichment(
+                projects, exec_by, sup_by, crew_by, sch_by
             )
-        schedules_by_project = _group_by_project_id(
-            await schedule_repo.list_by_projects(trend_project_ids, limit=1000)
+        health_trend = _build_health_trend_light(
+            projects, sch_by, open_risks, today
         )
-        suppliers_by_project = _group_by_project_id(
-            await supplier_repo.list_by_projects(trend_project_ids, limit=5000)
-        )
-        crew_by_project = _group_by_project_id(
-            await crew_repo.list_by_projects(trend_project_ids, limit=5000)
-        )
-        risks_by_project = _group_by_project_id(
-            await risk_repo.list_by_projects(trend_project_ids, limit=5000)
-        )
-        budgets_by_project = _group_by_project_id(
-            await budget_repo.list_by_projects(trend_project_ids, limit=1000)
-        )
-        for project in projects[:10]:
-            pid = project.project_id
-            readiness = compute_readiness(
-                executions=executions_by_project.get(pid, []),
-                permits=trend_permits_by_project.get(pid, []),
-                schedules=schedules_by_project.get(pid, []),
-                suppliers=suppliers_by_project.get(pid, []),
-                crew_plans=crew_by_project.get(pid, []),
-                risks=risks_by_project.get(pid, []),
-                budgets=budgets_by_project.get(pid, []),
-            )
-            health_trend.append(
-                {
-                    "month": project.project_name[:20],
-                    "health": readiness["overallReadinessPct"],
-                    "risk": min(100, open_risks * 5),
-                    "onTime": 100
-                    if project.target_completion_date
-                    and project.target_completion_date >= today
-                    else 50,
-                }
-            )
 
     return DashboardResponse(
         kpi=DashboardKPI(
             active_projects=len(active_projects),
             risk_projects=risk_projects,
-            on_time_projects=len(on_time),
+            on_time_projects=on_time_projects,
             total_budget=_format_budget_total(total_budget_val),
             open_risks=open_risks,
             recovery_plans=recovery_plans,
@@ -390,6 +478,7 @@ async def get_dashboard(session: AsyncSession) -> DashboardResponse:
         recent_activities=recent_activities,
         recent_recommendations=recommendations[:10],
         total_tokens_recent=total_tokens_recent,
+        projects=project_list_items,
     )
 
 
@@ -401,8 +490,9 @@ async def get_project_summary(session: AsyncSession, project_id: int) -> dict[st
     budgets = await BudgetRepository(session).list_by_project(project_id)
     inspections = await InspectionRepository(session).list_by_project(project_id)
     risks = await ProjectRiskRepository(session).list_by_project(project_id)
-    executions = await AgentExecutionRepository(session).list_by_project(project_id)
-    blueprint_execution = await AgentExecutionRepository(session).get_latest_by_agent(
+    exec_repo = AgentExecutionRepository(session)
+    executions = await exec_repo.list_by_project_full(project_id)
+    blueprint_execution = await exec_repo.get_latest_by_agent(
         project_id, "BlueprintAgent"
     )
     suppliers = await ProjectSupplierRepository(session).list_by_project(project_id)
@@ -441,6 +531,8 @@ async def start_analyze_job(
     project_id: int,
     *,
     description: str | None = None,
+    triggering_user_id: int | None = None,
+    send_report_email: bool = False,
 ) -> AnalyzeJob:
     project = await _get_project_or_404(session, project_id)
     documents = await DocumentRepository(session).list_by_project(project_id)
@@ -469,7 +561,11 @@ async def start_analyze_job(
                 existing_blob_paths["blueprint"] = doc.blob_url
                 skip_blob_upload = True
 
-    job = analyze_job_service.create_job(project_id)
+    job = analyze_job_service.create_job(
+        project_id,
+        triggering_user_id=triggering_user_id,
+        send_report_email=send_report_email,
+    )
     analyze_job_service.enqueue(
         job,
         project_name=project.project_name,

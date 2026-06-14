@@ -12,6 +12,7 @@ export interface User {
   email: string
   full_name: string
   is_active: boolean
+  report_email_opt_in: boolean
   created_at: string
   updated_at: string
 }
@@ -489,6 +490,7 @@ export interface DashboardApiResponse {
   recent_activities: DashboardApiActivity[]
   recent_recommendations: DashboardApiRecommendation[]
   total_tokens_recent: number
+  projects?: ProjectListItem[]
 }
 
 export interface ProjectCreatePayload {
@@ -521,6 +523,8 @@ export interface AnalyzeJobStatus {
   overall_pct?: number | null
   result?: AnalyzePipelineResult | null
   error?: string | null
+  report_delivery_status?: string | null
+  report_delivery_error?: string | null
 }
 
 export interface PersistenceSummary {

@@ -12,6 +12,7 @@ router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 @router.get("")
 async def read_dashboard(
     session: AsyncSession = Depends(get_db_required),
+    include_projects: bool = False,
 ):
-    data = await get_dashboard(session)
+    data = await get_dashboard(session, include_projects=include_projects)
     return success_response(DashboardResponse.model_validate(data))

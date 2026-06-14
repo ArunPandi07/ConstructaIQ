@@ -129,7 +129,7 @@ export function WorkflowProgressModal({
       projectIdRef.current = upload.project_id;
       setPhase('processing');
 
-      const job = await startAnalyze(upload.project_id);
+      const job = await startAnalyze(upload.project_id, { sendReportEmail: true });
       if (!mountedRef.current) return;
       setAnalyzeJobId(job.job_id);
 

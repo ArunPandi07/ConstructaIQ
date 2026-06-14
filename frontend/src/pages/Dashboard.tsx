@@ -108,15 +108,6 @@ export default function Dashboard() {
                 {isLoading ? "—" : getCumulativeBudget()}
               </p>
             </div>
-            <div className="w-px h-10 bg-stone-200"></div>
-            <div className="text-center">
-              <p className="text-[10px] text-stone-400 font-extrabold uppercase tracking-wider">
-                Mean Progress
-              </p>
-              <p className="text-2xl font-black text-emerald-600 mt-1 font-mono">
-                {isLoading ? "—" : `${getMeanProgress()}%`}
-              </p>
-            </div>
           </div>
         </div>
         <div className="mt-6 pt-5 border-t border-stone-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-3 text-xs text-stone-500">
@@ -142,29 +133,33 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="glass-card p-4 text-center">
-          <p className="text-[10px] text-stone-400 font-bold uppercase">Open Risks</p>
+        <div className="glass-card p-4 text-center bg-rose-50/80 border border-rose-100">
+          <p className="text-[10px] text-rose-600/80 font-bold uppercase">Open Risks</p>
           <p className="text-2xl font-black text-rose-600 mt-1 font-mono">
             {isLoading ? "—" : openRisks}
           </p>
+          <p className="text-[9px] text-rose-500/70 mt-1">All open risk items</p>
         </div>
-        <div className="glass-card p-4 text-center">
-          <p className="text-[10px] text-stone-400 font-bold uppercase">At-Risk Projects</p>
-          <p className="text-2xl font-black text-amber-600 mt-1 font-mono">
+        <div className="glass-card p-4 text-center bg-amber-50/80 border border-amber-100">
+          <p className="text-[10px] text-amber-700/80 font-bold uppercase">At-Risk Projects</p>
+          <p className="text-2xl font-black text-amber-700 mt-1 font-mono">
             {isLoading ? "—" : riskProjects}
           </p>
+          <p className="text-[9px] text-amber-600/70 mt-1">Sites with critical risks</p>
         </div>
-        <div className="glass-card p-4 text-center">
-          <p className="text-[10px] text-stone-400 font-bold uppercase">Recovery Plans</p>
-          <p className="text-2xl font-black text-stone-900 mt-1 font-mono">
+        <div className="glass-card p-4 text-center bg-indigo-50/80 border border-indigo-100">
+          <p className="text-[10px] text-indigo-600/80 font-bold uppercase">Recovery Plans</p>
+          <p className="text-2xl font-black text-indigo-700 mt-1 font-mono">
             {isLoading ? "—" : recoveryPlans}
           </p>
+          <p className="text-[9px] text-indigo-500/70 mt-1">Supply-chain mitigations</p>
         </div>
-        <div className="glass-card p-4 text-center">
-          <p className="text-[10px] text-stone-400 font-bold uppercase">On Time</p>
+        <div className="glass-card p-4 text-center bg-emerald-50/80 border border-emerald-100">
+          <p className="text-[10px] text-emerald-600/80 font-bold uppercase">On-Track Projects</p>
           <p className="text-2xl font-black text-emerald-600 mt-1 font-mono">
             {isLoading ? "—" : dashboard?.kpi.onTimeProjects ?? 0}
           </p>
+          <p className="text-[9px] text-emerald-600/70 mt-1">≥45% phase progress</p>
         </div>
       </div>
 

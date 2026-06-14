@@ -7,6 +7,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import type { ApiResponse } from '../types'
+import { dedupeAsync } from './requestDedupe'
 
 // ── Config ───────────────────────────────────────────────────
 
@@ -83,11 +84,14 @@ class ApiClient {
     const url = new URL(`${this.baseUrl}${path}`)
     if (params) Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v))
 
-    const res = await fetchWithTimeout(url.toString(), {
-      method: 'GET',
-      headers: this.buildHeaders(),
+    const requestKey = url.toString()
+    return dedupeAsync(requestKey, async () => {
+      const res = await fetchWithTimeout(requestKey, {
+        method: 'GET',
+        headers: this.buildHeaders(),
+      })
+      return this.handleResponse<T>(res)
     })
-    return this.handleResponse<T>(res)
   }
 
   async post<T>(path: string, body?: unknown): Promise<ApiResponse<T>> {

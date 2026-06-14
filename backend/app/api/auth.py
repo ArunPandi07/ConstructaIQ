@@ -127,6 +127,9 @@ async def update_profile(
     if user_update.full_name:
         current_user.full_name = user_update.full_name
 
+    if user_update.report_email_opt_in is not None:
+        current_user.report_email_opt_in = user_update.report_email_opt_in
+
     await session.commit()
     await session.refresh(current_user)
     return success_response(current_user, "Profile updated successfully")

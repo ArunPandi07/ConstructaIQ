@@ -62,13 +62,42 @@ class ProjectRiskRepository(BaseRepository[ProjectRisk]):
         result = await self.session.execute(stmt)
         return int(result.scalar() or 0)
 
+    async def count_recovery_plans_global(self) -> int:
+        """Supplier mitigations documented as recovery actions (distinct from all open risks)."""
+        stmt = (
+            select(func.count())
+            .select_from(ProjectRisk)
+            .where(
+                ProjectRisk.status == "open",
+                ProjectRisk.category == "supply_chain",
+                ProjectRisk.detail.isnot(None),
+                ProjectRisk.detail != "",
+            )
+        )
+        result = await self.session.execute(stmt)
+        return int(result.scalar() or 0)
+
+    async def count_open_high_severity_global(self) -> int:
+        """Open risk items flagged high severity (subset of open_risks)."""
+        stmt = (
+            select(func.count())
+            .select_from(ProjectRisk)
+            .where(
+                ProjectRisk.status == "open",
+                func.lower(ProjectRisk.severity) == "high",
+            )
+        )
+        result = await self.session.execute(stmt)
+        return int(result.scalar() or 0)
+
     async def count_risk_projects_global(self) -> int:
+        """Distinct projects with at least one open high-severity risk."""
         stmt = (
             select(func.count(func.distinct(ProjectRisk.project_id)))
             .select_from(ProjectRisk)
             .where(
                 ProjectRisk.status == "open",
-                func.lower(ProjectRisk.severity).in_(("high", "medium")),
+                func.lower(ProjectRisk.severity) == "high",
             )
         )
         result = await self.session.execute(stmt)

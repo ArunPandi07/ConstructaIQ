@@ -11,6 +11,9 @@ export function Profile() {
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [reportEmailOptIn, setReportEmailOptIn] = useState(
+    user?.report_email_opt_in ?? true,
+  )
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -31,6 +34,7 @@ export function Profile() {
       await updateProfile({
         full_name: fullName,
         email,
+        report_email_opt_in: reportEmailOptIn,
         ...(newPassword && {
           current_password: currentPassword,
           new_password: newPassword,
@@ -113,6 +117,27 @@ export function Profile() {
                 borderRadius: 8,
               }}
             />
+          </div>
+
+          <div style={{ marginBottom: 24 }}>
+            <label
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                fontWeight: 600,
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={reportEmailOptIn}
+                onChange={(e) => setReportEmailOptIn(e.target.checked)}
+              />
+              Email me consolidated intelligence reports after analyze completes
+            </label>
+            <p style={{ fontSize: 13, color: '#64748b', marginTop: 8 }}>
+              Reports are sent to your account email via Azure Communication Services.
+            </p>
           </div>
 
           <hr

@@ -1,15 +1,18 @@
+import { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AppProvider, useAppContext } from "./context/AppContext";
 import { AuthProvider } from "./context/AuthContext";
+import { LoadingProvider } from "./context/LoadingContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import Layout from "./components/Layout";
-import Dashboard from "./pages/Dashboard";
-import Projects from "./pages/Projects";
-import ProjectDetails from "./pages/ProjectDetails";
-import AIInsights from "./pages/AIInsights";
 import { Login } from "./pages/Login";
-import { Profile } from "./pages/Profile";
 import { isBackendProjectId } from "./services/projectApi";
+
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Projects = lazy(() => import("./pages/Projects"));
+const ProjectDetails = lazy(() => import("./pages/ProjectDetails"));
+const AIInsights = lazy(() => import("./pages/AIInsights"));
+const Profile = lazy(() => import("./pages/Profile").then(m => ({ default: m.Profile })));
 // import Settings from "./pages/Settings";
 
 function IntelligenceRedirect() {
@@ -25,7 +28,9 @@ export default function App() {
     <AuthProvider>
       <AppProvider>
         <BrowserRouter>
-          <Routes>
+          <LoadingProvider>
+          <Suspense fallback={null}>
+            <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/" element={<ProtectedRoute element={<Layout />} />}>
               <Route index element={<Navigate to="/dashboard" replace />} />
@@ -38,7 +43,9 @@ export default function App() {
               {/* <Route path="settings" element={<Settings />} /> */}
             </Route>
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
-          </Routes>
+            </Routes>
+          </Suspense>
+          </LoadingProvider>
         </BrowserRouter>
       </AppProvider>
     </AuthProvider>

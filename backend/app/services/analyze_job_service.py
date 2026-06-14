@@ -36,6 +36,10 @@ class AnalyzeJob:
     error: str | None = None
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     agent_steps: list[dict[str, Any]] = field(default_factory=list)
+    triggering_user_id: int | None = None
+    send_report_email: bool = False
+    report_delivery_status: str | None = None
+    report_delivery_error: str | None = None
 
     @property
     def frontend_status(self) -> str:
@@ -52,7 +56,13 @@ class AnalyzeJobService:
     def __init__(self) -> None:
         self._jobs: dict[str, AnalyzeJob] = {}
 
-    def create_job(self, project_id: int) -> AnalyzeJob:
+    def create_job(
+        self,
+        project_id: int,
+        *,
+        triggering_user_id: int | None = None,
+        send_report_email: bool = False,
+    ) -> AnalyzeJob:
         job_id = str(uuid.uuid4())
         steps = [
             {
@@ -69,6 +79,8 @@ class AnalyzeJobService:
             project_id=project_id,
             status="queued",
             agent_steps=steps,
+            triggering_user_id=triggering_user_id,
+            send_report_email=send_report_email,
         )
         self._jobs[job_id] = job
         return job
@@ -148,10 +160,53 @@ class AnalyzeJobService:
                     )
 
                 job.result = result
-                job.status = "complete"
                 job.overall_pct = 100
                 for step in job.agent_steps:
                     step["status"] = "complete"
+
+                await session.commit()
+
+                if job.send_report_email and job.triggering_user_id:
+                    job.report_delivery_status = "pending"
+                    try:
+                        from app.services.report_delivery_service import send_project_report_email
+
+                        async with factory() as email_session:
+                            delivery = await send_project_report_email(
+                                email_session,
+                                job.project_id,
+                                job.triggering_user_id,
+                                job.job_id,
+                            )
+                        job.report_delivery_status = delivery.status
+                        if delivery.error_message and delivery.status != "sent":
+                            job.report_delivery_error = delivery.error_message
+                        logger.info(
+                            "Report email for job %s project %s: %s to %s",
+                            job.job_id,
+                            job.project_id,
+                            delivery.status,
+                            delivery.recipient_email,
+                        )
+                    except Exception as report_exc:
+                        logger.exception(
+                            "Report email failed for job %s", job.job_id
+                        )
+                        job.report_delivery_status = "failed"
+                        job.report_delivery_error = str(report_exc)
+                elif job.send_report_email:
+                    job.report_delivery_status = "skipped"
+                    job.report_delivery_error = (
+                        "No user linked to this analyze job for report delivery."
+                    )
+                    logger.warning(
+                        "Report email skipped for job %s: no triggering user",
+                        job.job_id,
+                    )
+                else:
+                    job.report_delivery_status = "skipped"
+
+                job.status = "complete"
         except Exception as exc:
             logger.exception("Analyze job %s failed", job.job_id)
             job.status = "error"
