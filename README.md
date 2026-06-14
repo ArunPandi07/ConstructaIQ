@@ -1,18 +1,21 @@
-# ConstructaIQ - AI-Powered Construction Intelligence Platform
+# ConstructaIQ - AI-Powered Multi-Agent Construction Planning & Intelligence Platform
 
-> **Azure AI Fest Hackathon Entry** | Team Technorucs
+> **Azure AI Fest Hackathon Entry**
 
-ConstructaIQ transforms construction project management by leveraging a 6-agent AI pipeline to extract, analyze, and visualize project intelligence from contract and blueprint documents. Upload your construction documents, and within minutes receive comprehensive permit assessments, schedule plans, supplier recommendations, crew allocations, risk analysis, and an interactive 3D building model.
+ConstructaIQ transforms construction project management by leveraging a Multi-Agent Reasoning Pipeline to extract, analyze, and visualize project intelligence from contract and blueprint documents. Upload your construction documents, and within minutes receive comprehensive permit assessments, schedule plans, supplier recommendations, crew allocations, risk analysis, and an interactive 3D building model.
 
 ---
 
 ## Table of Contents
 
 - [Problem Statement](#problem-statement)
+- [Business Impact](#Business-Impact)
 - [Solution Overview](#solution-overview)
+- [AI Reasoning Engine](#AI-Reasoning-Engine)
 - [Architecture](#architecture)
-- [6-Agent AI Pipeline](#6-agent-ai-pipeline)
 - [Key Features](#key-features)
+- [Future Enhancements](#Future-Enhancements)
+- [Why Azure AI Foundry](#Why-Azure-AI-Foundry)
 - [Tech Stack](#tech-stack)
 - [Azure Services Integration](#azure-services-integration)
 - [Database Schema](#database-schema)
@@ -38,16 +41,65 @@ Construction project planning is a complex, time-consuming process involving mul
 
 ---
 
+## Business Impact
+
+Traditional Construction Planning:
+- 2–4 weeks document review
+- Manual permit identification
+- Manual scheduling
+- Fragmented supplier planning
+
+ConstructaIQ:
+- Analysis in minutes
+- AI-generated schedules
+- Automated permit assessment
+- Supplier & workforce planning
+- Risk identification
+
+---
+
 ## Solution Overview
 
 ConstructaIQ provides an end-to-end construction intelligence platform that:
 
 1. **Ingests** construction contract PDFs and architectural blueprint PDFs
 2. **Extracts** text and structural data using Azure Document Intelligence
-3. **Analyzes** documents through a 6-agent AI pipeline powered by Azure AI Foundry
+3. **Analyzes** documents through a Multi-Agent Reasoning Pipeline powered by Azure AI Foundry
 4. **Persists** structured intelligence to Azure SQL Database
 5. **Visualizes** results through an interactive React dashboard with 3D building models
 6. **Reports** consolidated findings via email using Azure Communication Services
+
+---
+
+## AI Reasoning Engine
+
+<img width="1536" height="1024" alt="image" src="https://github.com/user-attachments/assets/548e92cd-57ec-4090-8891-1341d3a4025b" />
+
+ConstructaIQ is not a chatbot.
+
+Each agent reasons independently and passes structured outputs to downstream agents.
+
+Contract Agent
+    ↓
+Blueprint Agent
+    ↓
+Permit Agent
+    ↓
+Schedule Agent
+    ↓
+Supplier Agent
+    ↓
+Crew Agent
+    ↓
+Risk Analysis Engine
+
+The Risk Analysis Engine evaluates:
+- Permit Risks
+- Schedule Risks
+- Supplier Risks
+- Workforce Risks
+
+and generates project-level recommendations.
 
 ---
 
@@ -80,73 +132,6 @@ ConstructaIQ provides an end-to-end construction intelligence platform that:
       | Document Persistence  |    | Parallel Execution    |    | Services (Email)      |
       | SAS Token Access      |    | Field Normalization   |    | Report Delivery       |
       +---+-------------------+    +---+-------------------+    +---+-------------------+
-```
-
----
-
-## 6-Agent AI Pipeline
-
-The core intelligence engine consists of 6 specialized Azure AI Foundry agents that execute in a staged pipeline:
-
-### Stage 1 - Document Analysis (Parallel)
-
-| Agent | Version | Input | Output |
-|-------|---------|-------|--------|
-| **ContractAgent** | v4 | Contract PDF text | Project scope, budget, client, milestones, duration, location |
-| **BlueprintAgent** | v5 | Blueprint PDF text | Construction type, structural system, MEP specs, material quantities, 3D building definition |
-
-### Stage 2 - Regulatory & Planning (Sequential)
-
-| Agent | Version | Input | Output |
-|-------|---------|-------|--------|
-| **PermitAgent** | v3 | Contract + Blueprint data | Required permits, categories, approval timelines, critical path impact |
-| **ScheduleAgent** | v2 | Contract + Blueprint + Permits | Project phases, durations, materials, inspection stages, dependencies |
-
-### Stage 3 - Procurement & Workforce (Parallel)
-
-| Agent | Version | Input | Output |
-|-------|---------|-------|--------|
-| **SupplierAgent** | v3 | Schedule + Supplier catalog | Procurement plan, delivery dates, supply chain risks, recommended suppliers |
-| **CrewAgent** | v2 | Schedule + Crew catalog | Crew allocations by phase, workforce gaps, labor cost estimates |
-
-### Pipeline Output Structure
-
-```json
-{
-  "projectSummary": {
-    "project_name": "Aurora Tower",
-    "client_name": "Lakefront Development Partners",
-    "budget": 186500000,
-    "duration_months": 28,
-    "floor_count": 42,
-    "square_footage": 1250000
-  },
-  "blueprintSummary": {
-    "construction_type": "Type I-A",
-    "stories_above_grade": 42,
-    "structural_steel_tons": 14200,
-    "building_definition": { /* 3D model JSON */ }
-  },
-  "permitAssessment": {
-    "required_permits": [
-      { "name": "Building Permit", "category": "Municipal", "estimated_approval_days": 45 }
-    ]
-  },
-  "projectPlan": {
-    "phases": [...],
-    "materials": [...],
-    "inspection_stages": [...],
-    "dependencies": [...]
-  },
-  "supplierAnalysis": {
-    "procurement_plan": [...],
-    "supply_chain_risks": [...]
-  },
-  "crewAnalysis": {
-    "crew_allocations": [...],
-    "workforce_gaps": [...]
-  }
-}
 ```
 
 ---
@@ -198,6 +183,33 @@ The core intelligence engine consists of 6 specialized Azure AI Foundry agents t
 - User registration and profile management
 - Role-based access (created_by project ownership)
 - Email preference controls
+
+---
+
+## Future Enhancements
+
+- Inspection Agent
+- Budget Agent
+- Real-time Supplier APIs
+- BIM Integration
+- Azure Digital Twins
+- Multi-project Portfolio Intelligence
+
+---
+
+## Why Azure AI Foundry
+
+ConstructaIQ uses Azure AI Foundry to orchestrate specialized construction intelligence agents.
+
+Benefits:
+
+- Multi-agent architecture
+- Structured JSON outputs
+- Agent versioning
+- Enterprise scalability
+- Construction-specific reasoning workflows
+
+Azure AI Foundry enables each agent to independently analyze project information while collaborating through structured outputs.
 
 ---
 
