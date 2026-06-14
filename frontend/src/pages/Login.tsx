@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { motion } from 'framer-motion'
 import { useAuth } from '../context/AuthContext'
 import { LogIn } from 'lucide-react'
 
@@ -28,40 +29,26 @@ export function Login() {
   }
 
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      }}
-    >
-      <div
-        style={{
-          background: 'white',
-          borderRadius: 16,
-          padding: 48,
-          width: '100%',
-          maxWidth: 420,
-          boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
-        }}
+    <div className="min-h-screen flex items-center justify-center bg-stone-100">
+      <motion.div
+        initial={{ opacity: 0, y: 30, scale: 0.96 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
+        className="glass-card p-8 w-full max-w-sm mx-4"
       >
-        <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <LogIn size={48} color="#667eea" style={{ margin: '0 auto' }} />
-          <h1 style={{ fontSize: 28, fontWeight: 700, marginTop: 16 }}>
+        <div className="text-center mb-8">
+          <LogIn size={40} className="mx-auto text-[#F5C518]" />
+          <h1 className="text-2xl font-extrabold text-stone-900 mt-4 tracking-tight">
             ConstructaIQ
           </h1>
-          <p style={{ color: '#64748b', marginTop: 8 }}>
+          <p className="text-sm text-stone-500 mt-2">
             Sign in to your account
           </p>
         </div>
 
-        <form onSubmit={handleSubmit}>
-          <div style={{ marginBottom: 20 }}>
-            <label
-              style={{ display: 'block', fontWeight: 600, marginBottom: 8 }}
-            >
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div>
+            <label className="block text-sm font-semibold text-stone-700 mb-1.5">
               Email
             </label>
             <input
@@ -69,21 +56,13 @@ export function Login() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              style={{
-                width: '100%',
-                padding: '12px 16px',
-                border: '1px solid #cbd5e1',
-                borderRadius: 8,
-                fontSize: 16,
-              }}
+              className="w-full px-3.5 py-2.5 text-sm border border-stone-200 rounded-xl bg-white text-stone-900 placeholder-stone-400 focus:outline-none focus:border-[#F5C518] focus:ring-1 focus:ring-[#F5C518]/30 transition"
               placeholder="you@company.com"
             />
           </div>
 
-          <div style={{ marginBottom: 24 }}>
-            <label
-              style={{ display: 'block', fontWeight: 600, marginBottom: 8 }}
-            >
+          <div>
+            <label className="block text-sm font-semibold text-stone-700 mb-1.5">
               Password
             </label>
             <input
@@ -91,28 +70,13 @@ export function Login() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              style={{
-                width: '100%',
-                padding: '12px 16px',
-                border: '1px solid #cbd5e1',
-                borderRadius: 8,
-                fontSize: 16,
-              }}
+              className="w-full px-3.5 py-2.5 text-sm border border-stone-200 rounded-xl bg-white text-stone-900 placeholder-stone-400 focus:outline-none focus:border-[#F5C518] focus:ring-1 focus:ring-[#F5C518]/30 transition"
               placeholder="••••••••"
             />
           </div>
 
           {error && (
-            <div
-              style={{
-                padding: 12,
-                background: '#fef2f2',
-                border: '1px solid #fecaca',
-                borderRadius: 8,
-                color: '#dc2626',
-                marginBottom: 20,
-              }}
-            >
+            <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
               {error}
             </div>
           )}
@@ -120,22 +84,13 @@ export function Login() {
           <button
             type="submit"
             disabled={loading}
-            style={{
-              width: '100%',
-              padding: '14px 24px',
-              background: loading ? '#9ca3af' : '#667eea',
-              color: 'white',
-              border: 'none',
-              borderRadius: 8,
-              fontSize: 16,
-              fontWeight: 600,
-              cursor: loading ? 'not-allowed' : 'pointer',
-            }}
+            className="w-full py-2.5 rounded-xl text-sm font-bold text-white transition disabled:opacity-60 disabled:cursor-not-allowed"
+            style={{ background: loading ? '#a8a29e' : '#F5C518', color: loading ? '#fff' : '#000' }}
           >
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
-      </div>
+      </motion.div>
     </div>
   )
 }

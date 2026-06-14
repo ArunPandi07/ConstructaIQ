@@ -1,6 +1,6 @@
-/* eslint-disable react-hooks/refs */
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
 import {
   Building2,
   AlertTriangle,
@@ -9,30 +9,16 @@ import {
   Plus,
 } from "lucide-react";
 import { useAppContext } from "../context/AppContext";
-import { useLoading } from "../context/LoadingContext";
 import { useDashboard, useProjects } from "../hooks/usePageData";
-import { ContentSkeleton } from "../components/Loader";
-import {
-  useScrollAnimation,
-  useStaggeredAnimation,
-} from "../hooks/useScrollAnimation";
+import { useLoading } from "../context/LoadingContext";
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const { setIsModalOpen } = useAppContext();
-  const { setLoading } = useLoading();
-  const {
-    projects,
-    loading: projectsLoading,
-    error: projectsError,
-    refreshProjects,
-  } = useProjects();
-  const {
-    data: dashboard,
-    loading: dashLoading,
-    error: dashError,
-    refetch,
-  } = useDashboard();
+  const { projects, loading: projectsLoading, error: projectsError, refreshProjects } =
+    useProjects();
+  const { data: dashboard, loading: dashLoading, error: dashError, refetch } =
+    useDashboard();
 
   const activeProjects = projects.filter((p) => p.status === "LIVE");
   const distinctLocations = new Set(
@@ -55,21 +41,16 @@ export default function Dashboard() {
     if (dashboard?.meanProgress != null) return dashboard.meanProgress;
     if (activeProjects.length === 0) return 0;
     return Math.round(
-      activeProjects.reduce((acc, p) => acc + p.progress, 0) /
-        activeProjects.length,
+      activeProjects.reduce((acc, p) => acc + p.progress, 0) / activeProjects.length,
     );
   };
 
-<<<<<<< HEAD
-  const activeCount = dashboard?.kpi.activeProjects ?? activeProjects.length;
-=======
   const activeCount =
     dashboard?.kpi.activeProjects ?? activeProjects.length;
   const openRisks = dashboard?.kpi.openRisks ?? 0;
   const riskProjects = dashboard?.kpi.riskProjects ?? 0;
   const recoveryPlans = dashboard?.kpi.recoveryPlans ?? 0;
   const riskDistribution = dashboard?.riskDistribution ?? [];
->>>>>>> 6e84e374aae6fa0583c5dc8c7c9abceff753715d
 
   const recentActivities = dashboard?.recentActivities ?? [];
   const totalTokens = dashboard?.totalTokensRecent ?? 0;
@@ -77,44 +58,64 @@ export default function Dashboard() {
   const isLoading = projectsLoading || dashLoading;
   const loadError = projectsError ?? dashError;
 
+  const { setLoading, hasFullscreenLoader } = useLoading();
   useEffect(() => {
-    setLoading(
-      "dashboard",
-      isLoading,
-      isLoading ? { message: "Loading dashboard data" } : undefined,
-    );
+    setLoading("dashboard", isLoading, isLoading ? { type: "fullscreen", message: "Loading dashboard data" } : undefined);
   }, [isLoading, setLoading]);
 
-  const heroAnim = useScrollAnimation({ threshold: 0.1, animation: "fade-up" });
-  const { containerRef: projectsContainerRef, itemStyles: projectItemStyles } =
-    useStaggeredAnimation(activeProjects.length, { baseDelay: 100 });
-  const telemetryAnim = useScrollAnimation({
-    threshold: 0.1,
-    animation: "fade-up",
-    delay: 100,
-  });
-  const progressAnim = useScrollAnimation({
-    threshold: 0.1,
-    animation: "fade-up",
-    delay: 150,
-  });
-  const recsAnim = useScrollAnimation({
-    threshold: 0.1,
-    animation: "fade-up",
-    delay: 200,
-  });
-  const errorAnim = useScrollAnimation({ threshold: 0.1 });
+  const [pageReady, setPageReady] = useState(false);
+  useEffect(() => {
+    if (!isLoading && !hasFullscreenLoader) {
+      const timer = setTimeout(() => setPageReady(true), 350);
+      return () => clearTimeout(timer);
+    } else {
+      setPageReady(false);
+    }
+  }, [isLoading, hasFullscreenLoader]);
+
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: { staggerChildren: 0.08 },
+    },
+  };
+
+  const cardVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: { duration: 0.4, ease: [0.4, 0, 0.2, 1] as const },
+    },
+  };
+
+  const pageVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: { staggerChildren: 0.08 },
+    },
+  };
+
+  const sectionVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: { duration: 0.5, ease: [0.4, 0, 0.2, 1] as const },
+    },
+  };
 
   return (
-    <div className="space-y-8 animate-fade-in-up">
-      {isLoading && !loadError && <ContentSkeleton variant="card" count={2} />}
-
+    <motion.div
+      variants={pageVariants}
+      initial="hidden"
+      animate={pageReady ? "visible" : "hidden"}
+      className="space-y-6"
+    >
       {loadError && (
-        <div
-          ref={errorAnim.ref}
-          style={errorAnim.style}
-          className="kpi-card p-4 border border-red-200 bg-red-50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3"
-        >
+        <motion.div variants={sectionVariants} className="glass-card p-4 border border-red-200 bg-red-50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
           <p className="text-sm text-red-700">{loadError}</p>
           <button
             type="button"
@@ -122,16 +123,15 @@ export default function Dashboard() {
               void refreshProjects();
               void refetch();
             }}
-            className="btn-ghost text-xs border-red-200 text-red-700 hover:bg-red-100 hover:border-red-300"
+            className="px-3 py-1.5 text-xs font-bold bg-white border border-red-200 rounded-lg"
           >
             Retry
           </button>
-        </div>
+        </motion.div>
       )}
 
-      <div
-        ref={heroAnim.ref}
-        style={heroAnim.style}
+      <motion.div
+        variants={sectionVariants}
         className="glass-card p-6 md:p-8 relative overflow-hidden"
       >
         <div className="absolute top-0 right-0 w-112.5 h-112.5 bg-radial from-[#F5C518]/10 via-transparent to-transparent pointer-events-none rounded-full blur-3xl -mr-20 -mt-20"></div>
@@ -156,7 +156,7 @@ export default function Dashboard() {
               </p>
               <p className="text-2xl font-black text-stone-900 flex items-center justify-center gap-1.5 mt-1 font-mono">
                 <Building2 className="w-5 h-5 text-[#F5C518]" />
-                {isLoading ? "\u2014" : activeCount}
+                {isLoading ? "—" : activeCount}
               </p>
             </div>
             <div className="w-px h-10 bg-stone-200"></div>
@@ -165,7 +165,7 @@ export default function Dashboard() {
                 Capital Value
               </p>
               <p className="text-2xl font-black text-stone-900 mt-1 font-mono">
-                {isLoading ? "\u2014" : getCumulativeBudget()}
+                {isLoading ? "—" : getCumulativeBudget()}
               </p>
             </div>
             <div className="w-px h-10 bg-stone-200"></div>
@@ -174,60 +174,62 @@ export default function Dashboard() {
                 Mean Progress
               </p>
               <p className="text-2xl font-black text-emerald-600 mt-1 font-mono">
-                {isLoading ? "\u2014" : `${getMeanProgress()}%`}
+                {isLoading ? "—" : `${getMeanProgress()}%`}
               </p>
             </div>
           </div>
         </div>
-        <div className="mt-6 pt-5 border-t border-stone-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-3 text-xs text-stone-500">
+        <div className="mt-5 pt-4 border-t border-stone-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-3 text-xs text-stone-500">
           <span className="flex items-center gap-2">
-<<<<<<< HEAD
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
-            6 Autonomous Coordinator Agents analyzing {activeCount} active
-            construction sites in parallel
-=======
             <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
             6 Autonomous Coordinator Agents analyzing {activeCount}{" "}
             active construction sites in parallel
->>>>>>> 6e84e374aae6fa0583c5dc8c7c9abceff753715d
           </span>
           <button
             onClick={() => setIsModalOpen(true)}
-            className="btn-primary text-xs"
-            type="button"
+            className="px-4 py-2 font-bold flex items-center gap-1.5 transition text-xs shadow-xs"
+            style={{
+              borderRadius: 9,
+              background: "#f5c518",
+              color: "#000",
+              cursor: "pointer",
+            }}
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="w-4 h-4" style={{ color: "#000" }} />
             On Board New Project
           </button>
         </div>
-      </div>
+      </motion.div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="glass-card p-4 text-center">
+      <motion.div
+        variants={sectionVariants}
+        className="grid grid-cols-2 md:grid-cols-4 gap-4"
+      >
+        <div className="glass-card p-5 text-center">
           <p className="text-[10px] text-stone-400 font-bold uppercase">Open Risks</p>
           <p className="text-2xl font-black text-rose-600 mt-1 font-mono">
             {isLoading ? "—" : openRisks}
           </p>
         </div>
-        <div className="glass-card p-4 text-center">
+        <div className="glass-card p-5 text-center">
           <p className="text-[10px] text-stone-400 font-bold uppercase">At-Risk Projects</p>
           <p className="text-2xl font-black text-amber-600 mt-1 font-mono">
             {isLoading ? "—" : riskProjects}
           </p>
         </div>
-        <div className="glass-card p-4 text-center">
+        <div className="glass-card p-5 text-center">
           <p className="text-[10px] text-stone-400 font-bold uppercase">Recovery Plans</p>
           <p className="text-2xl font-black text-stone-900 mt-1 font-mono">
             {isLoading ? "—" : recoveryPlans}
           </p>
         </div>
-        <div className="glass-card p-4 text-center">
+        <div className="glass-card p-5 text-center">
           <p className="text-[10px] text-stone-400 font-bold uppercase">On Time</p>
           <p className="text-2xl font-black text-emerald-600 mt-1 font-mono">
             {isLoading ? "—" : dashboard?.kpi.onTimeProjects ?? 0}
           </p>
         </div>
-      </div>
+      </motion.div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
@@ -241,44 +243,38 @@ export default function Dashboard() {
               </p>
             </div>
           </div>
-          <div
-            ref={projectsContainerRef}
+          <motion.div
+            variants={containerVariants}
             className="grid grid-cols-1 md:grid-cols-2 gap-6"
           >
+            {isLoading && (
+              <motion.div variants={cardVariants} className="glass-card p-10 text-center col-span-full text-stone-400 text-sm">
+                Loading projects from API…
+              </motion.div>
+            )}
             {!isLoading && activeProjects.length === 0 && (
-              <div className="premium-card p-10 text-center col-span-full flex flex-col items-center justify-center gap-4 min-h-50">
-                <div className="w-16 h-16 rounded-full bg-stone-100 flex items-center justify-center">
-                  <Building2 className="w-7 h-7 text-stone-300" />
-                </div>
-                <div>
-                  <p className="text-stone-500 text-sm">
-                    No projects yet. Onboard a project to run the 6-agent
-                    analyze pipeline.
-                  </p>
-                </div>
+              <motion.div variants={cardVariants} className="glass-card p-10 text-center col-span-full">
+                <p className="text-stone-500 text-sm mb-4">
+                  No projects yet. Onboard a project to run the 6-agent analyze pipeline.
+                </p>
                 <button
                   onClick={() => setIsModalOpen(true)}
-                  className="btn-primary"
-                  type="button"
+                  className="px-4 py-2 font-bold text-xs"
+                  style={{ borderRadius: 9, background: "#f5c518", color: "#000" }}
                 >
-                  <Plus className="w-4 h-4" />
                   On Board New Project
                 </button>
-              </div>
+              </motion.div>
             )}
             {!isLoading &&
-              activeProjects.map((p, idx) => (
-                <div
+              activeProjects.map((p) => (
+                <motion.div
                   key={p.id}
-                  onClick={() => {
-                    console.log("ID", p.id);
-
-                    navigate(`/projects/${p.id}`, {
-                      state: { from: "dashboard" },
-                    });
-                  }}
-                  className="premium-card interactive-card p-5 flex flex-col justify-between group relative min-h-75"
-                  style={projectItemStyles[idx]}
+                  variants={cardVariants}
+                  onClick={() =>
+                    navigate(`/projects/${p.id}`, { state: { from: "dashboard" } })
+                  }
+                  className="glass-card p-5 hover:border-[#F5C518] hover:shadow-md transition duration-300 cursor-pointer flex flex-col justify-between group relative min-h-75"
                 >
                   <div className="absolute top-0 right-0 w-24 h-24 bg-radial from-[#F5C518]/5 to-transparent pointer-events-none rounded-bl-3xl"></div>
                   <div>
@@ -334,12 +330,15 @@ export default function Dashboard() {
                       <ArrowRight className="w-4 h-4 translate-x-0 group-hover:translate-x-1 transition-transform" />
                     </div>
                   </div>
-                </div>
+                </motion.div>
               ))}
-          </div>
+          </motion.div>
         </div>
 
-        <div className="space-y-6">
+        <motion.div
+          variants={sectionVariants}
+          className="space-y-6"
+        >
           <div className="pl-1">
             <h2 className="text-lg font-black text-stone-800 tracking-tight">
               Active Platform Telemetry
@@ -350,13 +349,10 @@ export default function Dashboard() {
           </div>
 
           <div
-            ref={telemetryAnim.ref}
-            style={telemetryAnim.style}
-            className="bg-[#1a2035] text-white p-5 shadow-xl space-y-4 border border-stone-700/30 flex flex-col justify-between min-h-95 rounded-2xl relative overflow-hidden"
+            className="bg-[#1a2035] text-white p-5 shadow-xl space-y-4 border border-stone-700/30 flex flex-col justify-between min-h-95"
+            style={{ borderRadius: 12 }}
           >
-            <div className="absolute top-0 left-1/4 w-48 h-48 bg-[#F5C518]/5 rounded-full blur-3xl pointer-events-none"></div>
-            <div className="absolute top-0 left-0 right-0 h-px bg-linear-to-r from-transparent via-[#F5C518]/20 to-transparent"></div>
-            <div className="relative z-10 space-y-4">
+            <div className="space-y-4">
               <div className="flex justify-between items-center pb-3 border-b border-white/5">
                 <div className="flex items-center gap-1.5 text-xs font-bold text-zinc-100">
                   <span className="w-2 h-2 rounded-full bg-[#F5C518]"></span>
@@ -384,9 +380,7 @@ export default function Dashboard() {
                     No agent executions logged yet.
                   </div>
                 )}
-                <div className="text-zinc-500">
-                  · System state: LOOP_STATE_OK
-                </div>
+                <div className="text-zinc-500">· System state: LOOP_STATE_OK</div>
                 {totalTokens > 0 && (
                   <div className="text-zinc-500">
                     · Recent token usage: {totalTokens.toLocaleString()}
@@ -399,25 +393,21 @@ export default function Dashboard() {
               </div>
             </div>
             {activeProjects.length > 0 && (
-              <div className="bg-[#f0f2f5]/5 border border-white/5 p-3 rounded-2xl space-y-2 relative z-10">
+              <div className="bg-[#f0f2f5]/5 border border-white/5 p-3 rounded-2xl space-y-2">
                 <div className="flex items-center gap-2 text-xs font-black text-[#F5C518]">
                   <AlertTriangle className="w-4 h-4" />
                   PIPELINE STATUS
                 </div>
                 <p className="text-[10px] text-stone-400 leading-normal">
-                  {activeProjects.length} active project(s). Open a workspace
-                  for permits, suppliers, and crew from the latest analyze run.
+                  {activeProjects.length} active project(s). Open a workspace for
+                  permits, suppliers, and crew from the latest analyze run.
                 </p>
               </div>
             )}
           </div>
 
           {activeProjects.length > 0 && (
-            <div
-              ref={progressAnim.ref}
-              style={progressAnim.style}
-              className="kpi-card p-5 space-y-4"
-            >
+            <div className="glass-card p-5 space-y-4">
               <h3 className="text-xs font-bold uppercase tracking-wider text-stone-400 pl-1">
                 Portfolio progress
               </h3>
@@ -455,26 +445,19 @@ export default function Dashboard() {
           )}
 
           {(dashboard?.recentRecommendations?.length ?? 0) > 0 && (
-            <div
-              ref={recsAnim.ref}
-              style={recsAnim.style}
-              className="kpi-card p-5 space-y-3"
-            >
+            <div className="glass-card p-5 space-y-3">
               <h3 className="text-xs font-bold uppercase tracking-wider text-stone-400">
                 Permit follow-ups
               </h3>
               {dashboard!.recentRecommendations.slice(0, 3).map((r) => (
-                <p
-                  key={r.id}
-                  className="text-[11px] text-stone-600 leading-snug"
-                >
+                <p key={r.id} className="text-[11px] text-stone-600 leading-snug">
                   <strong>{r.project}:</strong> {r.recommendation}
                 </p>
               ))}
             </div>
           )}
-        </div>
+        </motion.div>
       </div>
-    </div>
+    </motion.div>
   );
 }

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { motion } from 'framer-motion'
 import { useAuth } from '../context/AuthContext'
 import { updateProfile } from '../services/authApi'
 import { User, Lock, Mail } from 'lucide-react'
@@ -49,171 +50,98 @@ export function Profile() {
   }
 
   return (
-    <div style={{ maxWidth: 800, margin: '0 auto', padding: 32 }}>
-      <h1 style={{ fontSize: 32, fontWeight: 700, marginBottom: 24 }}>
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.45, ease: [0.4, 0, 0.2, 1] }}
+      className="max-w-2xl mx-auto px-4 py-8"
+    >
+      <h1 className="text-2xl font-extrabold text-stone-900 mb-6 tracking-tight">
         Profile Settings
       </h1>
 
-      <div
-        style={{
-          background: 'white',
-          borderRadius: 12,
-          padding: 32,
-          border: '1px solid #e2e8f0',
-        }}
-      >
-        <form onSubmit={handleUpdateProfile}>
-          <div style={{ marginBottom: 24 }}>
-            <label
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                fontWeight: 600,
-                marginBottom: 8,
-              }}
-            >
-              <User size={18} />
+      <div className="glass-card p-6">
+        <form onSubmit={handleUpdateProfile} className="space-y-5">
+          <div>
+            <label className="flex items-center gap-2 text-sm font-semibold text-stone-700 mb-1.5">
+              <User size={16} className="text-stone-400" />
               Full Name
             </label>
             <input
               type="text"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '12px 16px',
-                border: '1px solid #cbd5e1',
-                borderRadius: 8,
-              }}
+              className="w-full px-3.5 py-2.5 text-sm border border-stone-200 rounded-xl bg-white text-stone-900 focus:outline-none focus:border-[#F5C518] focus:ring-1 focus:ring-[#F5C518]/30 transition"
             />
           </div>
 
-          <div style={{ marginBottom: 24 }}>
-            <label
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                fontWeight: 600,
-                marginBottom: 8,
-              }}
-            >
-              <Mail size={18} />
+          <div>
+            <label className="flex items-center gap-2 text-sm font-semibold text-stone-700 mb-1.5">
+              <Mail size={16} className="text-stone-400" />
               Email
             </label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '12px 16px',
-                border: '1px solid #cbd5e1',
-                borderRadius: 8,
-              }}
+              className="w-full px-3.5 py-2.5 text-sm border border-stone-200 rounded-xl bg-white text-stone-900 focus:outline-none focus:border-[#F5C518] focus:ring-1 focus:ring-[#F5C518]/30 transition"
             />
           </div>
 
-          <hr
-            style={{
-              margin: '32px 0',
-              border: 'none',
-              borderTop: '1px solid #e2e8f0',
-            }}
-          />
+          <hr className="border-stone-200 my-6" />
 
-          <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 16 }}>
-            <Lock size={18} style={{ display: 'inline', marginRight: 8 }} />
+          <h3 className="text-base font-bold text-stone-800 flex items-center gap-2">
+            <Lock size={16} className="text-stone-400" />
             Change Password
           </h3>
 
-          <div style={{ marginBottom: 16 }}>
-            <label
-              style={{ display: 'block', fontWeight: 600, marginBottom: 8 }}
-            >
+          <div>
+            <label className="block text-sm font-semibold text-stone-700 mb-1.5">
               Current Password
             </label>
             <input
               type="password"
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '12px 16px',
-                border: '1px solid #cbd5e1',
-                borderRadius: 8,
-              }}
+              className="w-full px-3.5 py-2.5 text-sm border border-stone-200 rounded-xl bg-white text-stone-900 placeholder-stone-400 focus:outline-none focus:border-[#F5C518] focus:ring-1 focus:ring-[#F5C518]/30 transition"
               placeholder="Enter current password"
             />
           </div>
 
-          <div style={{ marginBottom: 16 }}>
-            <label
-              style={{ display: 'block', fontWeight: 600, marginBottom: 8 }}
-            >
+          <div>
+            <label className="block text-sm font-semibold text-stone-700 mb-1.5">
               New Password
             </label>
             <input
               type="password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '12px 16px',
-                border: '1px solid #cbd5e1',
-                borderRadius: 8,
-              }}
+              className="w-full px-3.5 py-2.5 text-sm border border-stone-200 rounded-xl bg-white text-stone-900 placeholder-stone-400 focus:outline-none focus:border-[#F5C518] focus:ring-1 focus:ring-[#F5C518]/30 transition"
               placeholder="Enter new password"
             />
           </div>
 
-          <div style={{ marginBottom: 24 }}>
-            <label
-              style={{ display: 'block', fontWeight: 600, marginBottom: 8 }}
-            >
+          <div>
+            <label className="block text-sm font-semibold text-stone-700 mb-1.5">
               Confirm New Password
             </label>
             <input
               type="password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '12px 16px',
-                border: '1px solid #cbd5e1',
-                borderRadius: 8,
-              }}
+              className="w-full px-3.5 py-2.5 text-sm border border-stone-200 rounded-xl bg-white text-stone-900 placeholder-stone-400 focus:outline-none focus:border-[#F5C518] focus:ring-1 focus:ring-[#F5C518]/30 transition"
               placeholder="Confirm new password"
             />
           </div>
 
           {error && (
-            <div
-              style={{
-                padding: 12,
-                background: '#fef2f2',
-                border: '1px solid #fecaca',
-                borderRadius: 8,
-                color: '#dc2626',
-                marginBottom: 16,
-              }}
-            >
+            <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
               {error}
             </div>
           )}
 
           {success && (
-            <div
-              style={{
-                padding: 12,
-                background: '#f0fdf4',
-                border: '1px solid #bbf7d0',
-                borderRadius: 8,
-                color: '#16a34a',
-                marginBottom: 16,
-              }}
-            >
+            <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-sm text-emerald-700">
               {success}
             </div>
           )}
@@ -221,21 +149,13 @@ export function Profile() {
           <button
             type="submit"
             disabled={loading}
-            style={{
-              padding: '12px 24px',
-              background: loading ? '#9ca3af' : '#667eea',
-              color: 'white',
-              border: 'none',
-              borderRadius: 8,
-              fontSize: 16,
-              fontWeight: 600,
-              cursor: loading ? 'not-allowed' : 'pointer',
-            }}
+            className="px-5 py-2.5 rounded-xl text-sm font-bold text-black transition disabled:opacity-60 disabled:cursor-not-allowed"
+            style={{ background: loading ? '#a8a29e' : '#F5C518', color: loading ? '#fff' : '#000' }}
           >
             {loading ? 'Saving...' : 'Save Changes'}
           </button>
         </form>
       </div>
-    </div>
+    </motion.div>
   )
 }

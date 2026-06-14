@@ -1,3 +1,4 @@
+import { motion } from "framer-motion";
 import { Ruler } from "lucide-react";
 import type { BlueprintSummaryData } from "../types";
 import {
@@ -44,7 +45,13 @@ export default function BlueprintSummaryPanel({
   const formattedSqFt = formatSquareFootage(squareFootage);
 
   return (
-    <div className="glass-card p-5">
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-40px" }}
+      transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
+      className="glass-card p-5"
+    >
       <h3 className="text-sm font-bold text-stone-900 flex items-center gap-2 mb-4">
         <Ruler className="w-4 h-4 text-[#F5C518]" />
         Blueprint Intelligence
@@ -105,6 +112,6 @@ export default function BlueprintSummaryPanel({
             )}
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }

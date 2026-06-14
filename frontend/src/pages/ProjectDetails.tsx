@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo, lazy, Suspense } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
-import { motion } from "framer-motion";
 import {
   Building2,
   HardHat,
@@ -11,12 +10,6 @@ import {
   CalendarDays,
 } from "lucide-react";
 import { useAppContext } from "../context/AppContext";
-import { useLoading } from "../context/LoadingContext";
-import { ContentSkeleton } from "../components/Loader";
-import {
-  useScrollAnimation,
-  useStaggeredAnimation,
-} from "../hooks/useScrollAnimation";
 import { useProjectAgents, useProjectIntelligence } from "../hooks/usePageData";
 import {
   getProject,
@@ -32,10 +25,6 @@ const BuildingSnapshotCapture = lazy(() => import("../components/building3d/Buil
 import BlueprintSummaryPanel from "../components/BlueprintSummaryPanel";
 import BudgetBreakdownPanel from "../components/BudgetBreakdownPanel";
 import CrewPlanGantt from "../components/CrewPlanGantt";
-<<<<<<< HEAD
-import type { CrewPlanRead, Project } from "../types";
-import { countCompletedAgents, latestByAgent } from "../utils/agentHelpers";
-=======
 import InspectionChecklist from "../components/InspectionChecklist";
 import MaterialsPanel from "../components/MaterialsPanel";
 import ProjectRisksPanel from "../components/ProjectRisksPanel";
@@ -47,7 +36,6 @@ import {
   latestByAgent,
 } from "../utils/agentHelpers";
 import { useBuildingSnapshots } from "../hooks/useBuildingSnapshots";
->>>>>>> 6e84e374aae6fa0583c5dc8c7c9abceff753715d
 
 export default function ProjectDetails() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -73,14 +61,7 @@ export default function ProjectDetails() {
   const [projectLoading, setProjectLoading] = useState(false);
   const [projectError, setProjectError] = useState<string | null>(null);
   const [supplierCount, setSupplierCount] = useState(0);
-<<<<<<< HEAD
-  const [crewCount, setCrewCount] = useState(0);
-  const [suppliers, setSuppliers] = useState<Array<Record<string, unknown>>>(
-    [],
-  );
-=======
   const [suppliers, setSuppliers] = useState<ProjectSupplierRow[]>([]);
->>>>>>> 6e84e374aae6fa0583c5dc8c7c9abceff753715d
   const [crewPlans, setCrewPlans] = useState<CrewPlanRead[]>([]);
   type TabId =
     | "overview"
@@ -128,32 +109,17 @@ export default function ProjectDetails() {
   }, [projectId, setActiveProjectId]);
 
   useEffect(() => {
-    if (!project) return;
-    if (project.id !== selectedProj?.id) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setSelectedProj(project);
-    }
-  }, [project, selectedProj?.id]);
+    if (project) setSelectedProj(project);
+  }, [project]);
 
   useEffect(() => {
     if (!projectId || !isBackendProjectId(projectId) || project) return;
-    let cancelled = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setProjectLoading(true);
     setProjectError(null);
     getProject(Number(projectId))
-      .then((p) => {
-        if (!cancelled) setSelectedProj(mapBackendProjectToUI(p));
-      })
-      .catch((e: Error) => {
-        if (!cancelled) setProjectError(e.message);
-      })
-      .finally(() => {
-        if (!cancelled) setProjectLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
+      .then((p) => setSelectedProj(mapBackendProjectToUI(p)))
+      .catch((e: Error) => setProjectError(e.message))
+      .finally(() => setProjectLoading(false));
   }, [projectId, project]);
 
   useEffect(() => {
@@ -174,50 +140,28 @@ export default function ProjectDetails() {
       .catch(() => undefined);
   }, [projectId]);
 
-<<<<<<< HEAD
-=======
   const executionList = useMemo(() => agentExecutions ?? [], [agentExecutions]);
->>>>>>> 6e84e374aae6fa0583c5dc8c7c9abceff753715d
   const byAgent = useMemo(
-    () => latestByAgent(agentExecutions ?? []),
-    [agentExecutions],
+    () => latestByAgent(executionList),
+    [executionList],
   );
   const completedAgentCount = countCompletedAgents(byAgent);
-<<<<<<< HEAD
-
-  const { setLoading } = useLoading();
-=======
->>>>>>> 6e84e374aae6fa0583c5dc8c7c9abceff753715d
 
   const pageLoading =
     (projectLoading || intelligenceLoading || agentsLoading) && !selectedProj;
   const pageError = projectError ?? intelligenceError ?? agentsError;
 
-  useEffect(() => {
-    setLoading(
-      "project-details",
-      pageLoading,
-      pageLoading ? { message: "Loading project intelligence" } : undefined,
+  if (pageLoading) {
+    return (
+      <div className="text-center py-20">
+        <Building2 className="w-16 h-16 mx-auto text-stone-300 mb-4 animate-pulse" />
+        <h2 className="text-xl font-bold text-stone-700">Loading project…</h2>
+        <p className="text-sm text-stone-400 mt-1">
+          Fetching project data from the API.
+        </p>
+      </div>
     );
-  }, [pageLoading, setLoading]);
-
-  const { ref: heroRef, style: heroStyle } = useScrollAnimation<HTMLDivElement>(
-    { delay: 0 },
-  );
-  const { ref: agentRef, style: agentStyle } =
-    useScrollAnimation<HTMLDivElement>({ delay: 100 });
-  const { ref: complianceRef, style: complianceStyle } =
-    useScrollAnimation<HTMLDivElement>({ delay: 150 });
-  const { ref: schedulesRef, style: schedulesStyle } =
-    useScrollAnimation<HTMLDivElement>({ delay: 200 });
-  const { ref: spotlightRef, style: spotlightStyle } =
-    useScrollAnimation<HTMLDivElement>({ delay: 50 });
-  const { containerRef: barsRef, itemStyles: barStyles } =
-    useStaggeredAnimation<HTMLDivElement>(6, {
-      baseDelay: 100,
-    });
-
-  if (pageLoading) return null;
+  }
 
   if (!selectedProj) {
     return (
@@ -239,68 +183,6 @@ export default function ProjectDetails() {
 
   const permitList = intelligence?.requiredPermits ?? [];
   const phaseList = intelligence?.phases ?? [];
-<<<<<<< HEAD
-  const telemetry = {
-    contractAnalysisScore: progress,
-    blueprintReviewScore: Math.min(progress + 5, 100),
-    permitRequiredCount: permitList.length || 0,
-    budgetScore: progress,
-    siteReadiness: {
-      documents: progress,
-      permits: permitList.length
-        ? Math.round(
-            (permitList.filter((p) => p.status === "Approved").length /
-              permitList.length) *
-              100,
-          )
-        : 0,
-      crewPlan: crewCount > 0 ? Math.min(50 + crewCount * 10, 100) : 0,
-    },
-    contractSummaryText: intelligence?.client
-      ? `Client: ${intelligence.client}. ${intelligence.duration} duration at ${intelligence.location}.`
-      : selectedProj.description ||
-        "No contract summary until analyze completes.",
-    blueprintAnalysisText: intelligence?.squareFootage
-      ? `${intelligence.floors} floors, ${intelligence.squareFootage} SF, ${intelligence.complexity} complexity.`
-      : "Blueprint details populate after BlueprintAgent runs.",
-    permitStatusText:
-      permitList.length > 0
-        ? permitList.map((p) => `${p.name} (${p.status})`).join("; ")
-        : "No permits persisted yet.",
-    budgetBreakdownText: intelligence?.budget
-      ? `Contract budget: ${intelligence.budget}. ${supplierCount} supplier row(s), ${crewCount} crew plan(s) in database.`
-      : "Budget breakdown available after analyze persistence.",
-  };
-
-  const siteReadiness = telemetry.siteReadiness;
-  const overallReadiness = Math.round(
-    (siteReadiness.documents + siteReadiness.permits + siteReadiness.crewPlan) /
-      3,
-  );
-  const contractScore = telemetry.contractAnalysisScore;
-  const blueprintScore = telemetry.blueprintReviewScore;
-  const permitsCount =
-    intelligence?.requiredPermits?.length ?? telemetry.permitRequiredCount;
-  const permitsScore = permitList.length
-    ? Math.round(
-        (permitList.filter((p) => p.status === "Approved").length /
-          permitList.length) *
-          100,
-      )
-    : 0;
-  const supplierMetric =
-    supplierCount > 0 ? Math.min(60 + supplierCount * 8, 95) : 0;
-  const crewMetric = crewCount > 0 ? Math.min(60 + crewCount * 6, 95) : 0;
-  const phaseProgressAvg =
-    phaseList.length > 0
-      ? Math.round(
-          phaseList.reduce((acc, ph) => acc + (ph.progress ?? 0), 0) /
-            phaseList.length,
-        )
-      : 0;
-  const timelineScore =
-    phaseProgressAvg || Math.round((completedAgentCount / 6) * 100);
-=======
   const readiness = intelligence?.readiness;
 
   const overallReadiness = readiness?.overallReadinessPct ?? selectedProj.progress;
@@ -310,7 +192,6 @@ export default function ProjectDetails() {
     crewPlan: readiness?.crewPlanPct ?? readiness?.workforceReadinessPct ?? 0,
   };
   const permitsCount = permitList.length;
->>>>>>> 6e84e374aae6fa0583c5dc8c7c9abceff753715d
 
   const agentMetrics = [
     { label: "Contract", icon: "📜", val: readiness?.agentCompletionPct ?? 0 },
@@ -342,42 +223,37 @@ export default function ProjectDetails() {
   };
 
   return (
-    <div className="w-full max-w-none space-y-6">
+    <div className="w-full max-w-none space-y-6 animate-fade-in-up">
       {/* BREADCRUMB & ACTION STRIP */}
-      <motion.div
-        initial={{ opacity: 0, y: -8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3 }}
-        className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-2"
-      >
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-2">
         <button
           onClick={() => navigate(backPath)}
           style={{ cursor: "pointer" }}
-          className="px-4 py-2 bg-white border border-stone-200 text-stone-700 hover:text-stone-900 hover:border-stone-400 rounded-xl font-bold flex items-center gap-2 transition-all duration-200 text-xs shadow-xs hover:shadow-md hover:-translate-y-0.5 active:translate-y-0"
+          className="px-4 py-2 bg-white border border-stone-200 text-stone-700 hover:text-stone-900 hover:border-stone-400 rounded-xl font-bold flex items-center gap-2 transition text-xs shadow-xs"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to Portfolio Overview
         </button>
         <div className="text-right text-xs text-stone-400 font-semibold font-mono">
           Focus:{" "}
-          <span className="gradient-text font-bold">
+          <span className="text-[#E2B30D] font-bold">
             {selectedProj.name.split(" ")[0]} Project
           </span>
         </div>
-      </motion.div>
+      </div>
 
       {uploadJustCompleted && isBackendProjectId(projectId ?? "") && (
-        <div className="premium-card p-4 border border-emerald-200 bg-emerald-50 text-emerald-900 text-sm font-semibold shadow-sm!">
-          <span className="flex items-center gap-2">
-            ✔️ Six-agent analyze complete — persisted intelligence loaded from
-            the backend.
-          </span>
+        <div className="glass-card p-4 border border-emerald-200 bg-emerald-50 text-emerald-900 text-sm font-semibold">
+          Six-agent analyze complete — persisted intelligence loaded from the
+          backend.
         </div>
       )}
 
       {(intelligenceLoading || agentsLoading) &&
         isBackendProjectId(projectId ?? "") && (
-          <ContentSkeleton variant="card" count={1} />
+          <div className="text-sm text-stone-500 font-medium">
+            Loading project intelligence from API…
+          </div>
         )}
       {pageError && selectedProj && (
         <div className="glass-card p-3 border border-amber-200 bg-amber-50 text-amber-900 text-xs">
@@ -386,11 +262,7 @@ export default function ProjectDetails() {
       )}
 
       {/* DETAILED PROJECT TITLE BANNER */}
-      <div
-        ref={heroRef}
-        style={heroStyle}
-        className="premium-card p-5 md:p-6 relative overflow-hidden cursor-default!"
-      >
+      <div className="glass-card p-5 md:p-6 relative overflow-hidden">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 rounded-2xl bg-[#F5C518]/15 text-[#E2B30D] flex items-center justify-center shrink-0">
             <Building2 className="w-6 h-6" />
@@ -425,11 +297,7 @@ export default function ProjectDetails() {
       {/* ROW 1 — site overview + agent metrics (full width) */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 w-full">
         {/* SPOTLIGHT DETAILED SPECIFICATION CARD */}
-        <div
-          ref={spotlightRef}
-          style={spotlightStyle}
-          className="premium-card p-6 relative overflow-hidden flex flex-col justify-between group min-h-95 xl:col-span-4 w-full cursor-default!"
-        >
+        <div className="glass-card p-6 relative overflow-hidden flex flex-col justify-between group min-h-[380px] xl:col-span-4 w-full">
           <div
             className="absolute inset-0 opacity-5 pointer-events-none"
             style={{
@@ -505,20 +373,6 @@ export default function ProjectDetails() {
           </div>
         </div>
 
-<<<<<<< HEAD
-        {/* AGENT REALTIME MONITOR ACTIONS BARS CHART */}
-        <div
-          ref={agentRef}
-          style={agentStyle}
-          className="premium-card p-6 flex flex-col justify-between xl:col-span-8 w-full min-h-95 cursor-default!"
-        >
-          <div className="flex-1 flex flex-col">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-sm font-bold text-stone-900 tracking-tight flex items-center gap-2">
-                <Bot className="w-4 h-4 text-[#F5C518]" />
-                Focused Agent Activities
-              </h3>
-=======
         {/* 3D BUILDING PREVIEW CAROUSEL */}
         <div className="glass-card p-6 flex flex-col xl:col-span-8 w-full min-h-[380px]">
           <div className="flex justify-between items-center mb-4">
@@ -527,73 +381,10 @@ export default function ProjectDetails() {
               3D Building Previews
             </h3>
             {snapshotStatus === "ready" && snapshotShots.length > 0 && (
->>>>>>> 6e84e374aae6fa0583c5dc8c7c9abceff753715d
               <span className="text-[9px] bg-stone-100 text-stone-500 font-bold px-2 py-0.5 rounded-md font-mono uppercase">
                 {snapshotShots.length} views
               </span>
-<<<<<<< HEAD
-            </div>
-            <div
-              ref={barsRef}
-              className="grid grid-cols-6 gap-3 flex-1 min-h-50 items-end pt-4 pb-2 border-b border-stone-100"
-            >
-              {agentMetrics.map((agent, i) => (
-                <div
-                  key={agent.label}
-                  style={barStyles[i]}
-                  className="flex flex-col items-center h-full justify-end group/bar relative min-w-0"
-                >
-                  <div className="absolute -top-7 hidden group-hover/bar:block bg-[#1B1B1C] text-white text-[9px] px-1.5 py-0.5 rounded-sm whitespace-nowrap z-30 shadow-md">
-                    {agent.label}: {agent.val}%
-                  </div>
-                  <div className="w-full bg-stone-100 rounded-t-lg h-40 flex items-end overflow-hidden relative">
-                    <motion.div
-                      initial={{ height: 0 }}
-                      animate={{ height: `${Math.max(agent.val, 4)}%` }}
-                      transition={{
-                        duration: 0.8,
-                        delay: i * 0.1,
-                        ease: [0.4, 0, 0.2, 1],
-                      }}
-                      className="bg-linear-to-t from-[#F5C518] to-[#FCD34D] hover:from-[#E2B30D] hover:to-[#F5C518] w-full rounded-t-lg relative"
-                    />
-                  </div>
-                  <span className="text-[10px] mt-2 font-bold text-stone-500 truncate w-full text-center">
-                    {agent.label}
-                  </span>
-                  <span className="text-base -mt-0.5">{agent.icon}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="grid grid-cols-3 gap-3 text-center pt-4 w-full">
-            <div className="bg-stone-50 p-3 rounded-xl hover:bg-stone-100 transition-colors">
-              <p className="text-[9px] text-stone-400 font-medium uppercase tracking-wide">
-                Site Scores Avg
-              </p>
-              <p className="text-sm font-black text-stone-900 mt-0.5">
-                {Math.round((contractScore + blueprintScore) / 2)}%
-              </p>
-            </div>
-            <div className="bg-stone-50 p-3 rounded-xl hover:bg-stone-100 transition-colors">
-              <p className="text-[9px] text-stone-400 font-medium uppercase tracking-wide">
-                Agent Loops
-              </p>
-              <p className="text-sm font-black text-stone-900 mt-0.5">
-                {completedAgentCount} / {PIPELINE_AGENT_NAMES.length}
-              </p>
-            </div>
-            <div className="bg-stone-50 p-3 rounded-xl hover:bg-stone-100 transition-colors">
-              <p className="text-[9px] text-stone-400 font-medium uppercase tracking-wide">
-                Permits Filed
-              </p>
-              <p className="text-sm font-black text-rose-600 mt-0.5">
-                {permitsCount}
-              </p>
-            </div>
-=======
             )}
->>>>>>> 6e84e374aae6fa0583c5dc8c7c9abceff753715d
           </div>
           <Suspense fallback={<div className="h-64 rounded-2xl skeleton" />}>
             <BuildingPreviewCarousel
@@ -608,108 +399,10 @@ export default function ProjectDetails() {
         </div>
       </div>
 
+      {/* ROW 2 — compliance + project schedules (equal full-width columns) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full">
-        {/* SUPPLIERS & CREW — always rendered */}
-        <div className="grid grid-cols-1 gap-6 w-full">
-          {suppliers.length > 0 ? (
-            <div className="premium-card p-5 w-full cursor-default!">
-              <h3 className="text-sm font-bold text-stone-900 mb-3 flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#F5C518]"></span>
-                Suppliers ({supplierCount})
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-56 overflow-y-auto text-xs">
-                {suppliers.map((s, i) => (
-                  <div
-                    key={i}
-                    className="flex justify-between border border-stone-100 rounded-lg px-3 py-2 bg-stone-50 hover:bg-stone-100 hover:border-stone-200 transition-all duration-150"
-                  >
-                    <span className="font-semibold text-stone-800 truncate pr-2">
-                      {String(s.material_name ?? s.supplier_name ?? "Material")}
-                    </span>
-                    <span className="text-stone-500 font-mono shrink-0">
-                      {s.total_cost != null
-                        ? `$${Number(s.total_cost).toLocaleString()}`
-                        : "—"}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <div className="premium-card p-5 w-full cursor-default!">
-              <h3 className="text-sm font-bold text-stone-900 mb-3 flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#F5C518]"></span>
-                Suppliers
-              </h3>
-              <p className="text-xs text-stone-400 py-4 text-center">
-                No supplier data yet. Run analyze to populate.
-              </p>
-            </div>
-          )}
-          {/* PROJECT SCHEDULES */}
-          <div
-            ref={schedulesRef}
-            style={schedulesStyle}
-            className="premium-card p-6 flex flex-col w-full min-h-80 cursor-default!"
-          >
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-sm font-extrabold text-stone-900 tracking-tight flex items-center gap-2">
-                <CalendarDays className="w-4 h-4 text-[#F5C518]" />
-                Project Schedules
-              </h3>
-              <span className="text-[9px] font-semibold text-stone-400 uppercase tracking-widest font-mono bg-stone-50 border border-stone-200 px-2 py-0.5 rounded-md">
-                {phaseList.length} phase{phaseList.length === 1 ? "" : "s"}
-              </span>
-            </div>
-            <div className="space-y-3 flex-1 overflow-y-auto max-h-70 pr-1">
-              {phaseList.length === 0 && (
-                <p className="text-xs text-stone-500 py-4 text-center">
-                  No schedule phases yet. Run analyze to populate project
-                  schedules.
-                </p>
-              )}
-              {phaseList.map((phase, index) => (
-                <div
-                  key={index}
-                  className="flex items-stretch gap-3 p-3 rounded-xl bg-stone-50 border border-stone-200/60 hover:border-[#F5C518]/40 transition text-xs w-full"
-                >
-                  <div className="bg-[#F5C518] text-white p-2 rounded-lg shrink-0 flex items-center justify-center self-start">
-                    <CalendarDays className="w-4 h-4" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex flex-wrap justify-between gap-2 items-start">
-                      <h4 className="font-bold text-stone-900">{phase.name}</h4>
-                      <span className="text-[9px] font-mono font-bold text-[#E2B30D] bg-[#F5C518]/10 px-2 py-0.5 rounded">
-                        {phase.progress}% complete
-                      </span>
-                    </div>
-                    <p className="text-[10px] text-stone-500 mt-1">
-                      {phase.startDate || "TBD"} → {phase.endDate || "TBD"}
-                    </p>
-                    <div className="mt-2 flex items-center gap-2">
-                      <div className="progress-bar flex-1 h-1.5">
-                        <div
-                          className="progress-fill h-full"
-                          style={{ width: `${phase.progress ?? 0}%` }}
-                        />
-                      </div>
-                      <span className="text-[9px] text-stone-400 capitalize shrink-0">
-                        {phase.status}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
         {/* SITE READINESS METER */}
-        <div
-          ref={complianceRef}
-          style={complianceStyle}
-          className="premium-card p-6 flex flex-col justify-between w-full min-h-80 cursor-default!"
-        >
+        <div className="glass-card p-6 flex flex-col justify-between w-full min-h-[320px]">
           <div>
             <div className="flex justify-between items-start mb-3">
               <div>
@@ -720,7 +413,7 @@ export default function ProjectDetails() {
                   Ready state based on zoning rules
                 </p>
               </div>
-              <span className="font-black text-stone-900 bg-stone-50 border border-stone-200 font-mono px-2 py-0.5 rounded-lg text-xs">
+              <span className="text-lg font-black text-stone-900 bg-stone-50 border border-stone-200 font-mono px-2 py-0.5 rounded-lg text-xs">
                 {overallReadiness}%
               </span>
             </div>
@@ -789,31 +482,229 @@ export default function ProjectDetails() {
               <AlertTriangle className="w-4 h-4 text-[#E2B30D] shrink-0 mt-0.5" />
               <p className="text-[10px] text-stone-700 leading-normal">
                 <strong>Permit follow-up</strong>:{" "}
-                {pendingPermits
-                  .map((p) => `${p.name} (${p.status})`)
-                  .join("; ")}
+                {pendingPermits.map((p) => `${p.name} (${p.status})`).join("; ")}
               </p>
             </div>
           )}
         </div>
+        {/* PROJECT SCHEDULES */}
+        <div className="glass-card p-6 flex flex-col w-full min-h-[320px]">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-sm font-extrabold text-stone-900 tracking-tight flex items-center gap-2">
+              <CalendarDays className="w-4 h-4 text-[#F5C518]" />
+              Project Schedules
+            </h3>
+            <span className="text-[9px] font-semibold text-stone-400 uppercase tracking-widest font-mono bg-stone-50 border border-stone-200 px-2 py-0.5 rounded-md">
+              {phaseList.length} phase{phaseList.length === 1 ? "" : "s"}
+            </span>
+          </div>
+          <div className="space-y-3 flex-1 overflow-y-auto max-h-[280px] pr-1">
+            {phaseList.length === 0 && (
+              <p className="text-xs text-stone-500 py-4 text-center">
+                No schedule phases yet. Run analyze to populate project schedules.
+              </p>
+            )}
+            {phaseList.map((phase) => (
+              <div
+                key={phase.name}
+                className="flex items-stretch gap-3 p-3 rounded-xl bg-stone-50 border border-stone-200/60 hover:border-[#F5C518]/40 transition text-xs w-full"
+              >
+                <div className="bg-[#F5C518] text-white p-2 rounded-lg shrink-0 flex items-center justify-center self-start">
+                  <CalendarDays className="w-4 h-4" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex flex-wrap justify-between gap-2 items-start">
+                    <h4 className="font-bold text-stone-900">{phase.name}</h4>
+                    <span className="text-[9px] font-mono font-bold text-[#E2B30D] bg-[#F5C518]/10 px-2 py-0.5 rounded">
+                      {phase.progress}% complete
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-stone-500 mt-1">
+                    {phase.startDate || "TBD"} → {phase.endDate || "TBD"}
+                  </p>
+                  <div className="mt-2 flex items-center gap-2">
+                    <div className="progress-bar flex-1 h-1.5">
+                      <div
+                        className="progress-fill h-full"
+                        style={{ width: `${phase.progress ?? 0}%` }}
+                      />
+                    </div>
+                    <span className="text-[9px] text-stone-400 capitalize shrink-0">
+                      {phase.status}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
-      {crewPlans.length > 0 ? (
-        <div className="premium-card p-5 w-full cursor-default!">
-          <CrewPlanGantt plans={crewPlans} />
+
+      {/* ACCORDION DETAILED SPECIFICATION BLOCKS */}
+      {/* <div className="glass-card p-6 relative">
+        <h3 className="text-base font-extrabold text-stone-900 tracking-tight mb-4 flex items-center gap-2">
+          <Layers className="w-5 h-5 text-[#F5C518]" />
+          Detailed Site Specific Analytics & Agent Audits
+        </h3>
+        <div className="space-y-3">
+          <div className="border border-stone-200 rounded-2xl overflow-hidden transition-all duration-300">
+            <button
+              onClick={() => toggleSection("contract")}
+              className="w-full bg-stone-50 hover:bg-stone-100/70 p-4 flex justify-between items-center text-left transition"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-[#f0f2f5] border border-stone-200/80 flex items-center justify-center text-base">
+                  📜
+                </div>
+                <div>
+                  <span className="text-xs text-stone-400 uppercase font-bold tracking-widest block text-[9px]">
+                    Autonomous Report
+                  </span>
+                  <span className="text-xs font-bold text-stone-800">
+                    📜 Contract Summary Analysis
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="bg-stone-200/60 text-stone-700 text-[9px] font-mono font-bold px-2 py-0.5 rounded">
+                  ContractAgent v3
+                </span>
+                {expandedSections.contract ? (
+                  <ChevronUp className="w-4 h-4 text-stone-400" />
+                ) : (
+                  <ChevronDown className="w-4 h-4 text-stone-400" />
+                )}
+              </div>
+            </button>
+            {expandedSections.contract && (
+              <div className="p-5 bg-white text-xs text-stone-600 border-t border-stone-100 leading-relaxed space-y-2">
+                <p className="font-semibold text-stone-800">
+                  📋 Injected Agent Specification Insights:
+                </p>
+                <p>{telemetry.contractSummaryText}</p>
+                <div className="bg-stone-50 border border-stone-200/60 rounded-xl p-3 mt-3 flex justify-between items-center">
+                  <span className="font-semibold text-stone-700">
+                    Contract Verification Score
+                  </span>
+                  <span className="font-mono text-[#E2B30D] font-bold text-sm bg-white border border-stone-200 px-2.5 py-0.5 rounded-lg">
+                    {contractScore} / 100
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="border border-stone-200 rounded-2xl overflow-hidden transition-all duration-300">
+            <button
+              onClick={() => toggleSection("blueprint")}
+              className="w-full bg-stone-50 hover:bg-stone-100/70 p-4 flex justify-between items-center text-left transition"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-[#f0f2f5] border border-stone-200/80 flex items-center justify-center text-base">
+                  📐
+                </div>
+                <div>
+                  <span className="text-xs text-stone-400 uppercase font-bold tracking-widest block text-[9px]">
+                    Autonomously Extracted
+                  </span>
+                  <span className="text-xs font-bold text-stone-800">
+                    📐 Blueprint Review & Load Checks
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="bg-stone-200/60 text-stone-700 text-[9px] font-mono font-bold px-2 py-0.5 rounded">
+                  BlueprintAgent v2.4
+                </span>
+                {expandedSections.blueprint ? (
+                  <ChevronUp className="w-4 h-4 text-stone-400" />
+                ) : (
+                  <ChevronDown className="w-4 h-4 text-stone-400" />
+                )}
+              </div>
+            </button>
+            {expandedSections.blueprint && (
+              <div className="p-5 bg-white text-xs text-stone-600 border-t border-stone-100 leading-relaxed space-y-2">
+                <p className="font-semibold text-stone-800">
+                  📐 Building Footprint Analysis Results:
+                </p>
+                <p>{telemetry.blueprintAnalysisText}</p>
+                <div className="bg-stone-50 border border-stone-200/60 rounded-xl p-3 mt-3 flex justify-between items-center">
+                  <span className="font-semibold text-stone-700">
+                    Clearances Compliance Rating
+                  </span>
+                  <span className="font-mono text-[#E2B30D] font-bold text-sm bg-white border border-stone-200 px-2.5 py-0.5 rounded-lg">
+                    {blueprintScore} / 100
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="border border-stone-200 rounded-2xl overflow-hidden transition-all duration-300">
+            <button
+              onClick={() => toggleSection("permits")}
+              className="w-full bg-stone-50 hover:bg-stone-100/70 p-4 flex justify-between items-center text-left transition"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-[#f0f2f5] border border-stone-200/80 flex items-center justify-center text-base">
+                  🏛️
+                </div>
+                <div>
+                  <span className="text-xs text-stone-400 uppercase font-bold tracking-widest block text-[9px]">
+                    Permits & Filings
+                  </span>
+                  <span className="text-xs font-bold text-stone-800">
+                    🏛️ Permit Logs & Applications
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span
+                  className="status-badge text-[9.5px] font-black"
+                  style={{
+                    backgroundColor: "#f0f2f5",
+                    color: "#E2B30D",
+                    border: "1px solid #e5e7eb",
+                  }}
+                >
+                  {permitsCount} Pending Alerts
+                </span>
+                {expandedSections.permits ? (
+                  <ChevronUp className="w-4 h-4 text-stone-400" />
+                ) : (
+                  <ChevronDown className="w-4 h-4 text-stone-400" />
+                )}
+              </div>
+            </button>
+            {expandedSections.permits && (
+              <div className="p-5 bg-white text-xs text-stone-600 border-t border-stone-100 leading-relaxed space-y-2">
+                <p className="font-semibold text-stone-800">
+                  🏛️ Active Building Licensing Queue:
+                </p>
+                <p>{telemetry.permitStatusText}</p>
+                <div className="grid grid-cols-2 gap-3 mt-3 font-mono">
+                  <div className="bg-stone-50 border border-stone-200/60 rounded-xl p-3 text-center text-xs">
+                    <span className="text-[9px] text-stone-400 block font-bold uppercase">
+                      Approved
+                    </span>
+                    <span className="font-extrabold text-stone-800">
+                      {permitList.filter((p) => p.status === "Approved").length}
+                    </span>
+                  </div>
+                  <div className="bg-stone-50 border border-stone-200/60 rounded-xl p-3 text-center text-xs">
+                    <span className="text-[9px] text-stone-400 block font-bold uppercase">
+                      Pending review
+                    </span>
+                    <span className="font-extrabold text-[#E2B30D]">
+                      {pendingPermits.length}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
-<<<<<<< HEAD
-      ) : (
-        <div className="premium-card p-5 w-full cursor-default!">
-          <h3 className="text-sm font-bold text-stone-900 mb-3 flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#F5C518]"></span>
-            Crew Plans
-          </h3>
-          <p className="text-xs text-stone-400 py-4 text-center">
-            No crew plans yet. Run analyze to populate.
-          </p>
-        </div>
-      )}
-=======
       </div> */}
 
       {/* DETAIL TABS */}
@@ -904,7 +795,7 @@ export default function ProjectDetails() {
                 {suppliers.map((s, i) => (
                   <div
                     key={i}
-                    className="flex justify-between border border-stone-100 rounded-lg px-3 py-2 bg-stone-50"
+                    className="flex justify-between border border-stone-100 rounded-lg px-3 py-2 bg-stone-50 hover:bg-stone-100 hover:border-stone-200 transition-all duration-150"
                   >
                     <span className="font-semibold text-stone-800 truncate pr-2">
                       {String(s.material_name ?? s.supplier_name ?? "Material")}
@@ -919,13 +810,20 @@ export default function ProjectDetails() {
               </div>
             </div>
           )}
-          {crewPlans.length > 0 && (
-            <CrewPlanGantt
-              plans={crewPlans}
-              phases={intelligence?.phases}
-              criticalPathPhases={intelligence?.criticalPathPhases}
-              onOpenScheduleTab={() => handleTabChange("schedule")}
-            />
+          {crewPlans.length > 0 ? (
+            <div className="premium-card p-5 md:p-6 w-full cursor-default! animate-fade-in-up">
+              <CrewPlanGantt plans={crewPlans} />
+            </div>
+          ) : (
+            <div className="premium-card p-5 md:p-6 w-full cursor-default!">
+              <h3 className="text-sm font-bold text-stone-900 mb-3 flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#F5C518]"></span>
+                Crew Plans
+              </h3>
+              <p className="text-xs text-stone-400 py-4 text-center">
+                No crew plans yet. Run analyze to populate.
+              </p>
+            </div>
           )}
         </div>
       )}
@@ -1043,7 +941,6 @@ export default function ProjectDetails() {
           />
         </Suspense>
       )}
->>>>>>> 6e84e374aae6fa0583c5dc8c7c9abceff753715d
     </div>
   );
 }

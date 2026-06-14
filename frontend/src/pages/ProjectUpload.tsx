@@ -1,6 +1,7 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import { useState, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
 import {
   Upload,
   FileText,
@@ -225,10 +226,10 @@ function FieldLabel({
 
 const inputStyle: React.CSSProperties = {
   width: "100%",
-  padding: "7px 10px",
+  padding: "9px 12px",
   fontSize: "0.78rem",
   border: "1px solid var(--border2)",
-  borderRadius: 8,
+  borderRadius: 12,
   background: "var(--bg2)",
   color: "var(--text-primary)",
   outline: "none",
@@ -394,9 +395,9 @@ export default function ProjectUpload() {
   const sectionHeaderStyle: React.CSSProperties = {
     display: "flex",
     alignItems: "center",
-    gap: 8,
-    marginBottom: 16,
-    paddingBottom: 10,
+    gap: 10,
+    marginBottom: 20,
+    paddingBottom: 12,
     borderBottom: "1px solid var(--border)",
   };
 
@@ -422,7 +423,12 @@ export default function ProjectUpload() {
   };
 
   return (
-    <div className="space-y-5 animate-fade-in-up">
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
+      className="space-y-5"
+    >
       <div>
         <h2
           className="text-base font-bold"
@@ -488,7 +494,7 @@ export default function ProjectUpload() {
           </span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           <div className="md:col-span-2">
             <FieldLabel
               label="Project Name"
@@ -1668,6 +1674,6 @@ export default function ProjectUpload() {
           )}
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }

@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { motion } from "framer-motion";
 import { Bot, CheckCircle2, Circle, Lightbulb, ListFilter } from "lucide-react";
 import type { AgentExecutionRead, Recommendation } from "../types";
 
@@ -218,7 +219,13 @@ export default function RecommendationsPanel({
   }
 
   return (
-    <div className="space-y-5">
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-40px" }}
+      transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
+      className="space-y-5"
+    >
       <div className="glass-card p-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
@@ -260,7 +267,7 @@ export default function RecommendationsPanel({
           return (
             <div
               key={`${item.sourceAgent}-${item.id}`}
-              className="glass-card p-4 border border-stone-200/70"
+              className="glass-card p-5"
             >
               <div className="flex justify-between items-start gap-3">
                 <div className="min-w-0">
@@ -284,7 +291,7 @@ export default function RecommendationsPanel({
                   {item.description}
                 </p>
               )}
-              <div className="flex flex-wrap items-center justify-between gap-3 mt-4 pt-3 border-t border-stone-100">
+              <div className="flex flex-wrap items-center justify-between gap-3 mt-4 pt-4 border-t border-stone-100">
                 <span className="text-[10px] font-bold text-stone-500 bg-stone-100 rounded-full px-2 py-0.5">
                   {item.category}
                 </span>
@@ -307,8 +314,8 @@ export default function RecommendationsPanel({
               </div>
             </div>
           );
-        })}
+          })}
       </div>
-    </div>
+    </motion.div>
   );
 }

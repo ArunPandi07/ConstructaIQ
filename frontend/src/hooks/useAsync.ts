@@ -21,6 +21,7 @@ export function useAsync<T>(
   const [loading, setLoading] = useState(options.immediate !== false)
   const [error,   setError]   = useState<string | null>(null)
 
+  // Prevent stale-closure state updates after unmount
   const mountedRef = useRef(true)
   useEffect(() => {
     mountedRef.current = true

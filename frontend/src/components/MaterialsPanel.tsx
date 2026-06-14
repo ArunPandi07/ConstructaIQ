@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { motion } from "framer-motion";
 import { Link2, Package, Truck } from "lucide-react";
 import type { ProjectSupplierRow, ScheduleMaterial } from "../types";
 
@@ -200,9 +201,15 @@ export default function MaterialsPanel({ materials, supplierRows }: Props) {
   }
 
   return (
-    <div className="space-y-5">
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div className="glass-card p-4">
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-40px" }}
+      transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
+      className="space-y-5"
+    >
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="glass-card p-5">
           <p className="text-[10px] font-bold uppercase tracking-widest text-stone-400">
             Materials
           </p>
@@ -210,7 +217,7 @@ export default function MaterialsPanel({ materials, supplierRows }: Props) {
             {totalMaterials}
           </p>
         </div>
-        <div className="glass-card p-4">
+        <div className="glass-card p-5">
           <p className="text-[10px] font-bold uppercase tracking-widest text-stone-400">
             Supplier Linked
           </p>
@@ -218,7 +225,7 @@ export default function MaterialsPanel({ materials, supplierRows }: Props) {
             {linkedCount}
           </p>
         </div>
-        <div className="glass-card p-4">
+        <div className="glass-card p-5">
           <p className="text-[10px] font-bold uppercase tracking-widest text-stone-400">
             Categories
           </p>
@@ -260,7 +267,7 @@ export default function MaterialsPanel({ materials, supplierRows }: Props) {
                       className="border-b border-stone-50 align-top cursor-pointer hover:bg-stone-50/70"
                       onClick={() => setSelectedKey(selected ? null : key)}
                     >
-                      <td className="py-3 font-semibold text-stone-900">
+                      <td className="py-2.5 font-semibold text-stone-900">
                         {materialName(row.material)}
                         {selected && row.supplier && (
                           <div className="mt-2 text-[10px] text-stone-500 font-normal leading-relaxed">
@@ -275,10 +282,10 @@ export default function MaterialsPanel({ materials, supplierRows }: Props) {
                           </div>
                         )}
                       </td>
-                      <td className="py-3 text-stone-600 font-mono">
+                      <td className="py-2.5 text-stone-600 font-mono">
                         {formatQuantity(row.material)}
                       </td>
-                      <td className="py-3">
+                      <td className="py-2.5">
                         {row.supplier ? (
                           <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 px-2 py-0.5 font-bold">
                             <Link2 className="w-3 h-3" />
@@ -291,7 +298,7 @@ export default function MaterialsPanel({ materials, supplierRows }: Props) {
                           </span>
                         )}
                       </td>
-                      <td className="py-3 text-right font-mono text-stone-700">
+                      <td className="py-2.5 text-right font-mono text-stone-700">
                         {formatMoney(row.material.totalCost ?? row.supplier?.total_cost)}
                       </td>
                     </tr>
@@ -302,6 +309,6 @@ export default function MaterialsPanel({ materials, supplierRows }: Props) {
           </div>
         </div>
       ))}
-    </div>
+    </motion.div>
   );
 }
