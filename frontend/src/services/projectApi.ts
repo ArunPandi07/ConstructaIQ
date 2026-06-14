@@ -46,12 +46,32 @@ export async function uploadProjectPdfs(
 
 export async function startAnalyze(
   projectId: number,
-  description?: string,
+  options?: { description?: string; sendReportEmail?: boolean },
 ): Promise<AnalyzeJobResponse> {
+  const body: { description?: string; send_report_email?: boolean } = {}
+  if (options?.description) body.description = options.description
+  if (options?.sendReportEmail !== undefined) {
+    body.send_report_email = options.sendReportEmail
+  }
   const res = await apiClient.post<AnalyzeJobResponse>(
     `/projects/${projectId}/analyze`,
-    description ? { description } : {},
+    body,
   )
+  return unwrapData(res)
+}
+
+export async function emailProjectReport(projectId: number): Promise<{
+  delivery_id: number
+  status: string
+  recipient_email: string
+  error_message?: string | null
+}> {
+  const res = await apiClient.post<{
+    delivery_id: number
+    status: string
+    recipient_email: string
+    error_message?: string | null
+  }>(`/projects/${projectId}/report/email`, {})
   return unwrapData(res)
 }
 
@@ -145,6 +165,7 @@ export interface PollAnalyzeOptions {
   intervalMs?: number
   maxAttempts?: number
   onProgress?: (status: AnalyzeJobStatus) => void
+  onComplete?: (status: AnalyzeJobStatus) => void
 }
 
 export async function pollAnalyzeUntilComplete(
@@ -152,13 +173,18 @@ export async function pollAnalyzeUntilComplete(
   jobId: string,
   options: PollAnalyzeOptions = {},
 ): Promise<AnalyzePipelineResult> {
-  const { intervalMs = 1000, maxAttempts = 120, onProgress } = options
+  const { intervalMs = 3000, maxAttempts = 120, onProgress, onComplete } = options
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const status = await getAnalyzeStatus(projectId, jobId)
     onProgress?.(status)
 
     if (status.status === 'complete') {
+      if (status.report_delivery_status === 'pending') {
+        await new Promise((r) => setTimeout(r, intervalMs))
+        continue
+      }
+      onComplete?.(status)
       if (!status.result) {
         throw new Error('Analyze completed but no result payload was returned.')
       }

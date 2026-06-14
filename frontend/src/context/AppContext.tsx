@@ -8,7 +8,9 @@ import {
 } from 'react'
 import type { ReactNode } from 'react'
 import type { AnalyzePipelineResult, Project } from '../types'
+import { fetchDashboard } from '../services/api'
 import { listProjects, mapProjectListToUI } from '../services/projectApi'
+import { setDashboardCache } from '../services/dashboardCache'
 
 // ─────────────────────────────────────────────────────────────
 // BuildMind AI — Global App Context
@@ -69,7 +71,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const projectsCacheRef = useRef<{ data: Project[]; at: number } | null>(null)
   const PROJECTS_TTL_MS = 60_000
 
-  const refreshProjects = useCallback(async (force = false) => {
+  const bootstrapAppData = useCallback(async (force = false) => {
     const now = Date.now()
     if (
       !force &&
@@ -77,6 +79,35 @@ export function AppProvider({ children }: { children: ReactNode }) {
       now - projectsCacheRef.current.at < PROJECTS_TTL_MS
     ) {
       setProjects(projectsCacheRef.current.data)
+      return
+    }
+    setProjectsLoading(true)
+    setProjectsError(null)
+    try {
+      const res = await fetchDashboard({ includeProjects: true })
+      const { projects: projectItems, ...dashboardOnly } = res.data
+      if (projectItems?.length) {
+        const mapped = mapProjectListToUI(projectItems)
+        projectsCacheRef.current = { data: mapped, at: Date.now() }
+        setProjects(mapped)
+      } else {
+        const items = await listProjects()
+        const mapped = mapProjectListToUI(items)
+        projectsCacheRef.current = { data: mapped, at: Date.now() }
+        setProjects(mapped)
+      }
+      setDashboardCache(dashboardOnly)
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Failed to load app data'
+      setProjectsError(message)
+    } finally {
+      setProjectsLoading(false)
+    }
+  }, [])
+
+  const refreshProjects = useCallback(async (force = false) => {
+    if (!force) {
+      await bootstrapAppData(false)
       return
     }
     setProjectsLoading(true)
@@ -92,11 +123,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } finally {
       setProjectsLoading(false)
     }
-  }, [])
+  }, [bootstrapAppData])
 
   useEffect(() => {
-    void refreshProjects()
-  }, [refreshProjects])
+    void bootstrapAppData()
+  }, [bootstrapAppData])
 
   const handleProjectCreated = useCallback(
     (newProj: Project) => {

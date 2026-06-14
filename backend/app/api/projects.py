@@ -5,7 +5,14 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, s
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.dependencies import get_current_user, get_optional_current_user
+from app.db.models.user import User
 from app.db.session import get_db_required
+from app.schemas.report_delivery import ReportDeliveryRead, ReportEmailResponse
+from app.services.report_delivery_service import (
+    list_report_deliveries,
+    send_project_report_email,
+)
 from app.orchestrator.analyze_orchestrator import (
     PIPELINE_AGENTS,
     resolve_call_agent_version,
@@ -24,7 +31,7 @@ from app.schemas.project_responses import (
     ProjectSuppliersResponse,
     ProjectUploadResponse,
 )
-from app.schemas.agent_execution import AgentExecutionRead
+from app.schemas.agent_execution import AgentExecutionListItem, AgentExecutionRead
 from app.schemas.crew_plan import CrewPlanRead
 from app.schemas.project_supplier import ProjectSupplierRead
 from app.services.foundry_service import foundry_service
@@ -49,6 +56,7 @@ router = APIRouter(prefix="/projects", tags=["Projects"])
 
 class AnalyzeProjectRequest(BaseModel):
     description: Optional[str] = None
+    send_report_email: bool = True
 
 
 @router.get("")
@@ -65,8 +73,13 @@ async def read_projects(
 async def create_project_endpoint(
     payload: ProjectCreate,
     session: AsyncSession = Depends(get_db_required),
+    current_user: User | None = Depends(get_optional_current_user),
 ):
-    project = await create_project(session, payload)
+    project = await create_project(
+        session,
+        payload,
+        created_by_user_id=current_user.user_id if current_user else None,
+    )
     return success_response(ProjectRead.model_validate(project))
 
 
@@ -76,12 +89,14 @@ async def upload_project(
     contract: UploadFile | None = File(None),
     blueprint: UploadFile | None = File(None),
     session: AsyncSession = Depends(get_db_required),
+    current_user: User | None = Depends(get_optional_current_user),
 ):
     project, documents = await upload_project_documents(
         session,
         project_name=project_name,
         contract=contract,
         blueprint=blueprint,
+        created_by_user_id=current_user.user_id if current_user else None,
     )
     return success_response(
         ProjectUploadResponse(
@@ -96,11 +111,19 @@ async def analyze_project(
     project_id: int,
     body: AnalyzeProjectRequest = AnalyzeProjectRequest(),
     session: AsyncSession = Depends(get_db_required),
+    current_user: User | None = Depends(get_optional_current_user),
 ):
+    project = await get_project(session, project_id)
+    report_user_id = (
+        current_user.user_id if current_user is not None else None
+    ) or project.created_by_user_id
+    send_report = body.send_report_email and report_user_id is not None
     job = await start_analyze_job(
         session,
         project_id,
         description=body.description,
+        triggering_user_id=report_user_id if send_report else None,
+        send_report_email=send_report,
     )
     return success_response(
         AnalyzeJobResponse(
@@ -126,6 +149,8 @@ async def analyze_project_status(
             overall_pct=job.overall_pct,
             result=job.result,
             error=job.error,
+            report_delivery_status=job.report_delivery_status,
+            report_delivery_error=job.report_delivery_error,
         )
     )
 
@@ -196,8 +221,45 @@ async def read_project_agents(
     return success_response(
         ProjectAgentsResponse(
             project_id=project_id,
-            agents=[AgentExecutionRead.model_validate(a) for a in agents],
+            agents=[AgentExecutionListItem.model_validate(a) for a in agents],
         )
+    )
+
+
+@router.post("/{project_id}/report/email", status_code=status.HTTP_202_ACCEPTED)
+async def email_project_report(
+    project_id: int,
+    session: AsyncSession = Depends(get_db_required),
+    current_user: User = Depends(get_current_user),
+):
+    """Send consolidated intelligence report to the logged-in user's email."""
+    delivery = await send_project_report_email(
+        session,
+        project_id,
+        current_user.user_id,
+        skip_rate_limit=False,
+    )
+    return success_response(
+        ReportEmailResponse(
+            delivery_id=delivery.delivery_id,
+            status=delivery.status,
+            recipient_email=delivery.recipient_email,
+            error_message=delivery.error_message,
+        ),
+        "Report email processed.",
+    )
+
+
+@router.get("/{project_id}/report/deliveries")
+async def read_report_deliveries(
+    project_id: int,
+    session: AsyncSession = Depends(get_db_required),
+    current_user: User = Depends(get_current_user),
+):
+    deliveries = await list_report_deliveries(session, project_id)
+    user_deliveries = [d for d in deliveries if d.user_id == current_user.user_id]
+    return success_response(
+        [ReportDeliveryRead.model_validate(d) for d in user_deliveries]
     )
 
 

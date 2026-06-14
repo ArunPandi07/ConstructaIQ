@@ -11,6 +11,7 @@ from app.db.models.project_supplier import ProjectSupplier
 from app.db.models.schedule import Schedule
 from app.db.models.supplier_master import SupplierMaster
 from app.db.models.supplier_material import SupplierMaterial
+from app.db.models.report_delivery import ReportDelivery
 from app.db.models.user import User
 
 __all__ = [
@@ -27,5 +28,6 @@ __all__ = [
     "Schedule",
     "SupplierMaster",
     "SupplierMaterial",
+    "ReportDelivery",
     "User",
 ]

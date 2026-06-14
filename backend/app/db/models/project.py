@@ -4,7 +4,7 @@ from datetime import date
 from decimal import Decimal
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import BigInteger, Date, Identity, Integer, Numeric, String, Text
+from sqlalchemy import BigInteger, Date, ForeignKey, Identity, Integer, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -42,6 +42,9 @@ class Project(Base):
     floor_count: Mapped[Optional[int]] = mapped_column(Integer)
     complexity_level: Mapped[Optional[str]] = mapped_column(String(50))
     priority_score: Mapped[Optional[int]] = mapped_column(Integer)
+    created_by_user_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("users.user_id"), nullable=True, index=True
+    )
 
     documents: Mapped[list[Document]] = relationship(
         back_populates="project", cascade="all, delete-orphan"

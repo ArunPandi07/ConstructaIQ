@@ -1,6 +1,7 @@
 import { useAsync } from "./useAsync";
 import { useAppContext } from "../context/AppContext";
-import { fetchDashboard } from "../services/api";
+import { fetchDashboard } from '../services/api'
+import { getDashboardCache, setDashboardCache } from '../services/dashboardCache'
 import { fetchProjectIntelligence } from "../services/api";
 import { fetchRiskIntelligence } from "../services/api";
 import { fetchRecoveryStrategies } from "../services/api";
@@ -42,7 +43,17 @@ export function useProjects() {
 
 /** Dashboard KPIs, charts, and recent activity */
 export function useDashboard() {
-  return useAsync<DashboardData>(fetchDashboard);
+  return useAsync<DashboardData>(async () => {
+    const cached = getDashboardCache()
+    if (cached) {
+      return { data: cached.data }
+    }
+    const res = await fetchDashboard({ includeProjects: true })
+    const { projects, ...dashboardOnly } = res.data
+    void projects
+    setDashboardCache(dashboardOnly)
+    return { data: dashboardOnly }
+  });
 }
 
 /** Project intelligence — permits, crew, phases */
@@ -120,11 +131,23 @@ export function useAgentInsights(projectId: string) {
 }
 
 /** Raw agent execution rows for a project */
+const agentsCache = new Map<string, { data: AgentExecutionRead[]; at: number }>()
+const AGENTS_TTL_MS = 2 * 60_000
+
+export function clearAgentsCache(projectId: string) {
+  agentsCache.delete(projectId)
+}
+
 export function useProjectAgents(projectId: string) {
   return useAsync<AgentExecutionRead[]>(
     async () => {
       if (!isBackendProjectId(projectId)) return { data: [] };
+      const cached = agentsCache.get(projectId)
+      if (cached && Date.now() - cached.at < AGENTS_TTL_MS) {
+        return { data: cached.data }
+      }
       const res = await getProjectAgents(Number(projectId));
+      agentsCache.set(projectId, { data: res.agents, at: Date.now() })
       return { data: res.agents };
     },
     [projectId],

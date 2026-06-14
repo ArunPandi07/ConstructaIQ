@@ -187,7 +187,10 @@ export default function NewProjectModal({ open, onClose }: NewProjectModalProps)
     description: string | undefined,
     uiProject: ReturnType<typeof mapBackendProjectToUI>,
   ) => {
-    const job = await startAnalyze(projectId, description);
+    const job = await startAnalyze(projectId, {
+      description,
+      sendReportEmail: true,
+    });
     setAnalyzeJobId(job.job_id);
     setProgressStep("ContractAgent");
     setOverallPct(0);
@@ -196,6 +199,21 @@ export default function NewProjectModal({ open, onClose }: NewProjectModalProps)
       onProgress: (status) => {
         setProgressStep(status.progress_step ?? null);
         setOverallPct(status.overall_pct ?? null);
+      },
+      onComplete: (status) => {
+        if (status.report_delivery_status === "sent") {
+          setDescribeError(null);
+        } else if (
+          status.report_delivery_status === "failed" &&
+          status.report_delivery_error
+        ) {
+          console.warn("Report email failed:", status.report_delivery_error);
+        } else if (
+          status.report_delivery_status === "skipped" &&
+          status.report_delivery_error
+        ) {
+          console.warn("Report email skipped:", status.report_delivery_error);
+        }
       },
     });
 

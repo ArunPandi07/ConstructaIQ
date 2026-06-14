@@ -1,3 +1,5 @@
+from typing import Optional
+
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,6 +10,7 @@ from app.db.session import get_db_required
 from app.services.auth_service import decode_access_token
 
 security = HTTPBearer()
+optional_security = HTTPBearer(auto_error=False)
 
 
 async def get_current_user(
@@ -40,4 +43,29 @@ async def get_current_user(
             detail="User not found or inactive",
         )
 
+    return user
+
+
+async def get_optional_current_user(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(optional_security),
+    session: AsyncSession = Depends(get_db_required),
+) -> User | None:
+    """Return authenticated user when a valid Bearer token is present."""
+    if credentials is None:
+        return None
+
+    token = credentials.credentials
+    payload = decode_access_token(token)
+    if payload is None:
+        return None
+
+    try:
+        user_id = int(payload.get("sub"))
+    except (TypeError, ValueError):
+        return None
+
+    user_repo = UserRepository(session)
+    user = await user_repo.get_by_id(user_id)
+    if user is None or not user.is_active:
+        return None
     return user

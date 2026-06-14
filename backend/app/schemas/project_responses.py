@@ -3,7 +3,7 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, ConfigDict
 
-from app.schemas.agent_execution import AgentExecutionRead
+from app.schemas.agent_execution import AgentExecutionListItem, AgentExecutionRead
 from app.schemas.crew_plan import CrewPlanRead
 from app.schemas.document import DocumentRead
 from app.schemas.project import ProjectRead
@@ -29,6 +29,8 @@ class AnalyzeJobStatusResponse(BaseModel):
     overall_pct: Optional[int] = None
     result: Optional[dict[str, Any]] = None
     error: Optional[str] = None
+    report_delivery_status: Optional[str] = None
+    report_delivery_error: Optional[str] = None
 
 
 class ProjectSummaryResponse(BaseModel):
@@ -38,7 +40,7 @@ class ProjectSummaryResponse(BaseModel):
 
 class ProjectAgentsResponse(BaseModel):
     project_id: int
-    agents: list[AgentExecutionRead]
+    agents: list[AgentExecutionListItem]
 
 
 class ProjectSuppliersResponse(BaseModel):
@@ -107,3 +109,4 @@ class DashboardResponse(BaseModel):
     recent_activities: list[DashboardActivityItem] = []
     recent_recommendations: list[DashboardRecommendationItem] = []
     total_tokens_recent: int = 0
+    projects: list[ProjectListItem] = []

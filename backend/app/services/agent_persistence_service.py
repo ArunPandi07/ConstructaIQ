@@ -161,6 +161,36 @@ def _json_dumps(value: Any) -> str | None:
     return json.dumps(value)
 
 
+def _to_int(value: Any) -> int | None:
+    if value is None:
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    if isinstance(value, str):
+        try:
+            return int(float(value))
+        except (ValueError, TypeError):
+            return None
+    if isinstance(value, dict):
+        nums = [v for v in value.values() if isinstance(v, (int, float))]
+        return int(max(nums)) if nums else None
+    return None
+
+
+def _to_bool(value: Any) -> bool | None:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in ("true", "yes", "1", "high", "critical")
+    if isinstance(value, (int, float)):
+        return bool(value)
+    return None
+
+
 def _normalize_severity(value: Any, *, default: str = "medium") -> str:
     if isinstance(value, str) and value.strip():
         return value.strip().lower()
@@ -276,11 +306,25 @@ async def persist_supplier_and_crew_outputs(
     for row in procurement_plan:
         if not isinstance(row, dict):
             continue
-        material_name = row.get("material_name")
-        supplier_name = row.get("supplier_name")
+        material_name = row.get("material_name") or row.get("material")
+        supplier_name = row.get("supplier_name") or row.get("supplier")
         if not material_name and not supplier_name:
             logger.warning("Skipping procurement row with no material or supplier name")
             continue
+
+        delivery_raw = row.get("delivery_date") or row.get("delivery_month")
+        if isinstance(delivery_raw, int):
+            delivery_raw = f"month {delivery_raw}"
+
+        total_cost = row.get("total_cost")
+        if total_cost is None:
+            qty = row.get("quantity")
+            up = row.get("unit_price")
+            if qty is not None and up is not None:
+                try:
+                    total_cost = float(qty) * float(up)
+                except (ValueError, TypeError):
+                    total_cost = None
 
         await supplier_repo.create(
             ProjectSupplierCreate(
@@ -289,8 +333,8 @@ async def persist_supplier_and_crew_outputs(
                 supplier_name=supplier_name,
                 quantity=_parse_decimal(row.get("quantity")),
                 unit_price=_parse_decimal(row.get("unit_price")),
-                delivery_date=_parse_date(row.get("delivery_date"), project_start=start),
-                total_cost=_parse_decimal(row.get("total_cost")),
+                delivery_date=_parse_date(delivery_raw, project_start=start),
+                total_cost=_parse_decimal(total_cost),
             )
         )
         created_suppliers += 1
@@ -299,20 +343,29 @@ async def persist_supplier_and_crew_outputs(
     for row in crew_data.get("crew_allocations", []) or []:
         if not isinstance(row, dict):
             continue
-        phase_name = row.get("phase_name")
-        crew_name = row.get("crew_name") or row.get("employee_name")
+        phase_name = row.get("phase_name") or row.get("phase")
+        crew_name = row.get("crew_name") or row.get("employee_name") or row.get("crew")
         if not phase_name and not crew_name:
             logger.warning("Skipping crew allocation row with no phase or crew name")
             continue
+
+        start_raw = row.get("start_date") or row.get("start_month")
+        end_raw = row.get("end_date") or row.get("end_month")
+        if isinstance(start_raw, int):
+            start_raw = f"month {start_raw}"
+        if isinstance(end_raw, int):
+            end_raw = f"month {end_raw}"
+
+        labor_cost = row.get("labor_cost") or row.get("cost")
 
         await crew_repo.create(
             CrewPlanCreate(
                 project_id=project_id,
                 phase_name=phase_name,
                 crew_name=crew_name,
-                labor_cost=_parse_decimal(row.get("labor_cost")),
-                start_date=_parse_date(row.get("start_date"), project_start=start),
-                end_date=_parse_date(row.get("end_date"), project_start=start),
+                labor_cost=_parse_decimal(labor_cost),
+                start_date=_parse_date(start_raw, project_start=start),
+                end_date=_parse_date(end_raw, project_start=start),
                 headcount=_parse_int(row.get("headcount")),
                 skill_type=row.get("skill_type") or row.get("skill"),
             )
@@ -410,24 +463,41 @@ async def persist_analysis_outputs(
                 permit_name=name,
                 permit_category=item.get("category") or item.get("permit_category"),
                 status=item.get("status"),
-                estimated_approval_days=item.get("estimated_days")
-                or item.get("estimated_approval_days"),
+                estimated_approval_days=_to_int(
+                    item.get("estimated_days") or item.get("estimated_approval_days")
+                ),
                 required_documents=_json_dumps(
                     item.get("documents") or item.get("required_documents")
                 ),
-                critical_path_impact=item.get("critical_path_impact"),
+                critical_path_impact=_to_bool(item.get("critical_path_impact")),
             )
         )
         created_permits += 1
 
     created_schedules = 0
-    duration_days = plan_data.get("estimated_duration_days") or plan_data.get(
-        "total_duration_days"
+    duration_days = _to_int(
+        plan_data.get("estimated_duration_days") or plan_data.get("total_duration_days")
     )
     phase_breakdown = plan_data.get("project_phases") or plan_data.get("phases")
+
+    top_materials = plan_data.get("materials") or []
+    if not top_materials and isinstance(phase_breakdown, list):
+        for phase in phase_breakdown:
+            if isinstance(phase, dict):
+                phase_mats = phase.get("materials", [])
+                if isinstance(phase_mats, list):
+                    phase_name = phase.get("phase_name") or phase.get("name") or ""
+                    for m in phase_mats:
+                        if isinstance(m, str):
+                            top_materials.append(
+                                {"name": m, "category": phase_name}
+                            )
+                        elif isinstance(m, dict):
+                            top_materials.append(m)
+
     work_packages = {
         "dependencies": plan_data.get("dependencies") or [],
-        "materials": plan_data.get("materials") or [],
+        "materials": top_materials,
     }
     await schedule_repo.create(
         ScheduleCreate(
@@ -443,13 +513,18 @@ async def persist_analysis_outputs(
     for row in supplier_data.get("procurement_plan", []) or []:
         if isinstance(row, dict):
             cost = _parse_decimal(row.get("total_cost"))
+            if cost is None:
+                qty = _parse_decimal(row.get("quantity"))
+                up = _parse_decimal(row.get("unit_price"))
+                if qty is not None and up is not None:
+                    cost = qty * up
             if cost is not None:
                 material_cost += cost
 
     labor_cost = Decimal("0")
     for row in crew_data.get("crew_allocations", []) or []:
         if isinstance(row, dict):
-            cost = _parse_decimal(row.get("labor_cost"))
+            cost = _parse_decimal(row.get("labor_cost") or row.get("cost"))
             if cost is not None:
                 labor_cost += cost
 
@@ -465,7 +540,24 @@ async def persist_analysis_outputs(
     created_budgets = 1
 
     created_inspections = 0
-    for stage in plan_data.get("inspection_stages", []) or []:
+    inspection_stages = plan_data.get("inspection_stages", []) or []
+    if not inspection_stages and isinstance(phase_breakdown, list):
+        for phase in phase_breakdown:
+            if isinstance(phase, dict):
+                phase_name = phase.get("phase_name") or phase.get("name") or ""
+                phase_inspections = phase.get("inspections", [])
+                if isinstance(phase_inspections, list):
+                    for insp in phase_inspections:
+                        if isinstance(insp, str):
+                            inspection_stages.append(
+                                {"name": insp, "phase_name": phase_name}
+                            )
+                        elif isinstance(insp, dict):
+                            if "phase_name" not in insp:
+                                insp["phase_name"] = phase_name
+                            inspection_stages.append(insp)
+
+    for stage in inspection_stages:
         if isinstance(stage, str):
             await inspection_repo.create(
                 InspectionCreate(

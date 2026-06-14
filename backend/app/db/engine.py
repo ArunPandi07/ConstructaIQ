@@ -27,8 +27,14 @@ async def init_db() -> None:
         logger.info("DATABASE_URL not set — database layer disabled.")
         return
 
+    # MARS_Connection=yes is required to run asyncio.gather() parallel queries
+    # on the same session without getting "Connection is busy" errors from ODBC.
+    db_url = settings.DATABASE_URL
+    if "MARS_Connection" not in db_url:
+        db_url += ("&" if "?" in db_url else "?") + "MARS_Connection=yes"
+
     _engine = create_async_engine(
-        settings.DATABASE_URL,
+        db_url,
         pool_pre_ping=True,
         pool_size=settings.DB_POOL_SIZE,
         max_overflow=settings.DB_MAX_OVERFLOW,

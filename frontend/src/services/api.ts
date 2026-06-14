@@ -10,6 +10,7 @@ import type {
   DashboardApiResponse,
   DashboardData,
   ProjectIntelligenceData,
+  ProjectListItem,
   RecoveryStrategy,
   RiskIntelligenceData,
 } from '../types'
@@ -139,10 +140,18 @@ function buildDashboardFromProjects(): DashboardData {
   }
 }
 
-export async function fetchDashboard(): Promise<ApiResponse<DashboardData>> {
+export async function fetchDashboard(
+  options?: { includeProjects?: boolean },
+): Promise<ApiResponse<DashboardData & { projects?: ProjectListItem[] }>> {
   try {
-    const res = await apiClient.get<DashboardApiResponse>('/dashboard')
-    return ok(mapDashboardResponse(res.data))
+    const params: Record<string, string> = {}
+    if (options?.includeProjects) params.include_projects = 'true'
+    const res = await apiClient.get<DashboardApiResponse>('/dashboard', params)
+    const mapped = mapDashboardResponse(res.data)
+    return ok({
+      ...mapped,
+      projects: res.data.projects,
+    })
   } catch {
     try {
       const items = await listProjects()

@@ -33,6 +33,16 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     JWT_ACCESS_TOKEN_EXPIRE_HOURS: int = 24
 
+    # Azure Communication Services Email (optional)
+    AZURE_COMMUNICATION_CONNECTION_STRING: Optional[str] = None
+    AZURE_COMMUNICATION_EMAIL_FROM: Optional[str] = None
+    AZURE_COMMUNICATION_EMAIL_REPLY_TO: Optional[str] = None
+
+    # Intelligence report emails
+    REPORT_EMAIL_ENABLED: bool = False
+    FRONTEND_BASE_URL: str = "http://localhost:5173"
+    REPORT_EMAIL_RATE_LIMIT_MINUTES: int = 60
+
     model_config = SettingsConfigDict(
         env_file=os.path.join(Path(__file__).resolve().parent.parent.parent, ".env"),
         env_file_encoding="utf-8",

@@ -12,6 +12,8 @@ import {
 // import { NewProjectModal } from "./NewProjectModal";
 import { useAppContext } from "../context/AppContext";
 import { useAuth } from "../context/AuthContext";
+import { useLoading } from "../context/LoadingContext";
+import { FullscreenLoader, LoadingBar } from "./Loader";
 import NewProjectModal from "./NewProjectModal";
 
 const navItems = [
@@ -58,8 +60,14 @@ export default function Layout() {
     return location.pathname === path;
   };
 
+  const { hasFullscreenLoader, routeTransition } = useLoading();
+
   return (
-    <div className="min-h-screen bg-[#FAF9F6] text-[#1A1A1A] font-sans antialiased relative pb-16 flex flex-col">
+    <>
+      <LoadingBar show={routeTransition} />
+      <FullscreenLoader show={hasFullscreenLoader} rotateMessages />
+
+      <div className="min-h-screen bg-[#FAF9F6] text-[#1A1A1A] font-sans antialiased relative pb-16 flex flex-col">
       {/* Background decoration */}
       <div className="absolute top-0 right-0 w-80 h-80 opacity-[0.02] pointer-events-none select-none overflow-hidden text-[#1A1A1A]">
         <HardHat className="w-full h-full rotate-15 translate-x-12 -translate-y-12" />
@@ -180,5 +188,6 @@ export default function Layout() {
         />
       )}
     </div>
+    </>
   );
 }

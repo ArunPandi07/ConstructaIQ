@@ -1,4 +1,5 @@
 import { apiClient } from './apiClient'
+import { dedupeAsync } from './requestDedupe'
 import type { User } from '../types'
 
 interface LoginResponse {
@@ -16,8 +17,10 @@ export async function logout(): Promise<void> {
 }
 
 export async function getCurrentUser(): Promise<User> {
-  const response = await apiClient.get<User>('/auth/me')
-  return response.data
+  return dedupeAsync('auth/me', async () => {
+    const response = await apiClient.get<User>('/auth/me')
+    return response.data
+  })
 }
 
 export async function updateProfile(data: {
@@ -25,6 +28,7 @@ export async function updateProfile(data: {
   full_name?: string
   current_password?: string
   new_password?: string
+  report_email_opt_in?: boolean
 }): Promise<User> {
   const response = await apiClient.put<User>('/auth/me', data)
   return response.data

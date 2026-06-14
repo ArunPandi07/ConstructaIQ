@@ -27,4 +27,12 @@ services:
         value: HS256
       - key: JWT_ACCESS_TOKEN_EXPIRE_HOURS
         value: 24
+      - key: REPORT_EMAIL_ENABLED
+        value: false
+      - key: FRONTEND_BASE_URL
+        sync: false
+      - key: AZURE_COMMUNICATION_CONNECTION_STRING
+        sync: false
+      - key: AZURE_COMMUNICATION_EMAIL_FROM
+        sync: false
     healthCheckPath: /healthz
