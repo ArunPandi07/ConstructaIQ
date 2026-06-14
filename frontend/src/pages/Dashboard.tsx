@@ -1,4 +1,6 @@
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
 import {
   Building2,
   AlertTriangle,
@@ -8,6 +10,7 @@ import {
 } from "lucide-react";
 import { useAppContext } from "../context/AppContext";
 import { useDashboard, useProjects } from "../hooks/usePageData";
+import { useLoading } from "../context/LoadingContext";
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -55,10 +58,64 @@ export default function Dashboard() {
   const isLoading = projectsLoading || dashLoading;
   const loadError = projectsError ?? dashError;
 
+  const { setLoading, hasFullscreenLoader } = useLoading();
+  useEffect(() => {
+    setLoading("dashboard", isLoading, isLoading ? { type: "fullscreen", message: "Loading dashboard data" } : undefined);
+  }, [isLoading, setLoading]);
+
+  const [pageReady, setPageReady] = useState(false);
+  useEffect(() => {
+    if (!isLoading && !hasFullscreenLoader) {
+      const timer = setTimeout(() => setPageReady(true), 350);
+      return () => clearTimeout(timer);
+    } else {
+      setPageReady(false);
+    }
+  }, [isLoading, hasFullscreenLoader]);
+
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: { staggerChildren: 0.08 },
+    },
+  };
+
+  const cardVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: { duration: 0.4, ease: [0.4, 0, 0.2, 1] as const },
+    },
+  };
+
+  const pageVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: { staggerChildren: 0.08 },
+    },
+  };
+
+  const sectionVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: { duration: 0.5, ease: [0.4, 0, 0.2, 1] as const },
+    },
+  };
+
   return (
-    <div className="space-y-8 animate-fade-in-up">
+    <motion.div
+      variants={pageVariants}
+      initial="hidden"
+      animate={pageReady ? "visible" : "hidden"}
+      className="space-y-6"
+    >
       {loadError && (
-        <div className="glass-card p-4 border border-red-200 bg-red-50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+        <motion.div variants={sectionVariants} className="glass-card p-4 border border-red-200 bg-red-50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
           <p className="text-sm text-red-700">{loadError}</p>
           <button
             type="button"
@@ -70,10 +127,13 @@ export default function Dashboard() {
           >
             Retry
           </button>
-        </div>
+        </motion.div>
       )}
 
-      <div className="glass-card p-6 md:p-8 relative overflow-hidden">
+      <motion.div
+        variants={sectionVariants}
+        className="glass-card p-6 md:p-8 relative overflow-hidden"
+      >
         <div className="absolute top-0 right-0 w-112.5 h-112.5 bg-radial from-[#F5C518]/10 via-transparent to-transparent pointer-events-none rounded-full blur-3xl -mr-20 -mt-20"></div>
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 relative z-10">
           <div>
@@ -108,9 +168,18 @@ export default function Dashboard() {
                 {isLoading ? "—" : getCumulativeBudget()}
               </p>
             </div>
+            <div className="w-px h-10 bg-stone-200"></div>
+            <div className="text-center">
+              <p className="text-[10px] text-stone-400 font-extrabold uppercase tracking-wider">
+                Mean Progress
+              </p>
+              <p className="text-2xl font-black text-emerald-600 mt-1 font-mono">
+                {isLoading ? "—" : `${getMeanProgress()}%`}
+              </p>
+            </div>
           </div>
         </div>
-        <div className="mt-6 pt-5 border-t border-stone-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-3 text-xs text-stone-500">
+        <div className="mt-5 pt-4 border-t border-stone-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-3 text-xs text-stone-500">
           <span className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
             6 Autonomous Coordinator Agents analyzing {activeCount}{" "}
@@ -130,38 +199,37 @@ export default function Dashboard() {
             On Board New Project
           </button>
         </div>
-      </div>
+      </motion.div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="glass-card p-4 text-center bg-rose-50/80 border border-rose-100">
-          <p className="text-[10px] text-rose-600/80 font-bold uppercase">Open Risks</p>
+      <motion.div
+        variants={sectionVariants}
+        className="grid grid-cols-2 md:grid-cols-4 gap-4"
+      >
+        <div className="glass-card p-5 text-center">
+          <p className="text-[10px] text-stone-400 font-bold uppercase">Open Risks</p>
           <p className="text-2xl font-black text-rose-600 mt-1 font-mono">
             {isLoading ? "—" : openRisks}
           </p>
-          <p className="text-[9px] text-rose-500/70 mt-1">All open risk items</p>
         </div>
-        <div className="glass-card p-4 text-center bg-amber-50/80 border border-amber-100">
-          <p className="text-[10px] text-amber-700/80 font-bold uppercase">At-Risk Projects</p>
-          <p className="text-2xl font-black text-amber-700 mt-1 font-mono">
+        <div className="glass-card p-5 text-center">
+          <p className="text-[10px] text-stone-400 font-bold uppercase">At-Risk Projects</p>
+          <p className="text-2xl font-black text-amber-600 mt-1 font-mono">
             {isLoading ? "—" : riskProjects}
           </p>
-          <p className="text-[9px] text-amber-600/70 mt-1">Sites with critical risks</p>
         </div>
-        <div className="glass-card p-4 text-center bg-indigo-50/80 border border-indigo-100">
-          <p className="text-[10px] text-indigo-600/80 font-bold uppercase">Recovery Plans</p>
-          <p className="text-2xl font-black text-indigo-700 mt-1 font-mono">
+        <div className="glass-card p-5 text-center">
+          <p className="text-[10px] text-stone-400 font-bold uppercase">Recovery Plans</p>
+          <p className="text-2xl font-black text-stone-900 mt-1 font-mono">
             {isLoading ? "—" : recoveryPlans}
           </p>
-          <p className="text-[9px] text-indigo-500/70 mt-1">Supply-chain mitigations</p>
         </div>
-        <div className="glass-card p-4 text-center bg-emerald-50/80 border border-emerald-100">
-          <p className="text-[10px] text-emerald-600/80 font-bold uppercase">On-Track Projects</p>
+        <div className="glass-card p-5 text-center">
+          <p className="text-[10px] text-stone-400 font-bold uppercase">On Time</p>
           <p className="text-2xl font-black text-emerald-600 mt-1 font-mono">
             {isLoading ? "—" : dashboard?.kpi.onTimeProjects ?? 0}
           </p>
-          <p className="text-[9px] text-emerald-600/70 mt-1">≥45% phase progress</p>
         </div>
-      </div>
+      </motion.div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
@@ -175,14 +243,17 @@ export default function Dashboard() {
               </p>
             </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <motion.div
+            variants={containerVariants}
+            className="grid grid-cols-1 md:grid-cols-2 gap-6"
+          >
             {isLoading && (
-              <div className="glass-card p-10 text-center col-span-full text-stone-400 text-sm">
+              <motion.div variants={cardVariants} className="glass-card p-10 text-center col-span-full text-stone-400 text-sm">
                 Loading projects from API…
-              </div>
+              </motion.div>
             )}
             {!isLoading && activeProjects.length === 0 && (
-              <div className="glass-card p-10 text-center col-span-full">
+              <motion.div variants={cardVariants} className="glass-card p-10 text-center col-span-full">
                 <p className="text-stone-500 text-sm mb-4">
                   No projects yet. Onboard a project to run the 6-agent analyze pipeline.
                 </p>
@@ -193,12 +264,13 @@ export default function Dashboard() {
                 >
                   On Board New Project
                 </button>
-              </div>
+              </motion.div>
             )}
             {!isLoading &&
               activeProjects.map((p) => (
-                <div
+                <motion.div
                   key={p.id}
+                  variants={cardVariants}
                   onClick={() =>
                     navigate(`/projects/${p.id}`, { state: { from: "dashboard" } })
                   }
@@ -258,12 +330,15 @@ export default function Dashboard() {
                       <ArrowRight className="w-4 h-4 translate-x-0 group-hover:translate-x-1 transition-transform" />
                     </div>
                   </div>
-                </div>
+                </motion.div>
               ))}
-          </div>
+          </motion.div>
         </div>
 
-        <div className="space-y-6">
+        <motion.div
+          variants={sectionVariants}
+          className="space-y-6"
+        >
           <div className="pl-1">
             <h2 className="text-lg font-black text-stone-800 tracking-tight">
               Active Platform Telemetry
@@ -381,8 +456,8 @@ export default function Dashboard() {
               ))}
             </div>
           )}
-        </div>
+        </motion.div>
       </div>
-    </div>
+    </motion.div>
   );
 }

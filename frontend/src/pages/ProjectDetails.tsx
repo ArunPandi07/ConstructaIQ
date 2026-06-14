@@ -24,12 +24,12 @@ const BuildingPreviewCarousel = lazy(() => import("../components/BuildingPreview
 const BuildingSnapshotCapture = lazy(() => import("../components/building3d/BuildingSnapshotCapture"));
 import BlueprintSummaryPanel from "../components/BlueprintSummaryPanel";
 import BudgetBreakdownPanel from "../components/BudgetBreakdownPanel";
-const CrewPlanGantt = lazy(() => import("../components/CrewPlanGantt"));
-const SchedulePanel = lazy(() => import("../components/SchedulePanel"));
+import CrewPlanGantt from "../components/CrewPlanGantt";
 import InspectionChecklist from "../components/InspectionChecklist";
 import MaterialsPanel from "../components/MaterialsPanel";
 import ProjectRisksPanel from "../components/ProjectRisksPanel";
 import RecommendationsPanel from "../components/RecommendationsPanel";
+import SchedulePanel from "../components/SchedulePanel";
 import type { CrewPlanRead, Project, ProjectSupplierRow } from "../types";
 import {
   countCompletedAgents,
@@ -194,48 +194,12 @@ export default function ProjectDetails() {
   const permitsCount = permitList.length;
 
   const agentMetrics = [
-    {
-      label: "Contract",
-      icon: "📜",
-      val: readiness?.agentCompletionPct ?? 0,
-      barClass: "bg-amber-400 hover:bg-amber-500",
-      trackClass: "bg-amber-50",
-    },
-    {
-      label: "Blueprint",
-      icon: "📐",
-      val: readiness?.agentCompletionPct ?? 0,
-      barClass: "bg-indigo-500 hover:bg-indigo-600",
-      trackClass: "bg-indigo-50",
-    },
-    {
-      label: "Permits",
-      icon: "🏛️",
-      val: readiness?.permitReadinessPct ?? 0,
-      barClass: "bg-rose-500 hover:bg-rose-600",
-      trackClass: "bg-rose-50",
-    },
-    {
-      label: "Timeline",
-      icon: "🗓️",
-      val: readiness?.phaseProgressPct ?? 0,
-      barClass: "bg-emerald-500 hover:bg-emerald-600",
-      trackClass: "bg-emerald-50",
-    },
-    {
-      label: "Suppliers",
-      icon: "🚚",
-      val: readiness?.procurementReadinessPct ?? 0,
-      barClass: "bg-sky-500 hover:bg-sky-600",
-      trackClass: "bg-sky-50",
-    },
-    {
-      label: "Crew Ops",
-      icon: "👷",
-      val: readiness?.workforceReadinessPct ?? 0,
-      barClass: "bg-orange-500 hover:bg-orange-600",
-      trackClass: "bg-orange-50",
-    },
+    { label: "Contract", icon: "📜", val: readiness?.agentCompletionPct ?? 0 },
+    { label: "Blueprint", icon: "📐", val: readiness?.agentCompletionPct ?? 0 },
+    { label: "Permits", icon: "🏛️", val: readiness?.permitReadinessPct ?? 0 },
+    { label: "Timeline", icon: "🗓️", val: readiness?.phaseProgressPct ?? 0 },
+    { label: "Suppliers", icon: "🚚", val: readiness?.procurementReadinessPct ?? 0 },
+    { label: "Crew Ops", icon: "👷", val: readiness?.workforceReadinessPct ?? 0 },
   ];
 
   const detailTabs = [
@@ -768,9 +732,7 @@ export default function ProjectDetails() {
           />
         )}
         {activeTab === "schedule" && intelligence && (
-          <Suspense fallback={null}>
-            <SchedulePanel intelligence={intelligence} />
-          </Suspense>
+          <SchedulePanel intelligence={intelligence} />
         )}
         {activeTab === "materials" && (
           <MaterialsPanel
@@ -833,7 +795,7 @@ export default function ProjectDetails() {
                 {suppliers.map((s, i) => (
                   <div
                     key={i}
-                    className="flex justify-between border border-stone-100 rounded-lg px-3 py-2 bg-stone-50"
+                    className="flex justify-between border border-stone-100 rounded-lg px-3 py-2 bg-stone-50 hover:bg-stone-100 hover:border-stone-200 transition-all duration-150"
                   >
                     <span className="font-semibold text-stone-800 truncate pr-2">
                       {String(s.material_name ?? s.supplier_name ?? "Material")}
@@ -848,15 +810,20 @@ export default function ProjectDetails() {
               </div>
             </div>
           )}
-          {crewPlans.length > 0 && (
-            <Suspense fallback={null}>
-              <CrewPlanGantt
-                plans={crewPlans}
-                phases={intelligence?.phases}
-                criticalPathPhases={intelligence?.criticalPathPhases}
-                onOpenScheduleTab={() => handleTabChange("schedule")}
-              />
-            </Suspense>
+          {crewPlans.length > 0 ? (
+            <div className="premium-card p-5 md:p-6 w-full cursor-default! animate-fade-in-up">
+              <CrewPlanGantt plans={crewPlans} />
+            </div>
+          ) : (
+            <div className="premium-card p-5 md:p-6 w-full cursor-default!">
+              <h3 className="text-sm font-bold text-stone-900 mb-3 flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#F5C518]"></span>
+                Crew Plans
+              </h3>
+              <p className="text-xs text-stone-400 py-4 text-center">
+                No crew plans yet. Run analyze to populate.
+              </p>
+            </div>
           )}
         </div>
       )}
@@ -882,11 +849,9 @@ export default function ProjectDetails() {
                 <div className="absolute -top-7 hidden group-hover/bar:block bg-[#1B1B1C] text-white text-[9px] px-1.5 py-0.5 rounded-sm whitespace-nowrap z-30 shadow-md">
                   {agent.label}: {agent.val}%
                 </div>
-                <div
-                  className={`w-full rounded-t-lg h-[160px] flex items-end overflow-hidden ${agent.trackClass}`}
-                >
+                <div className="w-full bg-stone-100 rounded-t-lg h-[160px] flex items-end overflow-hidden">
                   <div
-                    className={`${agent.barClass} w-full rounded-t-lg transition-all duration-1000 relative`}
+                    className="bg-[#F5C518] hover:bg-[#E2B30D] w-full rounded-t-lg transition-all duration-1000 relative"
                     style={{ height: `${Math.max(agent.val, 4)}%` }}
                   />
                 </div>
@@ -899,27 +864,27 @@ export default function ProjectDetails() {
           </div>
         </div>
         <div className="grid grid-cols-3 gap-3 text-center pt-4 w-full">
-          <div className="bg-amber-50 border border-amber-100 p-3 rounded-xl">
-            <p className="text-[9px] text-amber-700/70 font-medium uppercase tracking-wide">
+          <div className="bg-stone-50 p-3 rounded-xl">
+            <p className="text-[9px] text-stone-400 font-medium uppercase tracking-wide">
               Site Scores Avg
             </p>
-            <p className="text-sm font-black text-amber-900 mt-0.5">
+            <p className="text-sm font-black text-stone-900 mt-0.5">
               {overallReadiness}%
             </p>
           </div>
-          <div className="bg-indigo-50 border border-indigo-100 p-3 rounded-xl">
-            <p className="text-[9px] text-indigo-600/70 font-medium uppercase tracking-wide">
+          <div className="bg-stone-50 p-3 rounded-xl">
+            <p className="text-[9px] text-stone-400 font-medium uppercase tracking-wide">
               Agent Loops
             </p>
-            <p className="text-sm font-black text-indigo-900 mt-0.5">
+            <p className="text-sm font-black text-stone-900 mt-0.5">
               {completedAgentCount} / {PIPELINE_AGENT_NAMES.length}
             </p>
           </div>
-          <div className="bg-rose-50 border border-rose-100 p-3 rounded-xl">
-            <p className="text-[9px] text-rose-600/70 font-medium uppercase tracking-wide">
+          <div className="bg-stone-50 p-3 rounded-xl">
+            <p className="text-[9px] text-stone-400 font-medium uppercase tracking-wide">
               Permits Filed
             </p>
-            <p className="text-sm font-black text-rose-700 mt-0.5">
+            <p className="text-sm font-black text-rose-600 mt-0.5">
               {permitsCount}
             </p>
           </div>

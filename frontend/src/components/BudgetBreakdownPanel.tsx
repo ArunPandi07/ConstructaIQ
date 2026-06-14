@@ -1,3 +1,4 @@
+import { motion } from "framer-motion";
 import { DollarSign, Layers, TrendingUp } from "lucide-react";
 import type { BudgetBreakdown, ProjectIntelligenceData } from "../types";
 
@@ -10,7 +11,13 @@ export default function BudgetBreakdownPanel({ intelligence, supplierRows }: Pro
   const breakdown: BudgetBreakdown | null | undefined = intelligence.budgetBreakdown;
 
   return (
-    <div className="space-y-6">
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-40px" }}
+      transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
+      className="space-y-5"
+    >
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="glass-card p-5">
           <p className="text-[10px] font-bold uppercase tracking-widest text-stone-400 mb-1">
@@ -95,6 +102,6 @@ export default function BudgetBreakdownPanel({ intelligence, supplierRows }: Pro
           </div>
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }

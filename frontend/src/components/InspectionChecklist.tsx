@@ -1,3 +1,4 @@
+import { motion } from "framer-motion";
 import { ClipboardCheck } from "lucide-react";
 import type { InspectionItem } from "../types";
 
@@ -14,7 +15,13 @@ const statusColor: Record<string, string> = {
 
 export default function InspectionChecklist({ inspections }: Props) {
   return (
-    <div className="glass-card p-5">
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-40px" }}
+      transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
+      className="glass-card p-5"
+    >
       <h3 className="text-sm font-bold text-stone-900 flex items-center gap-2 mb-4">
         <ClipboardCheck className="w-4 h-4 text-[#F5C518]" />
         Inspection Checkpoints
@@ -57,6 +64,6 @@ export default function InspectionChecklist({ inspections }: Props) {
           ))}
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }

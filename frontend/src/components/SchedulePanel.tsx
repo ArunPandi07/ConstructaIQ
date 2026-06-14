@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useState } from "react";
+import { motion } from "framer-motion";
 import { CalendarDays, GitBranch, Package } from "lucide-react";
 import type { ProjectIntelligenceData } from "../types";
 
@@ -109,7 +110,13 @@ export default function SchedulePanel({ intelligence }: Props) {
   );
 
   return (
-    <div className="space-y-6">
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-40px" }}
+      transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
+      className="space-y-5"
+    >
       <div className="glass-card p-5">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-sm font-bold text-stone-900 flex items-center gap-2">
@@ -230,6 +237,6 @@ export default function SchedulePanel({ intelligence }: Props) {
           )}
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }
