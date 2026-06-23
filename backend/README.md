@@ -12,22 +12,28 @@ pip install -r requirements.txt
 cp .env.example .env            # then fill in values
 ```
 
-## Azure SQL Database (optional)
+## MySQL Database (optional)
 
-The app runs without a database when `DATABASE_URL` is unset. To enable persistence infrastructure:
+The app runs without a database when `DATABASE_URL` is unset. Production and local dev use **MySQL** via the `asyncmy` async driver.
 
 ### Prerequisites
 
-1. **ODBC Driver 18 for SQL Server** — [Download](https://learn.microsoft.com/en-us/sql/connect/odbc/download-odbc-driver-for-sql-server) and install on your machine and deployment host.
-2. **Azure SQL Database** — create a server and database in Azure Portal.
-3. **Firewall** — add your client IP (or Azure service outbound IPs) under the SQL server's networking settings.
+1. **MySQL 8.x** server reachable from the app host (port 3306).
+2. **Database** — create with utf8mb4:
+
+```sql
+CREATE DATABASE constructaiq CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+GRANT ALL ON constructaiq.* TO 'backenduser'@'%';
+```
+
+3. **Python driver** — `asyncmy` is installed from `requirements.txt`.
 
 ### Connection string
 
-Set in `.env` (URL-encode special characters in the password):
+Set in `.env` (URL-encode special characters in the password, e.g. `~` → `%7E`):
 
 ```
-DATABASE_URL=mssql+aioodbc://<user>:<password>@<server>.database.windows.net:1433/<database>?driver=ODBC+Driver+18+for+SQL+Server&Encrypt=yes&TrustServerCertificate=no
+DATABASE_URL=mysql+asyncmy://backenduser:<password>@<host>:3306/constructaiq?charset=utf8mb4
 ```
 
 ### Migrations
@@ -37,11 +43,32 @@ cd backend
 python -m alembic upgrade head
 ```
 
-Revisions:
+Current Alembic revisions (MySQL):
 
-- `001_baseline` — empty baseline
-- `002_add_core_tables` — 12 tables from the ConstructaIQ database design
-- `003_add_project_risks` — supply-chain and workforce risk rows from Supplier/Crew agents
+- `001_mysql_initial` — full schema (squashed from legacy SQL Server migrations)
+- `002_longtext_columns` — `LONGTEXT` for large agent JSON / document text
+
+Legacy SQL Server migrations (`001_baseline` … `007_report_deliveries`) are archived under `alembic/versions/archive/` for history only.
+
+### One-time SQL Server → MySQL data migration
+
+If you have existing data in SQL Server (LocalDB or Azure SQL), copy it once:
+
+```bash
+# .env — keep SQL Server as source until ETL is verified
+SOURCE_DATABASE_URL=mssql+aioodbc://@localhost/hackathon?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes&Trusted_Connection=yes&Server=(localdb)%5CMSSQLLocalDB
+DATABASE_URL=mysql+asyncmy://backenduser:<password>@<host>:3306/constructaiq?charset=utf8mb4
+
+cd backend
+python -m alembic upgrade head
+python scripts/migrate_mssql_to_mysql.py --fresh
+```
+
+Requires **ODBC Driver 18** and `aioodbc`/`pyodbc` (included in `requirements.txt` for the ETL script). The script copies tables in FK-safe order, preserves primary keys, and resets `AUTO_INCREMENT`. Remove `SOURCE_DATABASE_URL` after verification.
+
+### Legacy SQL Server local dev (optional)
+
+For one-time ETL source only. See `scripts/ensure_localdb.py` and archived Alembic migrations. The runtime app no longer targets SQL Server by default.
 
 ### Bootstrap catalogs (before first analyze)
 
@@ -87,6 +114,8 @@ python -m alembic upgrade head
 | `supplier_master` | `SupplierMaster` | Supplier directory |
 | `supplier_materials` | `SupplierMaterial` | Supplier catalog items |
 | `crew_master` | `CrewMaster` | Crew/employee directory |
+| `report_deliveries` | `ReportDelivery` | Intelligence report email delivery audit |
+| `users` | `User` | Auth and report email preferences |
 
 Models live in `app/db/models/`. Pydantic DTOs in `app/schemas/`. Async repositories in `app/db/repositories/`.
 

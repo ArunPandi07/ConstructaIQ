@@ -5,7 +5,10 @@ from __future__ import annotations
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# Children first, parent last (SQL Server FK constraints).
+from app.config.settings import settings
+from app.db.dialect import reset_table_identities
+
+# Children first, parent last (FK constraints).
 PROJECT_TABLES_DELETE_ORDER: tuple[str, ...] = (
     "project_risks",
     "budgets",
@@ -19,19 +22,8 @@ PROJECT_TABLES_DELETE_ORDER: tuple[str, ...] = (
     "projects",
 )
 
-# Tables with IDENTITY columns — reseed after wipe for predictable demo IDs.
-IDENTITY_TABLES_RESEED: tuple[str, ...] = (
-    "project_risks",
-    "budgets",
-    "inspections",
-    "crew_plans",
-    "project_suppliers",
-    "schedules",
-    "permits",
-    "agent_executions",
-    "documents",
-    "projects",
-)
+# Tables with auto-increment PKs — reseed after wipe for predictable demo IDs.
+IDENTITY_TABLES_RESEED: tuple[str, ...] = PROJECT_TABLES_DELETE_ORDER
 
 
 async def truncate_project_data(
@@ -45,9 +37,10 @@ async def truncate_project_data(
         result = await session.execute(text(f"DELETE FROM {table}"))
         counts[table] = result.rowcount or 0
 
-    if reseed_identity:
-        for table in IDENTITY_TABLES_RESEED:
-            await session.execute(text(f"DBCC CHECKIDENT ('{table}', RESEED, 0)"))
+    if reseed_identity and settings.DATABASE_URL:
+        await reset_table_identities(
+            session, list(IDENTITY_TABLES_RESEED), settings.DATABASE_URL
+        )
 
     await session.flush()
     return counts

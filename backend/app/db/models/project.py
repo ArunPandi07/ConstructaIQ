@@ -4,7 +4,7 @@ from datetime import date
 from decimal import Decimal
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import BigInteger, Date, ForeignKey, Identity, Integer, Numeric, String, Text
+from sqlalchemy import BigInteger, Date, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -25,7 +25,7 @@ class Project(Base):
     __tablename__ = "projects"
 
     project_id: Mapped[int] = mapped_column(
-        BigInteger, Identity(always=False), primary_key=True
+        BigInteger, primary_key=True, autoincrement=True
     )
     project_name: Mapped[str] = mapped_column(String(255), nullable=False)
     project_type: Mapped[Optional[str]] = mapped_column(String(100))

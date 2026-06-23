@@ -3,7 +3,7 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import BigInteger, Boolean, Identity, Integer, Numeric, String
+from sqlalchemy import BigInteger, Boolean, Integer, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -17,7 +17,7 @@ class SupplierMaster(Base, CreatedAtMixin):
     __tablename__ = "supplier_master"
 
     supplier_id: Mapped[int] = mapped_column(
-        BigInteger, Identity(always=False), primary_key=True
+        BigInteger, primary_key=True, autoincrement=True
     )
     supplier_code: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
     supplier_name: Mapped[Optional[str]] = mapped_column(String(255))
