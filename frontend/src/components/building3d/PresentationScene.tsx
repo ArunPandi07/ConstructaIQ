@@ -22,7 +22,7 @@ export function PresentationScene({ spec, definition, viewMode }: Props) {
 
   // In exploded mode, we hide the main facade details and show slab outlines
   if (viewMode === "exploded") {
-    const explodedGap = 1.5;
+    const explodedGap = Math.max(floorHeight_m * 0.8, 3.0);
     
     // Create an array of slab instances
     const slabs = Array.from({ length: stories }, (_, i) => i);

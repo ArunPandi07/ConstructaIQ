@@ -189,22 +189,22 @@ export function FacadeFloorBands({ spec }: { spec: PresentationSpec }) {
             for (let b = 0; b < frontBays; b++) {
               if (floor === 0 && b === Math.floor(frontBays / 2) && spec.hasEntranceSteps) continue; // Skip for entrance
               const bx = (b + 0.5) * windowBayWidth_m;
-              addBayFrames(bx, 0.05, true);
+              addBayFrames(bx, -0.02, true);
             }
             // Rear face bays
             for (let b = 0; b < frontBays; b++) {
               const bx = (b + 0.5) * windowBayWidth_m;
-              addBayFrames(bx, depth_m - 0.05, true);
+              addBayFrames(bx, depth_m + 0.02, true);
             }
             // Left face bays
             for (let b = 0; b < sideBays; b++) {
               const bz = (b + 0.5) * windowBayWidth_m;
-              addBayFrames(0.05, bz, false);
+              addBayFrames(-0.02, bz, false);
             }
             // Right face bays
             for (let b = 0; b < sideBays; b++) {
               const bz = (b + 0.5) * windowBayWidth_m;
-              addBayFrames(width_m - 0.05, bz, false);
+              addBayFrames(width_m + 0.02, bz, false);
             }
 
             return <group key={`frames-${floor}`}>{instances}</group>;
@@ -240,16 +240,16 @@ export function FacadeFloorBands({ spec }: { spec: PresentationSpec }) {
 
             for (let b = 0; b < frontBays; b++) {
               if (floor === 0 && b === Math.floor(frontBays / 2) && spec.hasEntranceSteps) continue;
-              addBayGlass((b + 0.5) * windowBayWidth_m, 0.05, true);
+              addBayGlass((b + 0.5) * windowBayWidth_m, -0.02, true);
             }
             for (let b = 0; b < frontBays; b++) {
-              addBayGlass((b + 0.5) * windowBayWidth_m, depth_m - 0.05, true);
+              addBayGlass((b + 0.5) * windowBayWidth_m, depth_m + 0.02, true);
             }
             for (let b = 0; b < sideBays; b++) {
-              addBayGlass(0.05, (b + 0.5) * windowBayWidth_m, false);
+              addBayGlass(-0.02, (b + 0.5) * windowBayWidth_m, false);
             }
             for (let b = 0; b < sideBays; b++) {
-              addBayGlass(width_m - 0.05, (b + 0.5) * windowBayWidth_m, false);
+              addBayGlass(width_m + 0.02, (b + 0.5) * windowBayWidth_m, false);
             }
 
             return <group key={`glass-${floor}`}>{instances}</group>;

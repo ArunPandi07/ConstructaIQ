@@ -83,18 +83,22 @@ export default function SiteContext({
 
   const treePositions = useMemo(() => {
     if (type === "warehouse" || qualityTier === "low") return [];
-    const margin = Math.max(padW, padD) * 0.48;
+    
+    const mw = width_m / 2;
+    const md = depth_m / 2;
+    
+    // Placed exactly around the perimeter to guarantee no building overlap
     return [
-      [-margin, 0, -margin * 0.7],
-      [margin * 0.9, 0, -margin * 0.85],
-      [-margin * 0.85, 0, margin * 0.75],
-      [margin, 0, margin * 0.65],
-      [-margin * 0.5, 0, margin],
-      [margin * 0.55, 0, -margin],
-      [-margin, 0, margin * 0.2],
-      [margin * 0.7, 0, margin * 0.9],
+      [-mw - 3.5, 0, -md - 2.5],
+      [mw + 4.5, 0, -md - 3.5],
+      [-mw - 4.2, 0, md + 3.0],
+      [mw + 5.0, 0, md + 2.0],
+      [-mw + 2.0, 0, md + 4.5], 
+      [mw - 3.0, 0, -md - 4.5],
+      [-mw - 5.0, 0, md * 0.2],
+      [mw - 1.0, 0, md + 5.0],
     ] as Array<[number, number, number]>;
-  }, [type, qualityTier, padW, padD]);
+  }, [type, qualityTier, width_m, depth_m]);
 
   const grassMat = useMemo(() => {
     const mat = getMaterial("grass_patch").clone();

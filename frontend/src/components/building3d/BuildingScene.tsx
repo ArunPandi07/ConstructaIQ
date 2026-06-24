@@ -212,6 +212,7 @@ function SceneContent({ definition }: Props) {
         minDistance={Math.max(maxDim * 0.18, 8)}
         maxDistance={Math.max(maxDim * 3, 90)}
         enableDamping
+        onChange={() => invalidate()}
       />
 
       <EffectComposer multisampling={qualityTier === "high" ? 4 : 0}>
@@ -237,7 +238,7 @@ export default function BuildingScene({ definition }: Props) {
         fov: 46,
       }}
       className="rounded-2xl"
-      gl={{ antialias: qualityTier !== "low", alpha: false }}
+      gl={{ antialias: qualityTier !== "low" }}
     >
       <color attach="background" args={["#e8eef4"]} />
       <SceneContent definition={definition} />
