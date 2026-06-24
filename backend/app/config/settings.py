@@ -17,6 +17,11 @@ class Settings(BaseSettings):
     AZURE_AIFOUNDRY_ENDPOINT: Optional[str] = None
     AZURE_AIFOUNDRY_KEY: Optional[str] = None
 
+    # OpenAI Compatible Endpoint
+    LLM_BASE_URL: str = "http://217.18.55.85:8000/v1"
+    LLM_MODEL: str = "google/gemma-4-26b-a4b-it"
+    LLM_API_KEY: str = "empty"
+
     # Azure Blob Storage (optional — omit to use in-memory bytes for document extraction)
     AZURE_STORAGE_CONNECTION_STRING: Optional[str] = None
     AZURE_STORAGE_CONTAINER_NAME: str = "constructaiq-documents"
