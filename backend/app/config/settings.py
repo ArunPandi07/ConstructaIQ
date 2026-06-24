@@ -22,8 +22,10 @@ class Settings(BaseSettings):
     AZURE_STORAGE_CONTAINER_NAME: str = "constructaiq-documents"
     AZURE_STORAGE_SAS_EXPIRY_MINUTES: int = 60
 
-    # Azure SQL Database (optional — app runs without DB when unset)
+    # MySQL database (optional — app runs without DB when unset)
     DATABASE_URL: Optional[str] = None
+    # One-time ETL source (SQL Server) — used by migrate_mssql_to_mysql.py only
+    SOURCE_DATABASE_URL: Optional[str] = None
     DB_POOL_SIZE: int = 5
     DB_MAX_OVERFLOW: int = 10
     DB_ECHO: bool = False

@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import BigInteger, Date, ForeignKey, Identity, String
+from sqlalchemy import BigInteger, Date, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -17,7 +17,7 @@ class Inspection(Base, CreatedAtMixin):
     __tablename__ = "inspections"
 
     inspection_id: Mapped[int] = mapped_column(
-        BigInteger, Identity(always=False), primary_key=True
+        BigInteger, primary_key=True, autoincrement=True
     )
     project_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("projects.project_id"), nullable=False, index=True

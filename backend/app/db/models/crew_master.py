@@ -3,7 +3,7 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Optional
 
-from sqlalchemy import BigInteger, Identity, Integer, Numeric, String
+from sqlalchemy import BigInteger, Integer, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -14,7 +14,7 @@ class CrewMaster(Base, CreatedAtMixin):
     __tablename__ = "crew_master"
 
     crew_id: Mapped[int] = mapped_column(
-        BigInteger, Identity(always=False), primary_key=True
+        BigInteger, primary_key=True, autoincrement=True
     )
     employee_code: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
     employee_name: Mapped[Optional[str]] = mapped_column(String(255))

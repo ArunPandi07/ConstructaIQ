@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import BigInteger, Boolean, ForeignKey, Identity, Integer, String, Text
+from sqlalchemy import BigInteger, Boolean, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -16,7 +16,7 @@ class Permit(Base, CreatedAtMixin):
     __tablename__ = "permits"
 
     permit_id: Mapped[int] = mapped_column(
-        BigInteger, Identity(always=False), primary_key=True
+        BigInteger, primary_key=True, autoincrement=True
     )
     project_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("projects.project_id"), nullable=False, index=True

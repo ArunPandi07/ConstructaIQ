@@ -4,7 +4,7 @@ from datetime import date
 from decimal import Decimal
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import BigInteger, Date, ForeignKey, Identity, Integer, Numeric, String
+from sqlalchemy import BigInteger, Date, ForeignKey, Integer, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -18,7 +18,7 @@ class CrewPlan(Base, CreatedAtMixin):
     __tablename__ = "crew_plans"
 
     crew_plan_id: Mapped[int] = mapped_column(
-        BigInteger, Identity(always=False), primary_key=True
+        BigInteger, primary_key=True, autoincrement=True
     )
     project_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("projects.project_id"), nullable=False, index=True

@@ -11,6 +11,8 @@ aiohttp>=3.9.0
 azure-storage-blob>=12.19.0
 python-dotenv>=1.0.0
 sqlalchemy[asyncio]>=2.0
+asyncmy>=0.2.9
+# One-time SQL Server → MySQL ETL (migrate_mssql_to_mysql.py)
 aioodbc>=0.5.0
 pyodbc>=5.0
 alembic>=1.13

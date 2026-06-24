@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import BigInteger, ForeignKey, Identity, String, Text
+from sqlalchemy import BigInteger, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -16,7 +16,7 @@ class ProjectRisk(Base, CreatedAtMixin):
     __tablename__ = "project_risks"
 
     risk_id: Mapped[int] = mapped_column(
-        BigInteger, Identity(always=False), primary_key=True
+        BigInteger, primary_key=True, autoincrement=True
     )
     project_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("projects.project_id"), nullable=False, index=True
