@@ -13,6 +13,7 @@ const Projects = lazy(() => import("./pages/Projects"));
 const ProjectDetails = lazy(() => import("./pages/ProjectDetails"));
 const AIInsights = lazy(() => import("./pages/AIInsights"));
 const Profile = lazy(() => import("./pages/Profile").then(m => ({ default: m.Profile })));
+const Demo3DPage = lazy(() => import("./pages/Demo3DPage"));
 // import Settings from "./pages/Settings";
 
 function IntelligenceRedirect() {
@@ -32,6 +33,8 @@ export default function App() {
           <Suspense fallback={null}>
             <Routes>
             <Route path="/login" element={<Login />} />
+            {/* Public demo — no auth required */}
+            <Route path="/demo3d" element={<Demo3DPage />} />
             <Route path="/" element={<ProtectedRoute element={<Layout />} />}>
               <Route index element={<Navigate to="/dashboard" replace />} />
               <Route path="/dashboard" element={<Dashboard />} />

@@ -130,38 +130,37 @@ export default function LevelGroup({
   hideLabels = false,
   qualityTierOverride,
 }: Props) {
+  // Early return: exterior and exploded are handled entirely by PresentationScene
+  if (viewMode === "exterior" || viewMode === "exploded") {
+    return null;
+  }
+
   const measurementsVisible = useBuildingStore((state) => state.measurementsVisible);
   const storeQualityTier = useBuildingStore((state) => state.qualityTier);
   const qualityTier = qualityTierOverride ?? storeQualityTier;
   const selectedRoom = useBuildingStore((state) => state.selectedRoom);
   const { camera } = useThree();
   const active = level.level === activeLevel;
-  const showInterior = viewMode !== "exterior" && active;
-  const sectionMode = viewMode === "section" && active;
-  const wallHeight = sectionMode ? Math.min(level.height_m, 1.35) : level.height_m;
-  const showDetails = !simplified || active || viewMode !== "exterior";
-  const center = buildingCenter ?? new THREE.Vector3(0, 0, 0);
-  const cutawayActive = viewMode === "interior" || viewMode === "section";
-  const useCladding = viewMode === "exterior" || viewMode === "exploded";
-  const showWallCap = cutawayActive;
 
-  if (viewMode === "interior" && !active) return null;
-  if (viewMode === "section" && !active) return null;
+  if (!active) return null;
+
+  const showInterior = true;
+  const sectionMode = viewMode === "section";
+  const wallHeight = sectionMode ? Math.min(level.height_m, 1.35) : level.height_m;
+  const showDetails = true;
+  const center = buildingCenter ?? new THREE.Vector3(0, 0, 0);
+  const cutawayActive = true;
+  const useCladding = false;
+  const showWallCap = cutawayActive;
 
   return (
     <group>
-      <SlabMesh
-        level={level}
-        elevation={elevation}
-        visibleRooms={showInterior || sectionMode}
-        buildingType={buildingType}
-        clipPlane={clipPlane}
+      <SlabMesh 
+        level={level} 
+        elevation={elevation} 
         viewMode={viewMode}
-        qualityTier={qualityTier}
+        showFurniture={qualityTier !== "low"}
       />
-      {viewMode !== "interior" && viewMode !== "section" && (
-        <ColumnMesh level={level} elevation={elevation} />
-      )}
       {level.walls.map((wall) => {
         const cutawayHidden =
           cutawayActive && wallCutawayHidden(wall, elevation, camera.position, center);

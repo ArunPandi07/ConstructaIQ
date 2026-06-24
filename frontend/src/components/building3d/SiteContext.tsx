@@ -11,19 +11,38 @@ interface Props {
   minimal?: boolean;
 }
 
-function TreeProxy({ position, scale = 1 }: { position: [number, number, number]; scale?: number }) {
-  const trunkH = 1.8 * scale;
-  const foliageR = 1.4 * scale;
+import { Instances, Instance } from "@react-three/drei";
+
+function TreeInstances({ positions }: { positions: Array<[number, number, number]> }) {
+  if (positions.length === 0) return null;
+
   return (
-    <group position={position}>
-      <mesh position={[0, trunkH / 2, 0]} castShadow>
-        <cylinderGeometry args={[0.15 * scale, 0.2 * scale, trunkH, 8]} />
+    <group>
+      <Instances limit={positions.length} castShadow>
+        <cylinderGeometry args={[0.15, 0.2, 1.8, 8]} />
         <meshStandardMaterial color="#5c4033" roughness={0.9} metalness={0} />
-      </mesh>
-      <mesh position={[0, trunkH + foliageR * 0.6, 0]} castShadow>
-        <coneGeometry args={[foliageR, foliageR * 1.6, 8]} />
+        {positions.map((pos, i) => (
+          <Instance
+            key={`trunk_${i}`}
+            position={[pos[0], pos[1] + 0.9, pos[2]]}
+            scale={[0.85 + (i % 3) * 0.15, 0.85 + (i % 3) * 0.15, 0.85 + (i % 3) * 0.15]}
+          />
+        ))}
+      </Instances>
+      <Instances limit={positions.length} castShadow>
+        <coneGeometry args={[1.4, 2.2, 8]} />
         <meshStandardMaterial color="#4a7c45" roughness={0.85} metalness={0} />
-      </mesh>
+        {positions.map((pos, i) => {
+          const s = 0.85 + (i % 3) * 0.15;
+          return (
+            <Instance
+              key={`foliage_${i}`}
+              position={[pos[0], pos[1] + 1.8 * s + 1.4 * s * 0.6, pos[2]]}
+              scale={[s, s, s]}
+            />
+          );
+        })}
+      </Instances>
     </group>
   );
 }
@@ -149,19 +168,32 @@ export default function SiteContext({
         </mesh>
       ))}
 
-      {treePositions.map((pos, index) => (
-        <TreeProxy
-          key={`tree_${index}`}
-          position={[pos[0], -0.2, pos[2]]}
-          scale={0.85 + (index % 3) * 0.15}
-        />
-      ))}
+      {/* The Road */}
+      {!minimal && (
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.21, padD / 2 + 8]} receiveShadow>
+          <planeGeometry args={[padW + 24, 12]} />
+          <primitive object={getMaterial("road")} attach="material" />
+        </mesh>
+      )}
+
+      <TreeInstances positions={treePositions} />
 
       {type !== "warehouse" && (
-        <mesh position={[0, 0.6, -depth_m / 2 - 0.5]} castShadow>
-          <boxGeometry args={[3.5, 0.12, 1.8]} />
-          <primitive object={getMaterial("steel")} attach="material" />
-        </mesh>
+        <group>
+          {/* Bus Shelter */}
+          <mesh position={[0, 0.6, -depth_m / 2 - 0.5]} castShadow>
+            <boxGeometry args={[3.5, 0.12, 1.8]} />
+            <primitive object={getMaterial("steel")} attach="material" />
+          </mesh>
+          <mesh position={[-1.6, 0.3, -depth_m / 2 - 0.5]} castShadow>
+            <boxGeometry args={[0.1, 0.6, 1.6]} />
+            <primitive object={getMaterial("steel")} attach="material" />
+          </mesh>
+          <mesh position={[1.6, 0.3, -depth_m / 2 - 0.5]} castShadow>
+            <boxGeometry args={[0.1, 0.6, 1.6]} />
+            <primitive object={getMaterial("steel")} attach="material" />
+          </mesh>
+        </group>
       )}
 
       {/* Green perimeter strips between building edge and sidewalk */}

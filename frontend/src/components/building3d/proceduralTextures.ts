@@ -323,32 +323,115 @@ export function generateBrickCladdingMap(): THREE.CanvasTexture {
 }
 
 /**
- * Procedural wood floor albedo map
+ * Procedural wood floor albedo map (Herringbone pattern)
  */
 export function generateWoodFloorMap(): THREE.CanvasTexture {
-  const size = 256;
+  const size = 512;
   const canvas = document.createElement("canvas");
   canvas.width = size;
   canvas.height = size;
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("Failed to get canvas 2D context");
 
-  const plankH = 20;
-  ctx.fillStyle = "#8B7355";
+  const plankW = 120;
+  const plankH = 30;
+  
+  // Base background
+  ctx.fillStyle = "#111111"; // dark grout
   ctx.fillRect(0, 0, size, size);
 
-  for (let y = 0; y < size; y += plankH) {
-    const base = 120 + (y % 40);
-    ctx.fillStyle = `rgb(${base + 20}, ${base}, ${base - 30})`;
-    ctx.fillRect(0, y, size, plankH - 2);
-    ctx.strokeStyle = `rgba(60, 40, 20, 0.15)`;
-    for (let x = 0; x < size; x += 8) {
-      ctx.beginPath();
-      ctx.moveTo(x, y);
-      ctx.lineTo(x + 4, y + plankH);
-      ctx.stroke();
+  // Draw herringbone pattern
+  // We draw at a 45 degree angle by rotating the context
+  ctx.save();
+  ctx.translate(size / 2, size / 2);
+  ctx.rotate(Math.PI / 4);
+  ctx.translate(-size, -size); // back up to cover the corners after rotation
+
+  const drawArea = size * 2;
+  
+  for (let col = 0; col < drawArea / plankW; col++) {
+    for (let row = 0; row < drawArea / plankH; row++) {
+      const isA = col % 2 === 0;
+      
+      const x = col * plankW;
+      const y = row * plankH;
+      
+      // Wood color variation
+      const base = 120 + ((col * 7 + row * 11) % 40);
+      ctx.fillStyle = `rgb(${base + 20}, ${base}, ${base - 30})`;
+      
+      if (isA) {
+        ctx.fillRect(x + 1, y + 1, plankW - 2, plankH - 2);
+        // Wood grain
+        ctx.strokeStyle = `rgba(60, 40, 20, 0.15)`;
+        for (let i = 0; i < plankW; i += 8) {
+          ctx.beginPath();
+          ctx.moveTo(x + i, y + 1);
+          ctx.lineTo(x + i + 4, y + plankH - 1);
+          ctx.stroke();
+        }
+      } else {
+        // Interlocking column is shifted
+        const yShift = y - (plankW / 2);
+        ctx.fillRect(x + 1, yShift + 1, plankW - 2, plankH - 2);
+        // Wood grain
+        ctx.strokeStyle = `rgba(60, 40, 20, 0.15)`;
+        for (let i = 0; i < plankW; i += 8) {
+          ctx.beginPath();
+          ctx.moveTo(x + i, yShift + 1);
+          ctx.lineTo(x + i + 4, yShift + plankH - 1);
+          ctx.stroke();
+        }
+      }
     }
   }
+  ctx.restore();
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.needsUpdate = true;
+  return texture;
+}
+
+/**
+ * Procedural road map with dashed lane markings
+ */
+function generateRoadMap(): THREE.CanvasTexture {
+  const size = 512;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Failed to get canvas 2D context");
+
+  // Asphalt base
+  ctx.fillStyle = "#333333";
+  ctx.fillRect(0, 0, size, size);
+  
+  // Add some noise
+  ctx.fillStyle = "rgba(255,255,255,0.03)";
+  for(let i=0; i<1000; i++) {
+    ctx.fillRect(Math.random() * size, Math.random() * size, 2, 2);
+  }
+
+  // Dashed white line down the middle
+  ctx.strokeStyle = "#ffffff";
+  ctx.lineWidth = 8;
+  ctx.setLineDash([30, 30]); // 30px dash, 30px gap
+  ctx.beginPath();
+  ctx.moveTo(size / 2, 0);
+  ctx.lineTo(size / 2, size);
+  ctx.stroke();
+  
+  // Solid yellow lines on edges
+  ctx.setLineDash([]);
+  ctx.strokeStyle = "#e6b800";
+  ctx.lineWidth = 6;
+  ctx.beginPath();
+  ctx.moveTo(20, 0); ctx.lineTo(20, size);
+  ctx.moveTo(size - 20, 0); ctx.lineTo(size - 20, size);
+  ctx.stroke();
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.wrapS = THREE.RepeatWrapping;
@@ -398,6 +481,7 @@ let brickCladdingMapCache: THREE.CanvasTexture | null = null;
 let woodFloorMapCache: THREE.CanvasTexture | null = null;
 let grassMapCache: THREE.CanvasTexture | null = null;
 let pavingMapCache: THREE.CanvasTexture | null = null;
+let roadMapCache: THREE.CanvasTexture | null = null;
 
 export function getTileCladdingMap(): THREE.CanvasTexture {
   if (!tileCladdingMapCache) tileCladdingMapCache = generateTileCladdingMap();
@@ -452,4 +536,9 @@ function generatePavingMap(): THREE.CanvasTexture {
 export function getPavingMap(): THREE.CanvasTexture {
   if (!pavingMapCache) pavingMapCache = generatePavingMap();
   return pavingMapCache;
+}
+
+export function getRoadMap(): THREE.CanvasTexture {
+  if (!roadMapCache) roadMapCache = generateRoadMap();
+  return roadMapCache;
 }

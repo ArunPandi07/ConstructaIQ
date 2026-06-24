@@ -1,18 +1,18 @@
 import { useMemo } from "react";
 import * as THREE from "three";
-import type { BuildingType, BuildingViewMode, LevelDefinition, QualityTier, RoomDefinition } from "../../types/building";
+import type { BuildingViewMode, LevelDefinition, QualityTier, RoomDefinition } from "../../types/building";
 import { useBuildingStore } from "../../stores/buildingStore";
 import { getMaterial, roomColor } from "./MaterialLibrary";
-import { polygonArea, polygonShape, roomCentroid } from "./geometryUtils";
+import { polygonShape, roomCentroid } from "./geometryUtils";
 
 interface SlabMeshProps {
   level: LevelDefinition;
   elevation: number;
   visibleRooms?: boolean;
-  buildingType?: BuildingType;
   clipPlane?: THREE.Plane | null;
   viewMode?: BuildingViewMode;
   qualityTier?: QualityTier;
+  showFurniture?: boolean;
 }
 
 interface RoomSurfaceProps {
@@ -114,19 +114,6 @@ function SlabEdgeBands({ level, elevation }: { level: LevelDefinition; elevation
   );
 }
 
-function CoreShaft({ level, elevation }: { level: LevelDefinition; elevation: number }) {
-  const w = level.floorplate.width_m * 0.18;
-  const d = level.floorplate.depth_m * 0.22;
-  const x = level.floorplate.width_m * 0.38;
-  const z = level.floorplate.depth_m * 0.36;
-  return (
-    <mesh position={[x, elevation + level.height_m * 0.45, z]} castShadow receiveShadow>
-      <boxGeometry args={[w, level.height_m * 0.88, d]} />
-      <primitive object={getMaterial("steel")} attach="material" />
-    </mesh>
-  );
-}
-
 function RoomFurniture({
   room,
   elevation,
@@ -140,106 +127,71 @@ function RoomFurniture({
   const type = room.type.toLowerCase();
   const simplified = qualityTier === "low";
 
+  const cy = cz;
+
   if (type.includes("living")) {
     return (
-      <group position={[cx, elevation + 0.4, cz]}>
-        <mesh position={[-0.6, 0.25, 0]}>
-          <boxGeometry args={[1.8, 0.5, 0.7]} />
-          <primitive object={getMaterial("wood")} attach="material" />
+      <group position={[cx, elevation, cy]}>
+        <mesh position={[0, 0.22, 0]} castShadow receiveShadow>
+          <boxGeometry args={[2.2, 0.45, 0.9]} />
+          <primitive object={getMaterial("concrete")} attach="material" />
         </mesh>
-        <mesh position={[0.5, 0.2, 0.5]}>
-          <boxGeometry args={[0.9, 0.4, 0.6]} />
-          <primitive object={getMaterial("wood")} attach="material" />
+        <mesh position={[0.65, 0.22, 0.65]} castShadow receiveShadow>
+          <boxGeometry args={[0.9, 0.45, 1.4]} />
+          <primitive object={getMaterial("concrete")} attach="material" />
         </mesh>
-        {!simplified && (
-          <>
-            <mesh position={[0, 0.12, -0.5]}>
-              <boxGeometry args={[0.7, 0.24, 0.7]} />
-              <primitive object={getMaterial("wood")} attach="material" />
-            </mesh>
-            <mesh position={[1.2, 0.5, -0.8]}>
-              <boxGeometry args={[1.4, 0.9, 0.08]} />
-              <primitive object={getMaterial("steel")} attach="material" />
-            </mesh>
-          </>
-        )}
-      </group>
-    );
-  }
-
-  if (type.includes("bedroom")) {
-    return (
-      <group position={[cx, elevation + 0.35, cz]}>
-        <mesh position={[0, 0.2, 0]}>
-          <boxGeometry args={[1.6, 0.4, 2]} />
+        <mesh position={[-0.2, 0.2, 0.8]} castShadow receiveShadow>
+          <boxGeometry args={[0.9, 0.08, 0.5]} />
           <primitive object={getMaterial("wood")} attach="material" />
         </mesh>
         {!simplified && (
-          <mesh position={[-1.2, 0.6, 0]}>
-            <boxGeometry args={[0.5, 1.2, 0.35]} />
-            <primitive object={getMaterial("partition")} attach="material" />
+          <mesh position={[0, 1.5, -0.45]}>
+            <planeGeometry args={[1.2, 0.8]} />
+            <meshStandardMaterial color="#e0e0e0" />
           </mesh>
         )}
       </group>
     );
   }
 
-  if (type.includes("kitchen")) {
+  if (type === "kitchen") {
     return (
-      <group position={[cx, elevation + 0.4, cz]}>
-        <mesh position={[-0.8, 0.45, 0]}>
-          <boxGeometry args={[2.2, 0.9, 0.6]} />
+      <group position={[cx, elevation, cy]}>
+        <mesh position={[0, 0.45, 0]} castShadow receiveShadow>
+          <boxGeometry args={[2.4, 0.9, 0.6]} />
+          <primitive object={getMaterial("wood")} attach="material" />
+        </mesh>
+        <mesh position={[0, 0.92, 0]} castShadow receiveShadow>
+          <boxGeometry args={[2.45, 0.04, 0.65]} />
           <primitive object={getMaterial("partition")} attach="material" />
         </mesh>
-        {!simplified && (
-          <>
-            <mesh position={[0.8, 0.35, 0.4]}>
-              <boxGeometry args={[0.8, 0.7, 0.8]} />
-              <primitive object={getMaterial("wood")} attach="material" />
-            </mesh>
-            <mesh position={[0.8, 0.2, 0.9]}>
-              <cylinderGeometry args={[0.12, 0.12, 0.4, 8]} />
-              <primitive object={getMaterial("steel")} attach="material" />
-            </mesh>
-          </>
-        )}
+        <mesh position={[0, 2.1, -0.1]} castShadow receiveShadow>
+          <boxGeometry args={[2.4, 0.8, 0.35]} />
+          <meshStandardMaterial color="#ffffff" roughness={0.2} />
+        </mesh>
       </group>
     );
   }
 
-  if (type.includes("dining")) {
+  if (type === "bedroom") {
     return (
-      <group position={[cx, elevation + 0.4, cz]}>
-        <mesh position={[0, 0.35, 0]}>
-          <boxGeometry args={[1.4, 0.08, 0.9]} />
+      <group position={[cx, elevation, cy]}>
+        <mesh position={[0, 0.25, 0]} castShadow receiveShadow>
+          <boxGeometry args={[1.8, 0.5, 2.0]} />
+          <primitive object={getMaterial("partition")} attach="material" />
+        </mesh>
+        <mesh position={[0, 0.5, -0.9]} castShadow receiveShadow>
+          <boxGeometry args={[2.2, 0.6, 0.1]} />
           <primitive object={getMaterial("wood")} attach="material" />
         </mesh>
-        {!simplified &&
-          [-0.5, 0.5].flatMap((dx) =>
-            [-0.35, 0.35].map((dz) => (
-              <mesh key={`${dx}_${dz}`} position={[dx, 0.2, dz]}>
-                <boxGeometry args={[0.35, 0.4, 0.35]} />
-                <primitive object={getMaterial("wood")} attach="material" />
-              </mesh>
-            )),
-          )}
-      </group>
-    );
-  }
-
-  if (type.includes("lobby") || type.includes("retail")) {
-    return (
-      <group position={[cx, elevation + 0.4, cz]}>
-        <mesh position={[0, 0.35, 0]}>
-          <boxGeometry args={[1.2, 0.7, 0.6]} />
+        <mesh position={[-1.2, 0.25, -0.8]} castShadow receiveShadow>
+          <boxGeometry args={[0.4, 0.5, 0.4]} />
           <primitive object={getMaterial("wood")} attach="material" />
         </mesh>
-        {!simplified && (
-          <mesh position={[1.4, 0.2, 0.8]}>
-            <cylinderGeometry args={[0.25, 0.25, 0.4, 12]} />
-            <primitive object={getMaterial("highlight")} attach="material" />
-          </mesh>
-        )}
+        <mesh position={[1.2, 0.25, -0.8]} castShadow receiveShadow>
+          <boxGeometry args={[0.4, 0.5, 0.4]} />
+          <primitive object={getMaterial("wood")} attach="material" />
+        </mesh>
       </group>
     );
   }
@@ -250,13 +202,10 @@ function RoomFurniture({
 function MepHints({
   level,
   elevation,
-  buildingType,
 }: {
   level: LevelDefinition;
   elevation: number;
-  buildingType?: BuildingType;
 }) {
-  if (buildingType !== "hospital" && buildingType !== "warehouse") return null;
   const width = level.floorplate.width_m;
   const depth = level.floorplate.depth_m;
   return (
@@ -277,63 +226,52 @@ export default function SlabMesh({
   level,
   elevation,
   visibleRooms = true,
-  buildingType,
   clipPlane = null,
-  viewMode = "exterior",
+  viewMode,
   qualityTier = "medium",
+  showFurniture = false,
 }: SlabMeshProps) {
-  const slabMaterial = useMemo(() => {
-    const mat = getMaterial("floor").clone();
-    if (clipPlane) {
-      mat.clippingPlanes = [clipPlane];
-      mat.clipShadows = true;
-    }
-    return mat;
-  }, [clipPlane]);
-
-  const isTower =
-    buildingType === "office_tower" ||
-    buildingType === "residential_tower" ||
-    buildingType === "mixed_use";
-  const dollhouseMode = viewMode === "interior" || viewMode === "section";
+  const w = level.floorplate.width_m;
+  const d = level.floorplate.depth_m;
+  const dollhouseMode = viewMode === "interior";
+  const measurementsVisible = useBuildingStore((state) => state.measurementsVisible);
+  const showDetail = qualityTier !== "low";
 
   return (
     <group>
       <mesh
-        position={[
-          level.floorplate.width_m / 2,
-          elevation - 0.08,
-          level.floorplate.depth_m / 2,
-        ]}
+        position={[w / 2, elevation - 0.15, d / 2]}
         receiveShadow
-        material={slabMaterial}
+        castShadow
       >
-        <boxGeometry args={[level.floorplate.width_m, 0.16, level.floorplate.depth_m]} />
+        <boxGeometry args={[w, 0.3, d]} />
+        <primitive object={getMaterial("concrete")} attach="material" />
       </mesh>
-      <SlabEdgeBands level={level} elevation={elevation} />
+
+      {showDetail && <SlabEdgeBands level={level} elevation={elevation} />}
+
       {visibleRooms &&
-        level.rooms
-          .filter((room) => polygonArea(room.polygon) > 0)
-          .map((room) => (
+        level.rooms.map((room) => (
+          <group key={room.id}>
             <RoomSurface
-              key={room.id}
               room={room}
               elevation={elevation}
               clipPlane={clipPlane}
               useWoodFloor={dollhouseMode}
             />
-          ))}
-      {visibleRooms && isTower && <CoreShaft level={level} elevation={elevation} />}
-      {visibleRooms &&
-        level.rooms.map((room) => (
-          <RoomFurniture
-            key={`furn_${room.id}`}
-            room={room}
-            elevation={elevation}
-            qualityTier={qualityTier}
-          />
+            {showFurniture && <RoomFurniture room={room} elevation={elevation} />}
+            {measurementsVisible && <RoomLabel room={room} elevation={elevation} />}
+          </group>
         ))}
-      {visibleRooms && <MepHints level={level} elevation={elevation} buildingType={buildingType} />}
+
+      {visibleRooms && showFurniture && <MepHints level={level} elevation={elevation} />}
+      
+      {dollhouseMode && (
+        <mesh position={[w / 2, elevation + level.height_m - 0.06, d / 2]}>
+          <boxGeometry args={[w, 0.12, d]} />
+          <primitive object={getMaterial("partition")} attach="material" />
+        </mesh>
+      )}
     </group>
   );
 }

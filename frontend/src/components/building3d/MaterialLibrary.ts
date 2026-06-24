@@ -5,6 +5,7 @@ import {
   getConcreteRoughnessMap,
   getGrassMap,
   getPavingMap,
+  getRoadMap,
   getSteelBrushedNormalMap,
   getTileCladdingMap,
   getWoodFloorMap,
@@ -24,6 +25,7 @@ export type MaterialKey =
   | "highlight"
   | "selected"
   | "asphalt"
+  | "road"
   | "sidewalk"
   | "curtain_wall"
   | "context"
@@ -178,9 +180,20 @@ function createMaterials(): void {
   cache.set(
     "asphalt",
     new THREE.MeshStandardMaterial({
-      color: "#3d4248",
-      roughness: 0.92,
-      metalness: 0.05,
+      color: "#2a2a2a",
+      roughness: 0.95,
+      metalness: 0,
+    })
+  );
+
+  const roadMap = getRoadMap();
+  cache.set(
+    "road",
+    new THREE.MeshStandardMaterial({
+      color: "#ffffff",
+      roughness: 0.95,
+      metalness: 0,
+      map: roadMap,
     })
   );
 

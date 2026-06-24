@@ -48,13 +48,13 @@ function defaultQualityTier(definition: BuildingDefinition | null): QualityTier 
 export const useBuildingStore = create<BuildingStore>((set) => ({
   definition: null,
   activeLevel: 0,
-  viewMode: "exploded",  // Default to exploded view
+  viewMode: "exterior",  // Default to exterior view
   selectedRoom: null,
   hoveredRoom: null,
   sectionPlaneY: 0,
   measurementsVisible: true,
   loading: false,
-  qualityTier: "low",  // Default to low render quality
+  qualityTier: "medium",  // Default to medium render quality
   autoQuality: true,
   setDefinition: (definition) =>
     set({
@@ -90,7 +90,7 @@ export const useBuildingStore = create<BuildingStore>((set) => ({
   resetView: () =>
     set((state) => ({
       activeLevel: 0,
-      viewMode: "exploded",  // Reset to exploded view
+      viewMode: "exterior",  // Reset to exterior view
       selectedRoom: null,
       hoveredRoom: null,
       sectionPlaneY: defaultSectionHeight(state.definition),

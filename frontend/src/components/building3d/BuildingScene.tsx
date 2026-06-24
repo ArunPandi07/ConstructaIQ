@@ -21,6 +21,9 @@ import * as THREE from "three";
 import type { BuildingDefinition } from "../../types/building";
 import { useBuildingStore } from "../../stores/buildingStore";
 import type { SnapshotPreset } from "./snapshotPresets";
+import { PresentationScene } from "./PresentationScene";
+import { AnalyticalScene } from "./AnalyticalScene";
+import { buildPresentationSpec } from "./buildPresentationModel";
 import LevelGroup from "./LevelGroup";
 import RoofMesh from "./RoofMesh";
 import SiteContext from "./SiteContext";
@@ -58,7 +61,6 @@ function SceneContent({ definition }: Props) {
   const totalHeight = definition.building.totalHeight_m;
   const footprint = definition.building.footprint;
   const maxDim = Math.max(footprint.width_m, footprint.depth_m, totalHeight);
-  const lod = lodBand(definition, qualityTier);
   const fx = postFxSettings(qualityTier);
   const envPreset = environmentPreset(definition.building.type);
 
@@ -67,10 +69,18 @@ function SceneContent({ definition }: Props) {
     return new THREE.Plane(new THREE.Vector3(0, -1, 0), sectionPlaneY);
   }, [viewMode, sectionPlaneY]);
 
-  const { gl } = useThree();
+  const { gl, invalidate } = useThree();
+  
   useEffect(() => {
     gl.localClippingEnabled = viewMode === "section";
   }, [gl, viewMode]);
+
+  // Trigger re-render on demand when key state changes
+  useEffect(() => {
+    invalidate();
+  }, [viewMode, activeLevel, sectionPlaneY, qualityTier, invalidate]);
+
+  const presentationSpec = useMemo(() => buildPresentationSpec(definition), [definition]);
 
   const exteriorTargetOffsetX = footprint.width_m * 0.12;
   const target: [number, number, number] =
@@ -85,11 +95,6 @@ function SceneContent({ definition }: Props) {
           totalHeight / 2,
           footprint.depth_m / 2,
         ];
-
-  const buildingCenter = useMemo(
-    () => new THREE.Vector3(footprint.width_m / 2, totalHeight / 2, footprint.depth_m / 2),
-    [footprint.width_m, footprint.depth_m, totalHeight],
-  );
 
   const postEffects = useMemo(() => {
     const nodes: ReactElement[] = [];
@@ -157,41 +162,21 @@ function SceneContent({ definition }: Props) {
         color="#dceeff"
       />
 
-      <SiteContext definition={definition} showGrid={qualityTier !== "high"} />
-
-      <group>
-        {definition.levels.map((level, index) => {
-          const explodedOffset =
-            viewMode === "exploded"
-              ? index * Math.max(level.height_m * 0.45, 1.8)
-              : 0;
-          const elevation = elevations[index] + explodedOffset;
-          const distanceFromActive = Math.abs(index - activeLevel);
-          const representative = isRepresentativeMiddleFloor(definition, index);
-          const simplified =
-            viewMode === "exterior" &&
-            (distanceFromActive > lod || (representative && distanceFromActive > 0));
-          const heroGlass =
-            qualityTier === "high" && distanceFromActive <= 1 && viewMode === "exterior";
-
-          return (
-            <LevelGroup
-              key={level.level}
-              level={level}
-              elevation={elevation}
-              facade={definition.facade}
-              buildingType={definition.building.type}
-              viewMode={viewMode}
-              activeLevel={activeLevel}
-              simplified={simplified}
-              clipPlane={clipPlane}
-              buildingCenter={buildingCenter}
-              heroGlass={heroGlass}
-            />
-          );
-        })}
-        {viewMode === "exterior" && <RoofMesh definition={definition} />}
-      </group>
+      {viewMode === "exterior" || viewMode === "exploded" ? (
+        <PresentationScene 
+          spec={presentationSpec} 
+          definition={definition} 
+          viewMode={viewMode} 
+        />
+      ) : (
+        <AnalyticalScene 
+          definition={definition} 
+          viewMode={viewMode} 
+          activeLevel={activeLevel} 
+          clipPlane={clipPlane} 
+          qualityTier={qualityTier} 
+        />
+      )}
 
       {viewMode === "section" && (
         <mesh position={[footprint.width_m / 2, sectionPlaneY, footprint.depth_m / 2]}>
@@ -244,6 +229,7 @@ export default function BuildingScene({ definition }: Props) {
 
   return (
     <Canvas
+      frameloop="demand"
       shadows="percentage"
       dpr={canvasDpr(qualityTier)}
       camera={{
