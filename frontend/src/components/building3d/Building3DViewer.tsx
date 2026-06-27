@@ -30,7 +30,7 @@ interface Building3DViewerProps {
 export function Building3DViewer({ buildingDefinition }: Building3DViewerProps) {
   const [isDayMode, setIsDayMode] = useState(true);
   const [activeView, setActiveView] = useState<CameraView>(DEFAULT_VIEW);
-  const [autoRotate, setAutoRotate] = useState(false);
+  const [autoRotate, setAutoRotate] = useState(true);
   
   const viewerState = useViewerState();
 

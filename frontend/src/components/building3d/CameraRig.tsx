@@ -79,7 +79,7 @@ export function CameraRig({
       maxDistance={200}
       maxPolarAngle={Math.PI / 2.08}
       autoRotate={autoRotate}
-      autoRotateSpeed={0.6}
+      autoRotateSpeed={5.5}
     />
   );
 }
