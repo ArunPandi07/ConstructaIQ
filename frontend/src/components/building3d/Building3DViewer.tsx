@@ -10,9 +10,9 @@ import {
   BuildingModel,
 } from './BuildingModel';
 import { TwinTowerModel, TWIN_TOWER_CAMERA } from './TwinTowerModel';
-import { VillaModel, VILLA_CAMERA } from './VillaModel';
-import { AFrameModel, AFRAME_CAMERA } from './AFrameModel';
-import { HighRiseModel, HIGH_RISE_CAMERA } from './HighRiseModel';
+import { VillaModel } from './VillaModel';
+import { AFrameModel } from './AFrameModel';
+import { HighRiseModel } from './HighRiseModel';
 import { isTwinTowerBuilding, isVillaBuilding, isAFrameBuilding, isHighRiseBuilding } from './buildingProfile';
 import { CameraRig } from './CameraRig';
 import {
@@ -25,9 +25,14 @@ import { InspectorPanel } from './InspectorPanel';
 
 interface Building3DViewerProps {
   buildingDefinition: BuildingDefinition;
+  streamingHint?: {
+    isStreaming: boolean;
+    currentHeightM: number;
+    totalHeightM: number;
+  };
 }
 
-export function Building3DViewer({ buildingDefinition }: Building3DViewerProps) {
+export function Building3DViewer({ buildingDefinition, streamingHint }: Building3DViewerProps) {
   const [isDayMode, setIsDayMode] = useState(true);
   const [activeView, setActiveView] = useState<CameraView>(DEFAULT_VIEW);
   const [autoRotate, setAutoRotate] = useState(true);
@@ -128,6 +133,7 @@ export function Building3DViewer({ buildingDefinition }: Building3DViewerProps) 
           buildingDefinition={buildingDefinition}
           twinTower={isTwinTower}
           orbitTarget={orbitTarget}
+          streamingHint={streamingHint}
         />
       </Canvas>
     </div>

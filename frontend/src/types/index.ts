@@ -620,6 +620,8 @@ export interface AgentExecutionRead {
   tokens_used?: number | null
   output_json?: string | null
   error_message?: string | null
+  gpu_utilization_avg?: number | null
+  vram_peak_mb?: number | null
   created_at?: string
 }
 

@@ -28,7 +28,6 @@ export function HighRiseModel({
   const greyColor = 0x6e7378;
   const glassColor = 0x88b0c4;
   const glassEmissive = 0x4a7a8c;
-  const railingColor = 0x333333;
 
   const glassMatRef = useRef<THREE.MeshStandardMaterial>(null);
   useFrame((state) => {

@@ -16,6 +16,11 @@ interface CameraRigProps {
   buildingDefinition: BuildingDefinition;
   twinTower: boolean;
   orbitTarget: [number, number, number];
+  streamingHint?: {
+    isStreaming: boolean;
+    currentHeightM: number;
+    totalHeightM: number;
+  };
 }
 
 export function CameraRig({
@@ -24,6 +29,7 @@ export function CameraRig({
   buildingDefinition,
   twinTower,
   orbitTarget,
+  streamingHint,
 }: CameraRigProps) {
   const controlsRef = useRef<OrbitControlsImpl>(null);
   const { camera } = useThree();
@@ -66,6 +72,21 @@ export function CameraRig({
 
     if (t >= 1) {
       animationRef.current = null;
+    }
+  });
+
+  useFrame(() => {
+    // Dynamic height tracking during stream
+    if (streamingHint?.isStreaming && controlsRef.current && !animationRef.current) {
+      const { currentHeightM } = streamingHint;
+      
+      const targetYOffset = Math.max(0, currentHeightM * 0.4); // Target looks up slightly as building grows
+      const camYOffset = Math.max(0, currentHeightM * 0.6); // Camera lifts with building
+
+      // Smoothly interpolate current target and camera position
+      controlsRef.current.target.y = THREE.MathUtils.lerp(controlsRef.current.target.y, orbitTarget[1] + targetYOffset, 0.02);
+      camera.position.y = THREE.MathUtils.lerp(camera.position.y, camera.position.y + camYOffset * 0.05, 0.02);
+      controlsRef.current.update();
     }
   });
 

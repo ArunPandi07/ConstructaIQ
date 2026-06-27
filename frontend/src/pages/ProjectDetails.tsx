@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, lazy, Suspense } from "react";
+import { useState, useEffect, useMemo, lazy, Suspense, useRef } from "react";
 import { useParams, useNavigate, useLocation, Link, useSearchParams } from "react-router-dom";
 import {
   Building2,
@@ -40,6 +40,8 @@ import ProjectRisksPanel from "../components/ProjectRisksPanel";
 import RecommendationsPanel from "../components/RecommendationsPanel";
 import SchedulePanel from "../components/SchedulePanel";
 import { Building3DViewer } from "../components/building3d";
+import BuildingStreamPanel from "../components/building3d/BuildingStreamPanel";
+import { useBuildingStream } from "../hooks/useBuildingStream";
 import type { CrewPlanRead, Project, ProjectSupplierRow } from "../types";
 import {
   countCompletedAgents,
@@ -68,6 +70,21 @@ export default function ProjectDetails() {
     error: agentsError,
     refetch: refetchAgents,
   } = useProjectAgents(projectId ?? "");
+
+  const stream = useBuildingStream(projectId ?? "", intelligence?.buildingDefinition);
+  const [hasAutoStreamed, setHasAutoStreamed] = useState(false);
+  const viewerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const blueprintStatus = agentExecutions?.find(e => e.agent_name === "BlueprintAgent")?.status;
+    if (blueprintStatus === "completed" && !hasAutoStreamed && intelligence?.buildingDefinition) {
+      setHasAutoStreamed(true);
+      setTimeout(() => {
+        stream.startStream(false);
+        viewerRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 500);
+    }
+  }, [agentExecutions, hasAutoStreamed, intelligence, stream]);
 
   const [selectedProj, setSelectedProj] = useState<Project | null>(null);
   const [projectLoading, setProjectLoading] = useState(false);
@@ -300,7 +317,7 @@ export default function ProjectDetails() {
 
       {uploadJustCompleted && isBackendProjectId(projectId ?? "") && (
         <div className="glass-card p-4 border border-emerald-200 bg-emerald-50 text-emerald-900 text-sm font-semibold">
-          Six-agent analyze complete — persisted intelligence loaded from the
+          Nine-agent analysis complete — persisted intelligence loaded from the
           backend.
         </div>
       )}
@@ -514,8 +531,18 @@ export default function ProjectDetails() {
 
       {/* ── 3D BUILDING VIEWER ─────────────────────────────────── */}
       {intelligence?.buildingDefinition ? (
-        <div className="col-span-12 rounded-2xl overflow-hidden border border-stone-800/50 shadow-2xl relative w-full" style={{ height: '500px' }}>
-          <Building3DViewer buildingDefinition={intelligence.buildingDefinition} />
+        <div ref={viewerRef} className="col-span-12 rounded-2xl overflow-hidden border border-stone-800/50 shadow-2xl relative w-full" style={{ height: '500px' }}>
+          <Building3DViewer 
+            buildingDefinition={stream.partialDefinition ?? intelligence.buildingDefinition}
+            streamingHint={{
+              isStreaming: stream.status === "streaming",
+              currentHeightM: stream.partialDefinition?.levels.reduce((acc, lvl) => acc + lvl.height_m, 0) ?? 0,
+              totalHeightM: intelligence.buildingDefinition.building?.totalHeight_m ?? 50
+            }}
+          />
+          <div className="absolute bottom-6 right-6 z-10 pointer-events-auto">
+            <BuildingStreamPanel stream={stream} />
+          </div>
         </div>
       ) : (
         <div className="col-span-12 rounded-2xl bg-stone-950/50 border border-stone-800/30 h-[500px] flex flex-col items-center justify-center gap-3">

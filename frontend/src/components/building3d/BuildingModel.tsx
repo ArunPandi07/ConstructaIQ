@@ -1,8 +1,8 @@
 import { useMemo, useRef } from 'react';
+import { useSpring, animated } from '@react-spring/three';
 import { useFrame } from '@react-three/fiber';
 import { MeshStandardMaterial } from 'three';
-import * as THREE from 'three';
-import type { BuildingDefinition, FacadeDefinition, LevelDefinition, RoomDefinition, WallDefinition, StairDefinition, OpeningDefinition } from '../../types/building';
+import type { BuildingDefinition, FacadeDefinition, LevelDefinition, RoomDefinition, WallDefinition, StairDefinition } from '../../types/building';
 import {
   CLADDING_COLORS,
   darken,
@@ -11,13 +11,12 @@ import {
   getWindowPlacements,
   computePolygonBounds,
   wallSegmentTransform,
-  ROOM_TYPE_COLORS,
   WALL_TYPE_COLORS,
   EXPLODED_SPACING,
   MULLION_DEPTH,
   RECESS_DEPTH,
 } from './buildingUtils';
-import type { WindowPlacement, FaceWallData, WallFace, Point2D } from './buildingUtils';
+import type { WindowPlacement, WallFace } from './buildingUtils';
 import type { ViewerState, SelectedElement } from './useViewerState';
 
 // ── Material constants ──────────────────────────────────────────────────────
@@ -497,7 +496,7 @@ function InteriorWallSegment({ wall, levelIndex, levelName, height, halfW, halfD
     levelName,
     id: `wall-${levelIndex}-${wall.start.x}-${wall.start.y}`,
     wallType: wall.type,
-    dimensions: { length: t.length, thickness: t.thickness, height },
+    dimensions: { length: t.length, depth: t.thickness, height },
   });
 
   return (
@@ -762,6 +761,17 @@ function PitchedRoof({ width, depth, colors, viewerState }: { width: number; dep
   );
 }
 
+// ── Animated floor entrance ─────────────────────────────────────────────────
+function AnimatedFloor({ yBase, children }: { yBase: number; children: React.ReactNode }) {
+  const spring = useSpring({
+    from: { position: [0, yBase - 5, 0] as [number, number, number] },
+    to: { position: [0, yBase, 0] as [number, number, number] },
+    config: { tension: 160, friction: 22 },
+    reset: false,
+  });
+  return <animated.group position={spring.position as unknown as [number, number, number]}>{children}</animated.group>;
+}
+
 // ── Main export ─────────────────────────────────────────────────────────────
 export function BuildingModel({
   buildingDefinition,
@@ -816,11 +826,12 @@ export function BuildingModel({
                           (isFloorPlan ? false : isIsolate); // in floor plan, only active is visible
                           
         if (isFloorPlan && viewerState.activeLevel !== -1 && !isActive) return null;
+        if (!isVisible && !isFloorPlan) return null;
 
         const opacity = (!isActive && isIsolate && viewerState.activeLevel !== -1) ? 0.08 : 1.0;
 
         return (
-          <group key={`level-${index}`} position={[0, yBase, 0]}>
+          <AnimatedFloor key={`level-${index}`} yBase={yBase}>
             {/* We apply a group level material override approach for opacity if needed, 
                 but since we use StandardMaterials inside, it's better to pass opacity down if we want. 
                 For simplicity in React Three Fiber, if we want to make the whole level transparent,
@@ -850,7 +861,7 @@ export function BuildingModel({
                 viewerState={viewerState}
               />
             </group>
-          </group>
+          </AnimatedFloor>
         );
       })}
 

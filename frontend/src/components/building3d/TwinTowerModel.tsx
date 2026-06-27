@@ -2,7 +2,7 @@
  * HTML-accurate Twin Tower Residential exterior (G+6, 14×12 m towers, 2.8 m connector).
  * Ported from the reference Three.js HTML prototype.
  */
-import { useMemo, type ReactElement, useRef } from 'react';
+import { useMemo, type ReactElement } from 'react';
 import type { BuildingDefinition } from '../../types/building';
 import type { ViewerState, SelectedElement } from './useViewerState';
 
@@ -96,16 +96,11 @@ function Tower({ cx, glassIntensity = 0.3, viewerState, name }: { cx: number; gl
   for (let f = 0; f < FLOORS; f++) {
     const isGround = f === 0;
     const yBase = isGround ? 0 : GH + (f - 1) * FH;
-    const fh = isGround ? GH : FH;
     
     let yOffset = 0;
     if (isExploded) yOffset = f * 2.0; // EXPLODED_SPACING
 
     const isActive = f === viewerState.activeLevel;
-    const isVisible = viewerState.mode === 'exterior' || isExploded || 
-                      (isIsolate && viewerState.activeLevel === -1) ||
-                      isActive || 
-                      (isFloorPlan ? false : isIsolate);
                       
     if (isFloorPlan && viewerState.activeLevel !== -1 && !isActive) continue;
 

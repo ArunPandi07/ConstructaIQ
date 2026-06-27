@@ -172,19 +172,7 @@ export function ViewerControls({
         </div>
       </div>
 
-      <div className={`absolute bottom-6 left-1/2 -translate-x-1/2 hidden lg:flex items-center gap-5 px-5 py-2 rounded-xl backdrop-blur-md border ${bgClass} ${borderClass} pointer-events-auto`}>
-        <div className={`flex items-center gap-2 text-xs ${mText}`}>
-          <kbd className={`px-2 py-0.5 rounded font-mono text-[10px] ${isDayMode ? 'bg-stone-200 text-stone-700' : 'bg-white/10 text-stone-300'}`}>Drag</kbd> Orbit
-        </div>
-        <div className={`flex items-center gap-2 text-xs ${mText}`}>
-          <kbd className={`px-2 py-0.5 rounded font-mono text-[10px] ${isDayMode ? 'bg-stone-200 text-stone-700' : 'bg-white/10 text-stone-300'}`}>Scroll</kbd> Zoom
-        </div>
-        <div className={`flex items-center gap-2 text-xs ${mText}`}>
-          <kbd className={`px-2 py-0.5 rounded font-mono text-[10px] ${isDayMode ? 'bg-stone-200 text-stone-700' : 'bg-white/10 text-stone-300'}`}>Right-Drag</kbd> Pan
-        </div>
-      </div>
-
-      <div className={`absolute top-20 right-4 w-52 p-4 rounded-xl backdrop-blur-md border ${bgClass} ${borderClass} pointer-events-auto mt-40 sm:mt-0`}>
+      <div className={`absolute top-1 right-4 w-52 p-4 rounded-xl backdrop-blur-md border ${bgClass} ${borderClass} pointer-events-auto mt-40 sm:mt-0`}>
         <div className="flex justify-between items-center mb-4">
           <h3 className={`text-[10px] font-bold uppercase tracking-wider ${mText}`}>Building Specs</h3>
           <button

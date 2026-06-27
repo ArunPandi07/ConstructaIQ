@@ -32,6 +32,8 @@ class AgentExecution(Base, CreatedAtMixin):
     completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     duration_seconds: Mapped[Optional[int]] = mapped_column(Integer)
     tokens_used: Mapped[Optional[int]] = mapped_column(Integer)
+    gpu_utilization_avg: Mapped[Optional[int]] = mapped_column(Integer)
+    vram_peak_mb: Mapped[Optional[int]] = mapped_column(Integer)
     output_json: Mapped[Optional[str]] = mapped_column(LongText)
     error_message: Mapped[Optional[str]] = mapped_column(LongText)
 

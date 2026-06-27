@@ -124,7 +124,7 @@ export default function AgentDetailPanel({ agentName, run, runLabel }: Props) {
         <Badge variant={statusVariant(run)}>{run.status ?? "unknown"}</Badge>
       </div>
 
-      <dl className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+      <dl className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 text-xs">
         <div className="rounded-lg bg-stone-50 px-3 py-2">
           <dt className="text-[9px] font-bold uppercase text-stone-400">Duration</dt>
           <dd className="font-bold text-stone-900 mt-0.5">
@@ -149,6 +149,22 @@ export default function AgentDetailPanel({ agentName, run, runLabel }: Props) {
             {run.tokens_used != null && run.tokens_used > 0
               ? run.tokens_used.toLocaleString()
               : "Not tracked"}
+          </dd>
+        </div>
+        <div className="rounded-lg bg-stone-50 px-3 py-2">
+          <dt className="text-[9px] font-bold uppercase text-stone-400">GPU Util</dt>
+          <dd className="font-bold text-stone-900 mt-0.5">
+            {run.gpu_utilization_avg != null
+              ? `${run.gpu_utilization_avg}%`
+              : "—"}
+          </dd>
+        </div>
+        <div className="rounded-lg bg-stone-50 px-3 py-2">
+          <dt className="text-[9px] font-bold uppercase text-stone-400">Peak VRAM</dt>
+          <dd className="font-bold text-stone-900 mt-0.5">
+            {run.vram_peak_mb != null
+              ? `${(run.vram_peak_mb / 1024).toFixed(1)} GB`
+              : "—"}
           </dd>
         </div>
       </dl>

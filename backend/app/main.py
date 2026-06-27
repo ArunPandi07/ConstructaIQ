@@ -14,6 +14,7 @@ from app.api.dashboard import router as dashboard_router
 from app.api.projects import router as projects_router
 from app.api.settings import router as settings_router
 from app.api.websockets import router as websockets_router
+from app.api.building_stream import router as building_stream_router
 
 logger = get_logger("MainApp")
 
@@ -47,6 +48,7 @@ for api_prefix in ("/api", "/api/v1"):
     app.include_router(analyze_router, prefix=api_prefix)
     app.include_router(catalogs_router, prefix=api_prefix)
     app.include_router(settings_router, prefix=api_prefix)
+    app.include_router(building_stream_router, prefix=api_prefix)
 
 # Mount WS router globally
 app.include_router(websockets_router)

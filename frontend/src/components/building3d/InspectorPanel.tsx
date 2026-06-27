@@ -88,7 +88,6 @@ export function InspectorPanel({ viewerState }: InspectorPanelProps) {
                   dimensions.length ? `${dimensions.length.toFixed(2)}l` : null,
                   dimensions.depth ? `${dimensions.depth.toFixed(2)}d` : null,
                   dimensions.height ? `${dimensions.height.toFixed(2)}h` : null,
-                  dimensions.thickness ? `${dimensions.thickness.toFixed(2)}t` : null,
                 ].filter(Boolean).join(' × ')} m
               </span>
             </div>

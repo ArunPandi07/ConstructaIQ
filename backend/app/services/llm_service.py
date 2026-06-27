@@ -57,7 +57,7 @@ class LLMService:
         text: str,
         agent_name: str,
         version: str,
-    ) -> str:
+    ) -> tuple[str, dict]:
         """Call the configured OpenAI-compatible LLM for an agent prompt."""
         if not self.llm_base_url:
             raise ValueError("LLM not configured. Set LLM_BASE_URL.")
@@ -68,7 +68,7 @@ class LLMService:
         text: str,
         agent_name: str,
         version: str,
-    ) -> str:
+    ) -> tuple[str, dict]:
         llm = self._openai_llm
         if not llm:
             self._init_openai_llm()
@@ -87,13 +87,15 @@ class LLMService:
         response = await llm.ainvoke([HumanMessage(content=text)])
         if response and response.content:
             logger.info("Response received from agent '%s'.", agent_name)
-            return str(response.content)
+            token_usage = response.response_metadata.get("token_usage", {})
+            return str(response.content), token_usage
         raise ValueError(f"Agent call failed for '{agent_name}'. Empty response.")
 
     async def call_llm(self, prompt: str, agent_name: str, version: str = "1") -> str:
-        return await self.call_agent_directly(
+        content, _ = await self.call_agent_directly(
             text=prompt, agent_name=agent_name, version=version
         )
+        return content
 
     async def astream_messages(self, messages: list) -> AsyncGenerator[str, None]:
         """Stream LLM response tokens for a list of LangChain messages."""

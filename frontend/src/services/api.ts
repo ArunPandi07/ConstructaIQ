@@ -213,16 +213,16 @@ export async function fetchRecoveryStrategies(
 ): Promise<ApiResponse<unknown>> {
   if (isBackendProjectId(projectId)) {
     const res = await apiClient.get<any>(`/projects/${projectId}/recovery-strategies`);
-    return { data: res.data };
+    return { data: res.data, status: 'success', timestamp: new Date().toISOString() };
   }
-  return { data: { strategies: [] } };
+  return { data: { strategies: [] }, status: 'success', timestamp: new Date().toISOString() };
 }
 
 export async function activateRecoveryStrategy(
   _projectId: string,
   _strategyId: string,
 ): Promise<ApiResponse<{ activated: boolean }>> {
-  return { data: { activated: true } };
+  return { data: { activated: true }, status: 'success', timestamp: new Date().toISOString() };
 }
 
 export async function analyzeChangeImpact(
@@ -231,9 +231,9 @@ export async function analyzeChangeImpact(
 ): Promise<ApiResponse<ChangeImpactData>> {
   if (isBackendProjectId(projectId)) {
     const res = await apiClient.post<any>(`/projects/${projectId}/change-impact`, scenario);
-    return { data: res.data.impact };
+    return { data: res.data.impact, status: 'success', timestamp: new Date().toISOString() };
   }
-  return { data: null as any };
+  return { data: null as any, status: 'success', timestamp: new Date().toISOString() };
 }
 
 export async function fetchAgentInsights(

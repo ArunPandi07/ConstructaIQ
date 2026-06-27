@@ -170,7 +170,7 @@ export function resolveMaterialCost(
   material: ScheduleMaterial,
   supplier?: ProjectSupplierRow,
 ): number | null {
-  if (material.totalCost != null && material.totalCost !== '') {
+  if (material.totalCost != null) {
     const value = Number(material.totalCost)
     return Number.isFinite(value) ? value : null
   }

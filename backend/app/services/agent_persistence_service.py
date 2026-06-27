@@ -751,6 +751,9 @@ async def persist_analysis_outputs(
                 started_at=started,
                 completed_at=completed,
                 duration_seconds=duration_seconds,
+                tokens_used=record.get("tokens_used"),
+                gpu_utilization_avg=record.get("gpu_utilization_avg"),
+                vram_peak_mb=record.get("vram_peak_mb"),
                 output_json=_json_dumps(record.get("output")),
             )
         )

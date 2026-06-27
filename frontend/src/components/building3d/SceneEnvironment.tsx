@@ -129,7 +129,7 @@ function Sidewalk({
 
 // ── Selection Outline Effect ────────────────────────────────────────────────
 function SelectionOutline({ viewerState, isDayMode }: { viewerState: ViewerState, isDayMode: boolean }) {
-  const outlineRef = useRef<any>();
+  const outlineRef = useRef<any>(null);
 
   useFrame(() => {
     if (outlineRef.current && outlineRef.current.selection) {
@@ -150,7 +150,7 @@ function SelectionOutline({ viewerState, isDayMode }: { viewerState: ViewerState
         pulseSpeed={0}
         visibleEdgeColor={isDayMode ? 0xf5c518 : 0x60a5fa}
         hiddenEdgeColor={isDayMode ? 0xc49d13 : 0x3b82f6}
-        blendFunction={BlendFunction.ALPHA_MULTIPLY}
+        blendFunction={BlendFunction.ALPHA}
       />
     </EffectComposer>
   );

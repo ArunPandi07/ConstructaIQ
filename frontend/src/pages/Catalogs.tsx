@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { Truck, Users, Loader2 } from 'lucide-react'
 import { apiClient } from '../services/apiClient'
 import { unwrapData } from '../services/projectApi'
-import type { ApiResponse } from '../types'
 
 interface SupplierRow {
   supplier_id: number
@@ -29,8 +28,8 @@ export default function Catalogs() {
     setLoading(true)
     setError(null)
     Promise.all([
-      apiClient.get<ApiResponse<SupplierRow[]>>('/suppliers').then(unwrapData),
-      apiClient.get<ApiResponse<CrewRow[]>>('/crew').then(unwrapData),
+      apiClient.get<SupplierRow[]>('/suppliers').then(unwrapData),
+      apiClient.get<CrewRow[]>('/crew').then(unwrapData),
     ])
       .then(([supplierRows, crewRows]) => {
         setSuppliers(supplierRows)

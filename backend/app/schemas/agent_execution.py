@@ -15,6 +15,8 @@ class AgentExecutionCreate(BaseModel):
     completed_at: Optional[datetime] = None
     duration_seconds: Optional[int] = None
     tokens_used: Optional[int] = None
+    gpu_utilization_avg: Optional[int] = None
+    vram_peak_mb: Optional[int] = None
     output_json: Optional[str] = None
     error_message: Optional[str] = None
 
@@ -29,6 +31,8 @@ class AgentExecutionUpdate(BaseModel):
     completed_at: Optional[datetime] = None
     duration_seconds: Optional[int] = None
     tokens_used: Optional[int] = None
+    gpu_utilization_avg: Optional[int] = None
+    vram_peak_mb: Optional[int] = None
     output_json: Optional[str] = None
     error_message: Optional[str] = None
 
@@ -56,5 +60,7 @@ class AgentExecutionListItem(BaseModel):
     completed_at: Optional[datetime] = None
     duration_seconds: Optional[int] = None
     tokens_used: Optional[int] = None
+    gpu_utilization_avg: Optional[int] = None
+    vram_peak_mb: Optional[int] = None
     error_message: Optional[str] = None
     created_at: datetime

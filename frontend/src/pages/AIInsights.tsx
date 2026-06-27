@@ -9,6 +9,7 @@ import AgentInsightsKpiRow from "../components/agentInsights/AgentInsightsKpiRow
 import AgentMasterList from "../components/agentInsights/AgentMasterList";
 import AgentPipelineStrip from "../components/agentInsights/AgentPipelineStrip";
 import ChatPanel from "../components/chat/ChatPanel";
+import GpuTelemetryPanel from "../components/GpuTelemetryPanel";
 import PipelineRunSelector from "../components/agentInsights/PipelineRunSelector";
 import { useAppContext } from "../context/AppContext";
 import { clearAgentsCache, useAgentInsights, useProjects } from "../hooks/usePageData";
@@ -337,6 +338,10 @@ export default function AIInsights() {
 
         {isBackendProjectId(selectedId) && !insightsLoading && (
           <>
+            <motion.div variants={childVariants}>
+              <GpuTelemetryPanel />
+            </motion.div>
+
             <motion.div variants={childVariants}>
               <AgentPipelineStrip
                 byAgent={byAgent}

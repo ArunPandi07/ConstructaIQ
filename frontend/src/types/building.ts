@@ -3,7 +3,15 @@ export type BuildingType =
   | "office_tower"
   | "hospital"
   | "mixed_use"
-  | "warehouse";
+  | "warehouse"
+  | "villa"
+  | "residential_villa"
+  | "a_frame"
+  | "high_rise"
+  | "twin_tower"
+  | "rectangular"
+  | "l_shape"
+  | "u_shape";
 
 export type BuildingViewMode = "exterior";
 
@@ -71,7 +79,7 @@ export interface BuildingMeta {
   footprint: Footprint;
   construction_type?: string | null;
   roof_type: "flat" | "pitched" | "sawtooth" | "pergola" | "penthouse";
-  footprint_shape?: "rectangular" | "l_shape" | "u_shape" | "twin_tower";
+  footprint_shape?: "rectangular" | "l_shape" | "u_shape" | "twin_tower" | "villa" | "a_frame" | "high_rise";
   cladding_material?: "stone_white" | "stone_dark" | "glass" | "concrete";
   primary_color?: string;
 }
