@@ -123,3 +123,77 @@ export function classifyExteriorWalls(
 
   return result;
 }
+
+// ── Room and Wall Utilities ─────────────────────────────────────────────────
+
+export interface Point2D {
+  x: number;
+  y: number;
+}
+
+export function computePolygonBounds(polygon: Point2D[]): { centerX: number; centerY: number; width: number; depth: number } {
+  if (!polygon || polygon.length === 0) {
+    return { centerX: 0, centerY: 0, width: 0, depth: 0 };
+  }
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  
+  for (const p of polygon) {
+    if (p.x < minX) minX = p.x;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.y > maxY) maxY = p.y;
+  }
+  
+  return {
+    centerX: (minX + maxX) / 2,
+    centerY: (minY + maxY) / 2,
+    width: maxX - minX,
+    depth: maxY - minY,
+  };
+}
+
+export function wallSegmentTransform(
+  start: Point2D,
+  end: Point2D,
+  thickness: number = 0.28
+): { cx: number; cy: number; length: number; rotationY: number; thickness: number } {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const length = Math.hypot(dx, dy);
+  const rotationY = Math.atan2(dy, dx);
+  
+  return {
+    cx: start.x + dx / 2,
+    cy: start.y + dy / 2,
+    length,
+    rotationY,
+    thickness,
+  };
+}
+
+export const ROOM_TYPE_COLORS: Record<string, number> = {
+  lobby: 0xFFB347,
+  office: 0x5B9BD5,
+  residential: 0x7BC67E,
+  bedroom: 0x7BC67E,
+  bathroom: 0xB4A7D6,
+  utility: 0xB4A7D6,
+  kitchen: 0xCC6644,
+  storage: 0x95A5A6,
+  mechanical: 0x95A5A6,
+  default: 0xD5D5D5,
+};
+
+export const WALL_TYPE_COLORS: Record<string, number> = {
+  core: 0x555555,
+  interior: 0x888888,
+  partition: 0xBBBBBB,
+  exterior: 0xD8D5CE,
+};
+
+export const EXPLODED_SPACING = 2.0;
+export const MULLION_DEPTH = 0.04;
+export const RECESS_DEPTH = 0.08;

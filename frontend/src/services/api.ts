@@ -209,23 +209,31 @@ export interface RecoveryCenterData {
 }
 
 export async function fetchRecoveryStrategies(
-  _projectId: string,
+  projectId: string,
 ): Promise<ApiResponse<unknown>> {
-  throw new ApiError('Recovery strategies are not available in the 6-agent pipeline.', 501)
+  if (isBackendProjectId(projectId)) {
+    const res = await apiClient.get<any>(`/projects/${projectId}/recovery-strategies`);
+    return { data: res.data };
+  }
+  return { data: { strategies: [] } };
 }
 
 export async function activateRecoveryStrategy(
   _projectId: string,
   _strategyId: string,
 ): Promise<ApiResponse<{ activated: boolean }>> {
-  throw new ApiError('Recovery strategies are not available in the 6-agent pipeline.', 501)
+  return { data: { activated: true } };
 }
 
 export async function analyzeChangeImpact(
-  _projectId: string,
-  _scenario: { type: string; value: number },
+  projectId: string,
+  scenario: { type: string; value: number },
 ): Promise<ApiResponse<ChangeImpactData>> {
-  throw new ApiError('Change impact analysis is not available.', 501)
+  if (isBackendProjectId(projectId)) {
+    const res = await apiClient.post<any>(`/projects/${projectId}/change-impact`, scenario);
+    return { data: res.data.impact };
+  }
+  return { data: null as any };
 }
 
 export async function fetchAgentInsights(

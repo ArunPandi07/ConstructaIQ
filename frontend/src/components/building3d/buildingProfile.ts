@@ -14,3 +14,14 @@ export function isTwinTowerBuilding(definition?: BuildingDefinition | null): boo
     depth_m <= 14
   );
 }
+export function isVillaBuilding(definition?: BuildingDefinition | null): boolean {
+  return definition?.building?.footprint_shape === 'villa';
+}
+
+export function isAFrameBuilding(definition?: BuildingDefinition | null): boolean {
+  return definition?.building?.footprint_shape === 'a_frame';
+}
+
+export function isHighRiseBuilding(definition?: BuildingDefinition | null): boolean {
+  return definition?.building?.footprint_shape === 'high_rise';
+}

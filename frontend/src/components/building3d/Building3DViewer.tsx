@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
 import * as THREE from 'three';
 
@@ -6,15 +6,22 @@ import type { BuildingDefinition } from '../../types/building';
 import { ViewerControls } from './ViewerControls';
 import { SceneLighting } from './SceneLighting';
 import { SceneEnvironment } from './SceneEnvironment';
-import { BuildingModel } from './BuildingModel';
+import {
+  BuildingModel,
+} from './BuildingModel';
 import { TwinTowerModel, TWIN_TOWER_CAMERA } from './TwinTowerModel';
-import { isTwinTowerBuilding } from './buildingProfile';
+import { VillaModel, VILLA_CAMERA } from './VillaModel';
+import { AFrameModel, AFRAME_CAMERA } from './AFrameModel';
+import { HighRiseModel, HIGH_RISE_CAMERA } from './HighRiseModel';
+import { isTwinTowerBuilding, isVillaBuilding, isAFrameBuilding, isHighRiseBuilding } from './buildingProfile';
 import { CameraRig } from './CameraRig';
 import {
   computeCameraPreset,
   DEFAULT_VIEW,
   type CameraView,
 } from './cameraPresets';
+import { useViewerState } from './useViewerState';
+import { InspectorPanel } from './InspectorPanel';
 
 interface Building3DViewerProps {
   buildingDefinition: BuildingDefinition;
@@ -24,16 +31,30 @@ export function Building3DViewer({ buildingDefinition }: Building3DViewerProps) 
   const [isDayMode, setIsDayMode] = useState(true);
   const [activeView, setActiveView] = useState<CameraView>(DEFAULT_VIEW);
   const [autoRotate, setAutoRotate] = useState(false);
+  
+  const viewerState = useViewerState();
 
-  const twinTower = isTwinTowerBuilding(buildingDefinition);
+  const isTwinTower = isTwinTowerBuilding(buildingDefinition);
+  const isVilla = isVillaBuilding(buildingDefinition);
+  const isAFrame = isAFrameBuilding(buildingDefinition);
+  const isHighRise = isHighRiseBuilding(buildingDefinition);
 
   const { cameraPos, orbitTarget } = useMemo(() => {
-    const preset = computeCameraPreset(DEFAULT_VIEW, buildingDefinition, twinTower);
+    // If in floor-plan mode, override the preset logic
+    const view = viewerState.mode === 'floor-plan' ? 'floor-plan' : activeView;
+    const preset = computeCameraPreset(view, buildingDefinition, isTwinTower);
     return {
       cameraPos: preset.position,
       orbitTarget: preset.target,
     };
-  }, [buildingDefinition, twinTower]);
+  }, [buildingDefinition, isTwinTower, activeView, viewerState.mode]);
+
+  // Sync mode changes with view/rotate
+  useEffect(() => {
+    if (viewerState.mode === 'floor-plan') {
+      setAutoRotate(false);
+    }
+  }, [viewerState.mode]);
 
   return (
     <div className={`relative w-full h-full transition-colors duration-300 ${isDayMode ? 'bg-stone-100' : 'bg-stone-950'}`}>
@@ -41,17 +62,26 @@ export function Building3DViewer({ buildingDefinition }: Building3DViewerProps) 
         buildingDefinition={buildingDefinition}
         isDayMode={isDayMode}
         onToggleDayNight={() => setIsDayMode(!isDayMode)}
-        activeView={activeView}
-        onViewChange={setActiveView}
+        activeView={viewerState.mode === 'floor-plan' ? 'floor-plan' : activeView}
+        onViewChange={(view) => {
+          if (viewerState.mode === 'floor-plan' && view !== 'floor-plan') {
+             viewerState.setMode('exterior');
+          }
+          setActiveView(view);
+        }}
         autoRotate={autoRotate}
         onToggleAutoRotate={() => setAutoRotate((prev) => !prev)}
+        viewerState={viewerState}
       />
+      
+      <InspectorPanel viewerState={viewerState} />
 
       <Canvas
         shadows
+        frameloop="demand"
         camera={{
           position: cameraPos,
-          fov: twinTower ? TWIN_TOWER_CAMERA.fov : 40,
+          fov: isTwinTower ? TWIN_TOWER_CAMERA.fov : 40,
           near: 0.1,
           far: 1000,
         }}
@@ -60,6 +90,7 @@ export function Building3DViewer({ buildingDefinition }: Building3DViewerProps) 
           toneMapping: THREE.ACESFilmicToneMapping,
           toneMappingExposure: isDayMode ? 1.3 : 0.85,
         }}
+        onPointerMissed={() => viewerState.setSelectedElement(null)}
       >
         <color attach="background" args={[isDayMode ? '#f3f4f6' : '#0d0f14']} />
 
@@ -68,26 +99,34 @@ export function Building3DViewer({ buildingDefinition }: Building3DViewerProps) 
           buildingDefinition={buildingDefinition}
         />
 
-        {twinTower ? (
-          <TwinTowerModel buildingDefinition={buildingDefinition} isDayMode={isDayMode} />
+        {isTwinTower ? (
+          <TwinTowerModel buildingDefinition={buildingDefinition} isDayMode={isDayMode} viewerState={viewerState} />
+        ) : isVilla ? (
+          <VillaModel buildingDefinition={buildingDefinition} isDayMode={isDayMode} viewerState={viewerState} />
+        ) : isAFrame ? (
+          <AFrameModel buildingDefinition={buildingDefinition} isDayMode={isDayMode} viewerState={viewerState} />
+        ) : isHighRise ? (
+          <HighRiseModel buildingDefinition={buildingDefinition} isDayMode={isDayMode} viewerState={viewerState} />
         ) : (
           <>
             <BuildingModel
               buildingDefinition={buildingDefinition}
               isDayMode={isDayMode}
+              viewerState={viewerState}
             />
             <SceneEnvironment
               isDayMode={isDayMode}
               buildingDefinition={buildingDefinition}
+              viewerState={viewerState}
             />
           </>
         )}
 
         <CameraRig
-          activeView={activeView}
+          activeView={viewerState.mode === 'floor-plan' ? 'floor-plan' : activeView}
           autoRotate={autoRotate}
           buildingDefinition={buildingDefinition}
-          twinTower={twinTower}
+          twinTower={isTwinTower}
           orbitTarget={orbitTarget}
         />
       </Canvas>

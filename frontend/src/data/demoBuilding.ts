@@ -317,11 +317,35 @@ export const TWIN_TOWER_DEMO: BuildingDefinition = {
 };
 
 /** Available demo building variants for the selector */
-export type DemoVariant = "residential_tower" | "twin_tower" | "office_tower" | "mixed_use";
+export type DemoVariant = "residential_tower" | "twin_tower" | "office_tower" | "mixed_use" | "villa" | "a_frame" | "high_rise";
 
 export function getDemoVariant(variant: DemoVariant): BuildingDefinition {
   if (variant === "twin_tower") {
     return TWIN_TOWER_DEMO;
+  }
+  
+  if (variant === "villa") {
+    return {
+      building: { type: "residential_villa", stories: 2, totalHeight_m: 6.4, footprint: { width_m: 20, depth_m: 20 }, construction_type: "Concrete", roof_type: "flat", footprint_shape: "villa" },
+      levels: Array.from({ length: 2 }, (_, i) => ({ level: i, name: i === 0 ? "Ground Floor" : "First Floor", height_m: 3.2, floorplate: { width_m: 20, depth_m: 20 }, rooms: [], walls: [], stairs: [] })),
+      facade: { balconies: true, balcony_depth_m: 0, railing_height_m: 1.1, window_pattern: "grid", material: "brick" }
+    };
+  }
+
+  if (variant === "a_frame") {
+    return {
+      building: { type: "residential_villa", stories: 2, totalHeight_m: 7, footprint: { width_m: 15, depth_m: 12 }, construction_type: "Wood", roof_type: "pitched", footprint_shape: "a_frame" },
+      levels: Array.from({ length: 2 }, (_, i) => ({ level: i, name: i === 0 ? "Ground Floor" : "Loft", height_m: 3.5, floorplate: { width_m: 15, depth_m: 12 }, rooms: [], walls: [], stairs: [] })),
+      facade: { balconies: true, balcony_depth_m: 0, railing_height_m: 1.1, window_pattern: "punched", material: "wood" }
+    };
+  }
+
+  if (variant === "high_rise") {
+    return {
+      building: { type: "residential_tower", stories: 7, totalHeight_m: 22.4, footprint: { width_m: 20, depth_m: 15 }, construction_type: "Concrete", roof_type: "flat", footprint_shape: "high_rise" },
+      levels: Array.from({ length: 7 }, (_, i) => ({ level: i, name: i === 0 ? "Ground Floor" : `Level ${i}`, height_m: 3.2, floorplate: { width_m: 20, depth_m: 15 }, rooms: [], walls: [], stairs: [] })),
+      facade: { balconies: true, balcony_depth_m: 1.5, railing_height_m: 1.1, window_pattern: "strip", material: "white_render" }
+    };
   }
 
   if (variant === "office_tower") {

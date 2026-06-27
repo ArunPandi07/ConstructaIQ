@@ -1,7 +1,7 @@
 import type { BuildingDefinition } from '../../types/building';
 import { TWIN_TOWER_CAMERA } from './TwinTowerModel';
 
-export type CameraView = 'front' | 'angle' | 'side' | 'top';
+export type CameraView = 'front' | 'angle' | 'side' | 'top' | 'floor-plan';
 
 export const DEFAULT_VIEW: CameraView = 'angle';
 
@@ -56,6 +56,11 @@ export function computeCameraPreset(
       return {
         position: [tx, dist * 1.4, tz + 0.01],
         target,
+      };
+    case 'floor-plan':
+      return {
+        position: [0, dist * 1.4, 0.01],
+        target: [0, 0, 0],
       };
     case 'angle':
     default:

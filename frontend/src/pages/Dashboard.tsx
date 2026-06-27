@@ -11,6 +11,7 @@ import {
 import { useAppContext } from "../context/AppContext";
 import { useDashboard, useProjects } from "../hooks/usePageData";
 import { useLoading } from "../context/LoadingContext";
+import { useWebSocket } from "../context/WebSocketContext";
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -19,6 +20,14 @@ export default function Dashboard() {
     useProjects();
   const { data: dashboard, loading: dashLoading, error: dashError, refetch } =
     useDashboard();
+  const { lastMessage } = useWebSocket("dashboard");
+
+  useEffect(() => {
+    if (lastMessage && (lastMessage.type === "AGENT_UPDATE" || lastMessage.type === "PIPELINE_COMPLETE")) {
+      refreshProjects();
+      refetch();
+    }
+  }, [lastMessage, refreshProjects, refetch]);
 
   const activeProjects = projects.filter((p) => p.status === "LIVE");
   const distinctLocations = new Set(

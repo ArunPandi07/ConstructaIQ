@@ -4,6 +4,9 @@ import { getDemoVariant, type DemoVariant } from '../data/demoBuilding';
 
 const VARIANTS: { id: DemoVariant; label: string }[] = [
   { id: 'twin_tower', label: 'Twin Tower (G+6)' },
+  { id: 'villa', label: 'Modern Villa' },
+  { id: 'a_frame', label: 'A-Frame House' },
+  { id: 'high_rise', label: 'High-Rise Apartment' },
   { id: 'residential_tower', label: 'Residential Tower' },
   { id: 'office_tower', label: 'Office Tower' },
   { id: 'mixed_use', label: 'Mixed Use' },

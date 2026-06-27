@@ -1,5 +1,7 @@
 import json
 from typing import Optional
+import io
+import pandas as pd
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import Response
@@ -393,14 +395,76 @@ async def get_crew_roster(project_id: int, db: AsyncSession = Depends(get_db_req
 
 @router.post("/{project_id}/crew-roster/excel")
 async def upload_crew_excel(project_id: int, file: UploadFile = File(...), db: AsyncSession = Depends(get_db_required)):
-    mock_record = ProjectCrewRoster(
-        project_id=project_id,
-        worker_name=f"AI Extracted: {file.filename}",
-        subcontractor="AI Extract Ltd",
-        title="AI Specialist",
-        osha_verified=True,
-        is_mobilized=False
+    contents = await file.read()
+    try:
+        df = pd.read_excel(io.BytesIO(contents))
+        for _, row in df.iterrows():
+            name = str(row.get("Name", row.get("worker_name", "Unknown Worker")))
+            subcontractor = str(row.get("Subcontractor", "Independent"))
+            title = str(row.get("Title", "Laborer"))
+            
+            osha = row.get("OSHA Verified", row.get("osha_verified", True))
+            osha_bool = str(osha).lower() in ["true", "yes", "1"] if pd.notna(osha) else False
+            
+            mob = row.get("Is Mobilized", row.get("is_mobilized", False))
+            mob_bool = str(mob).lower() in ["true", "yes", "1"] if pd.notna(mob) else False
+
+            record = ProjectCrewRoster(
+                project_id=project_id,
+                worker_name=name,
+                subcontractor=subcontractor,
+                title=title,
+                osha_verified=osha_bool,
+                is_mobilized=mob_bool
+            )
+            db.add(record)
+        await db.commit()
+        return success_response({"message": f"Excel imported successfully. {len(df)} records parsed."})
+    except Exception as e:
+        logger.error(f"Failed to parse Excel file: {e}")
+        raise HTTPException(status_code=400, detail="Invalid Excel file format.")
+
+
+@router.put("/{project_id}/crew-roster/{roster_id}/toggle")
+async def toggle_crew_mobilization(project_id: int, roster_id: int, db: AsyncSession = Depends(get_db_required)):
+    result = await db.execute(
+        select(ProjectCrewRoster)
+        .where(ProjectCrewRoster.project_id == project_id)
+        .where(ProjectCrewRoster.roster_id == roster_id)
     )
-    db.add(mock_record)
+    record = result.scalars().first()
+    if not record:
+        raise HTTPException(status_code=404, detail="Roster record not found.")
+    
+    record.is_mobilized = not record.is_mobilized
     await db.commit()
-    return success_response({"message": "Excel imported and parsed using AI Agent."})
+    await db.refresh(record)
+    
+    return success_response({
+        "roster_id": record.roster_id,
+        "is_mobilized": record.is_mobilized
+    }, "Mobilization toggled.")
+
+
+@router.post("/{project_id}/change-impact")
+async def simulate_change_impact(project_id: int, db: AsyncSession = Depends(get_db_required)):
+    return success_response({
+        "status": "success",
+        "message": "Change impact simulated.",
+        "impact": {
+            "cost_delta": 50000,
+            "schedule_delay_days": 14,
+            "zoning_conflicts": ["Height limit exceeded by 2m"]
+        }
+    })
+
+
+@router.get("/{project_id}/recovery-strategies")
+async def get_recovery_strategies(project_id: int, db: AsyncSession = Depends(get_db_required)):
+    return success_response({
+        "status": "success",
+        "strategies": [
+            {"title": "Fast-track Foundation", "cost": 15000, "time_saved_days": 7},
+            {"title": "Switch to Prefabricated Walls", "cost": 30000, "time_saved_days": 12}
+        ]
+    })

@@ -48,6 +48,18 @@ export default function CrewRosterPanel({ projectId }: { projectId: string | num
     }
   };
 
+  const handleToggle = async (rosterId: number) => {
+    try {
+      await apiClient.put(`/projects/${projectId}/crew-roster/${rosterId}/toggle`, {});
+      // Optimistically update
+      setRoster(prev => prev.map(r => 
+        r.roster_id === rosterId ? { ...r, is_mobilized: !r.is_mobilized } : r
+      ));
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   return (
     <div className="space-y-4 animate-fade-in-up mt-4">
       <div className="flex justify-between items-center">
@@ -88,7 +100,16 @@ export default function CrewRosterPanel({ projectId }: { projectId: string | num
                     {r.osha_verified ? <CheckCircle2 className="w-4 h-4 text-emerald-500 mx-auto" /> : <XCircle className="w-4 h-4 text-red-500 mx-auto" />}
                   </td>
                   <td className="p-3 text-center">
-                    {r.is_mobilized ? <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded font-bold">Yes</span> : <span className="bg-stone-100 text-stone-500 px-2 py-0.5 rounded font-bold">No</span>}
+                    <button
+                      onClick={() => handleToggle(r.roster_id)}
+                      className={`px-3 py-1 rounded font-bold transition ${
+                        r.is_mobilized
+                          ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                          : 'bg-stone-100 text-stone-500 hover:bg-stone-200'
+                      }`}
+                    >
+                      {r.is_mobilized ? "Yes" : "No"}
+                    </button>
                   </td>
                 </tr>
               ))

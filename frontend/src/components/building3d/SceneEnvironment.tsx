@@ -1,9 +1,15 @@
 import { ContactShadows } from '@react-three/drei';
+import { EffectComposer, Outline } from '@react-three/postprocessing';
+import { BlendFunction } from 'postprocessing';
+import { useFrame } from '@react-three/fiber';
+import { useRef } from 'react';
 import type { BuildingDefinition } from '../../types/building';
+import type { ViewerState } from './useViewerState';
 
 interface SceneEnvironmentProps {
   isDayMode: boolean;
   buildingDefinition?: BuildingDefinition;
+  viewerState?: ViewerState;
 }
 
 // ── Procedural Tree (from Prototype 3) ──────────────────────────────────────
@@ -121,10 +127,40 @@ function Sidewalk({
   );
 }
 
+// ── Selection Outline Effect ────────────────────────────────────────────────
+function SelectionOutline({ viewerState, isDayMode }: { viewerState: ViewerState, isDayMode: boolean }) {
+  const outlineRef = useRef<any>();
+
+  useFrame(() => {
+    if (outlineRef.current && outlineRef.current.selection) {
+      outlineRef.current.selection.clear();
+      const hm = viewerState.hoveredMeshRef.current;
+      const sm = viewerState.selectedMeshRef.current;
+      if (hm && hm !== sm) outlineRef.current.selection.add(hm);
+      if (sm) outlineRef.current.selection.add(sm);
+    }
+  });
+
+  return (
+    <EffectComposer autoClear={false}>
+      <Outline
+        ref={outlineRef}
+        blur
+        edgeStrength={3}
+        pulseSpeed={0}
+        visibleEdgeColor={isDayMode ? 0xf5c518 : 0x60a5fa}
+        hiddenEdgeColor={isDayMode ? 0xc49d13 : 0x3b82f6}
+        blendFunction={BlendFunction.ALPHA_MULTIPLY}
+      />
+    </EffectComposer>
+  );
+}
+
 // ── Main scene environment ──────────────────────────────────────────────────
 export function SceneEnvironment({
   isDayMode,
   buildingDefinition,
+  viewerState,
 }: SceneEnvironmentProps) {
   const width = buildingDefinition?.building.footprint.width_m || 20;
   const depth = buildingDefinition?.building.footprint.depth_m || 20;
@@ -157,62 +193,70 @@ export function SceneEnvironment({
     { pos: [halfW + 5, -0.1, -halfD - 5], size: [5, 5] },
   ];
 
+  const showSite = viewerState?.layers.site ?? true;
+
   return (
     <>
-      {/* Ground plane */}
-      <mesh
-        receiveShadow
-        rotation={[-Math.PI / 2, 0, 0]}
-        position={[0, -0.15, 0]}
-      >
-        <planeGeometry args={[200, 200]} />
-        <meshStandardMaterial
-          color={isDayMode ? 0xc8c8c4 : 0x2a2d35}
-          roughness={0.95}
-        />
-      </mesh>
+      {viewerState && <SelectionOutline viewerState={viewerState} isDayMode={isDayMode} />}
+      
+      {showSite && (
+        <>
+          {/* Ground plane */}
+          <mesh
+            receiveShadow
+            rotation={[-Math.PI / 2, 0, 0]}
+            position={[0, -0.15, 0]}
+          >
+            <planeGeometry args={[200, 200]} />
+            <meshStandardMaterial
+              color={isDayMode ? 0xc8c8c4 : 0x2a2d35}
+              roughness={0.95}
+            />
+          </mesh>
 
-      {/* Grid */}
-      <gridHelper
-        args={[
-          200,
-          80,
-          isDayMode ? 0xbbbbbb : 0x334455,
-          isDayMode ? 0xdddddd : 0x1a2030,
-        ]}
-        position={[0, -0.14, 0]}
-      />
+          {/* Grid */}
+          <gridHelper
+            args={[
+              200,
+              80,
+              isDayMode ? 0xbbbbbb : 0x334455,
+              isDayMode ? 0xdddddd : 0x1a2030,
+            ]}
+            position={[0, -0.14, 0]}
+          />
 
-      {/* Sidewalk around the building */}
-      <Sidewalk width={width} depth={depth} padding={5} />
+          {/* Sidewalk around the building */}
+          <Sidewalk width={width} depth={depth} padding={5} />
 
-      {/* Contact Shadows */}
+          {/* Grass patches */}
+          {grassPatches.map((g, i) => (
+            <GrassPatch key={`grass-${i}`} position={g.pos} size={g.size} />
+          ))}
+
+          {/* Trees */}
+          {treePositions.map((pos, i) => (
+            <Tree
+              key={`tree-${i}`}
+              position={pos}
+              height={5 + (i % 3) * 1.5}
+              radius={1.5 + (i % 2) * 0.6}
+            />
+          ))}
+
+          {/* Streetlamps */}
+          {lampPositions.map((pos, i) => (
+            <Streetlamp key={`lamp-${i}`} position={pos} isDayMode={isDayMode} />
+          ))}
+        </>
+      )}
+
+      {/* Contact Shadows are always shown regardless of site visibility to ground the building */}
       <ContactShadows
         position={[0, -0.13, 0]}
         opacity={isDayMode ? 0.35 : 0.55}
         scale={80}
         blur={2}
       />
-
-      {/* Grass patches */}
-      {grassPatches.map((g, i) => (
-        <GrassPatch key={`grass-${i}`} position={g.pos} size={g.size} />
-      ))}
-
-      {/* Trees */}
-      {treePositions.map((pos, i) => (
-        <Tree
-          key={`tree-${i}`}
-          position={pos}
-          height={5 + (i % 3) * 1.5}
-          radius={1.5 + (i % 2) * 0.6}
-        />
-      ))}
-
-      {/* Streetlamps */}
-      {lampPositions.map((pos, i) => (
-        <Streetlamp key={`lamp-${i}`} position={pos} isDayMode={isDayMode} />
-      ))}
     </>
   );
 }
