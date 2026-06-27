@@ -21,6 +21,37 @@ export function latestByAgent(
   return map
 }
 
+export function executionsForRun(
+  agents: AgentExecutionRead[],
+  runId: string | null,
+): AgentExecutionRead[] {
+  if (!runId) return agents
+  return agents.filter((row) => row.run_id === runId)
+}
+
+export function byAgentForRun(
+  agents: AgentExecutionRead[],
+  runId: string | null,
+): Record<string, AgentExecutionRead> {
+  return latestByAgent(executionsForRun(agents, runId))
+}
+
+export function computeRunMetrics(agents: AgentExecutionRead[]) {
+  const byAgent = latestByAgent(agents)
+  const totalDuration = agents.reduce(
+    (sum, row) => sum + (row.duration_seconds ?? 0),
+    0,
+  )
+  return {
+    completedCount: countCompletedAgents(byAgent),
+    errorCount: countErrorAgents(byAgent),
+    lastRun: lastCompletedAt(agents),
+    totalDuration,
+    avgDuration:
+      agents.length > 0 ? Math.round(totalDuration / agents.length) : 0,
+  }
+}
+
 export function agentStatusLabel(status: string | null | undefined): string {
   const s = (status ?? '').toLowerCase()
   if (COMPLETE.has(s)) return 'VERIFIED'
@@ -83,6 +114,18 @@ export function isAgentComplete(status: string | null | undefined): boolean {
 
 export function countCompletedAgents(byAgent: Record<string, AgentExecutionRead>): number {
   return PIPELINE_AGENT_NAMES.filter((name) => isAgentComplete(byAgent[name]?.status)).length
+}
+
+export function agentCompletionPct(
+  byAgent: Record<string, AgentExecutionRead>,
+  agentName: string,
+): number {
+  const status = byAgent[agentName]?.status
+  if (isAgentComplete(status)) return 100
+  const s = (status ?? '').toLowerCase()
+  if (RUNNING.has(s)) return 50
+  if (ERROR.has(s)) return 25
+  return 0
 }
 
 export function aggregateAgentUsage(agents: AgentExecutionRead[]) {

@@ -12,6 +12,7 @@ import Badge from "../Badge";
 interface Props {
   agentName: string;
   run: AgentExecutionRead | undefined;
+  runLabel?: string;
 }
 
 function statusVariant(run: AgentExecutionRead | undefined) {
@@ -92,7 +93,7 @@ function JsonBlock({ parsed }: { parsed: Record<string, unknown> }) {
   );
 }
 
-export default function AgentDetailPanel({ agentName, run }: Props) {
+export default function AgentDetailPanel({ agentName, run, runLabel }: Props) {
   const parsed = run?.output_json ? parseAgentOutput(run.output_json) : null;
   const highlights = parsed ? extractAgentHighlights(agentName, parsed) : [];
 
@@ -116,6 +117,7 @@ export default function AgentDetailPanel({ agentName, run }: Props) {
             <p className="text-[10px] text-stone-500">
               Execution #{run.execution_id}
               {run.agent_version ? ` · v${run.agent_version}` : ""}
+              {runLabel ? ` · Run ${runLabel}` : run.run_id ? ` · Run ${run.run_id.slice(0, 8)}` : ""}
             </p>
           </div>
         </div>

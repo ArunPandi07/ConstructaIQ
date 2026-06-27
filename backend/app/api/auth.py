@@ -44,9 +44,11 @@ async def register(
         hashed_password=hashed_password,
         full_name=user_data.full_name,
     )
-    created_user = await user_repo.create(user)
+    session.add(user)
+    await session.flush()
+    await session.refresh(user)
     await session.commit()
-    return success_response(created_user, "User registered successfully")
+    return success_response(UserRead.model_validate(user), "User registered successfully")
 
 
 @router.post("/login", response_model=ApiResponse[Token])
@@ -87,7 +89,7 @@ async def get_current_user_info(
     current_user: User = Depends(get_current_user),
 ):
     """Get current authenticated user's profile."""
-    return success_response(current_user)
+    return success_response(UserRead.model_validate(current_user))
 
 
 @router.put("/me", response_model=ApiResponse[UserRead])

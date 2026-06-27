@@ -1,4 +1,3 @@
-export { default as BuildingScene } from "./BuildingScene";
-export { default as ViewerControls } from "./ViewerControls";
-export { PresentationScene } from "./PresentationScene";
-export { AnalyticalScene } from "./AnalyticalScene";
+export { Building3DViewer } from './Building3DViewer';
+export type { CameraView } from './cameraPresets';
+export { DEFAULT_VIEW } from './cameraPresets';

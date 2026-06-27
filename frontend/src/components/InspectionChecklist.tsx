@@ -31,7 +31,7 @@ export default function InspectionChecklist({ inspections }: Props) {
           No inspections persisted yet. Run analyze to generate inspection stages.
         </p>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
           {inspections.map((item, i) => (
             <div
               key={i}

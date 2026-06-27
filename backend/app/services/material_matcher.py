@@ -115,6 +115,11 @@ def score_material_match(a: str, b: str) -> float:
         return 0.0
 
     overlap = len(intersection) / max(len(tokens_a), len(tokens_b))
+    smaller, larger = (
+        (tokens_a, tokens_b) if len(tokens_a) <= len(tokens_b) else (tokens_b, tokens_a)
+    )
+    if smaller and smaller.issubset(larger):
+        overlap = max(overlap, len(smaller) / len(larger), 0.45)
     keyword_bonus = sum(0.05 for token in intersection if token in MATERIAL_KEYWORDS)
     return min(1.0, overlap + keyword_bonus)
 

@@ -43,6 +43,28 @@ class AgentExecutionRepository(BaseRepository[AgentExecution]):
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
 
+    async def list_by_project_and_run(
+        self,
+        project_id: int,
+        run_id: str,
+        *,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> list[AgentExecution]:
+        stmt = (
+            select(AgentExecution)
+            .options(*_EXECUTION_LIST_DEFERS)
+            .where(
+                AgentExecution.project_id == project_id,
+                AgentExecution.run_id == run_id,
+            )
+            .order_by(AgentExecution.execution_id.desc())
+            .offset(skip)
+            .limit(limit)
+        )
+        result = await self.session.execute(stmt)
+        return list(result.scalars().all())
+
     async def list_by_project_and_agent(
         self,
         project_id: int,

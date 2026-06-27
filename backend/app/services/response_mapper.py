@@ -13,6 +13,12 @@ from app.db.models.permit import Permit
 from app.db.models.project import Project
 from app.db.models.project_risk import ProjectRisk
 from app.db.models.schedule import Schedule
+from app.services.agent_field_mapper import (
+    normalize_crew_agent,
+    normalize_supplier_agent,
+    normalize_supply_chain_risk_rows,
+    normalize_workforce_gap_rows,
+)
 from app.services.building_templates import (
     generate_building_definition,
     is_building_definition_sufficient,
@@ -59,6 +65,171 @@ def _to_float(value: Any) -> float | None:
         return None
 
 
+def _supplier_record_id(row: Any) -> int | None:
+    value = getattr(row, "supplier_record_id", None) or getattr(row, "id", None)
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _supplier_decimal(row: Any, field: str) -> float | None:
+    return _to_float(getattr(row, field, None))
+
+
+def _find_supplier_row(
+    material_name: str,
+    supplier_rows: list[Any],
+) -> tuple[Any | None, int | None]:
+    supplier_candidates = [
+        (_supplier_record_id(row), getattr(row, "material_name", None) or "")
+        for row in supplier_rows
+    ]
+    supplier_names = [
+        name for _, name in supplier_candidates if name and str(name).strip()
+    ]
+
+    supplier_record_id: int | None = None
+    norm_name = normalize_material_label(str(material_name))
+    for record_id, supplier_material in supplier_candidates:
+        if not supplier_material or record_id is None:
+            continue
+        if normalize_material_label(str(supplier_material)) == norm_name:
+            supplier_record_id = record_id
+            break
+
+    if supplier_record_id is None and supplier_names:
+        match = best_material_match(str(material_name), supplier_names)
+        if match:
+            for record_id, supplier_material in supplier_candidates:
+                if supplier_material == match[0] and record_id is not None:
+                    supplier_record_id = record_id
+                    break
+
+    if supplier_record_id is None:
+        return None, None
+
+    for row in supplier_rows:
+        if _supplier_record_id(row) == supplier_record_id:
+            return row, supplier_record_id
+    return None, supplier_record_id
+
+
+def _compute_total_cost(
+    quantity: Any,
+    unit_price: Any,
+    total_cost: Any,
+) -> float | None:
+    resolved = _to_float(total_cost)
+    if resolved is not None:
+        return resolved
+    qty = _to_float(quantity)
+    price = _to_float(unit_price)
+    if qty is not None and price is not None:
+        return qty * price
+    return None
+
+
+def _build_material_row(
+    mat: dict[str, Any] | str,
+    supplier_rows: list[Any],
+) -> dict[str, Any]:
+    if isinstance(mat, str):
+        material_name = mat.strip() or "Material"
+        category = "General"
+        quantity = None
+        unit = ""
+        unit_cost = None
+        total_cost = None
+    else:
+        material_name = (
+            mat.get("material_name") or mat.get("name") or "Material"
+        )
+        category = (
+            mat.get("category")
+            or mat.get("material_category")
+            or mat.get("type")
+            or "General"
+        )
+        quantity = mat.get("quantity")
+        unit = mat.get("unit") or ""
+        unit_cost = (
+            mat.get("unit_cost") or mat.get("unit_price") or mat.get("price")
+        )
+        total_cost = mat.get("total_cost")
+
+    supplier_row, supplier_record_id = _find_supplier_row(
+        str(material_name), supplier_rows
+    )
+
+    if supplier_row is not None:
+        if quantity is None or quantity == "":
+            quantity = getattr(supplier_row, "quantity", None)
+        if not unit:
+            unit = "EA"
+        if unit_cost is None or unit_cost == "":
+            unit_cost = getattr(supplier_row, "unit_price", None)
+        if total_cost is None or total_cost == "":
+            total_cost = getattr(supplier_row, "total_cost", None)
+
+    row_payload: dict[str, Any] = {
+        "name": material_name,
+        "materialName": material_name,
+        "category": category,
+        "quantity": quantity,
+        "unit": unit or "",
+        "unitCost": _to_float(unit_cost),
+        "totalCost": _compute_total_cost(quantity, unit_cost, total_cost),
+    }
+    if supplier_record_id is not None:
+        row_payload["supplierRecordId"] = supplier_record_id
+    return row_payload
+
+
+def _build_supplier_only_material_row(supplier_row: Any) -> dict[str, Any]:
+    material_name = getattr(supplier_row, "material_name", None) or "Material"
+    quantity = getattr(supplier_row, "quantity", None)
+    unit_price = getattr(supplier_row, "unit_price", None)
+    total_cost = getattr(supplier_row, "total_cost", None)
+    supplier_record_id = _supplier_record_id(supplier_row)
+    return {
+        "name": material_name,
+        "materialName": material_name,
+        "category": "Procurement",
+        "quantity": quantity,
+        "unit": "EA" if quantity not in (None, "") else "",
+        "unitCost": _to_float(unit_price),
+        "totalCost": _compute_total_cost(quantity, unit_price, total_cost),
+        "supplierRecordId": supplier_record_id,
+    }
+
+
+def _map_materials_with_suppliers(
+    materials: list[Any],
+    supplier_rows: list[Any],
+) -> list[dict[str, Any]]:
+    mapped_materials: list[dict[str, Any]] = []
+    matched_supplier_ids: set[int] = set()
+
+    for mat in materials:
+        if isinstance(mat, (dict, str)):
+            row_payload = _build_material_row(mat, supplier_rows)
+            mapped_materials.append(row_payload)
+            record_id = row_payload.get("supplierRecordId")
+            if record_id is not None:
+                matched_supplier_ids.add(int(record_id))
+
+    for supplier_row in supplier_rows:
+        record_id = _supplier_record_id(supplier_row)
+        if record_id is None or record_id in matched_supplier_ids:
+            continue
+        mapped_materials.append(_build_supplier_only_material_row(supplier_row))
+
+    return mapped_materials
+
+
 def _parse_json_field(value: str | None) -> Any:
     if not value:
         return None
@@ -82,25 +253,80 @@ def _extract_blueprint_summary(execution: AgentExecution | None) -> dict[str, An
     raw = _parse_json_field(execution.output_json)
     if not isinstance(raw, dict):
         return None
+
+    # Recursively unwrap nested blueprint_summary wrappers
+    for _ in range(5):
+        wrapper = None
+        if isinstance(raw.get("blueprint_summary"), dict):
+            wrapper = raw["blueprint_summary"]
+        elif isinstance(raw.get("blueprintSummary"), dict):
+            wrapper = raw["blueprintSummary"]
+        if wrapper is None:
+            break
+        merged = {k: v for k, v in raw.items() if k not in ("blueprint_summary", "blueprintSummary")}
+        merged.update(wrapper)
+        raw = merged
+
+    # Drop 3D geometry — served separately via buildingDefinition
+    for geometry_key in ("building_definition", "buildingDefinition", "levels", "building"):
+        raw.pop(geometry_key, None)
+
+    # Flatten dictionaries if nested (e.g., structural_quantities, footprint_m)
+    flattened_raw: dict[str, Any] = {}
+    for k, v in raw.items():
+        if isinstance(v, dict) and k not in ("mep_highlights",):
+            for sub_k, sub_v in v.items():
+                if sub_k not in flattened_raw and sub_k not in raw:
+                    flattened_raw[sub_k] = sub_v
+        else:
+            flattened_raw[k] = v
+
+    raw = flattened_raw
+
+    # Normalize spelling variations for key structural metrics
+    if "structural_steel_ton" in raw and "structural_steel_tons" not in raw:
+        raw["structural_steel_tons"] = raw["structural_steel_ton"]
+    if "rebar_ton" in raw and "rebar_tons" not in raw:
+        raw["rebar_tons"] = raw["rebar_ton"]
+
     keys = (
+        "project_name",
         "construction_type",
         "stories_above_grade",
         "structural_steel_tons",
         "concrete_cy",
         "curtain_wall_sf",
+        "metal_deck_sf",
         "lateral_system",
+        "width_m",
+        "depth_m",
         "mep_highlights",
         "building_features",
         "likely_structural_details",
+        "foundation_type",
+        "stories_below_grade",
     )
     summary = {k: raw[k] for k in keys if k in raw}
-    return summary or raw
+    if not summary:
+        summary = {
+            k: v
+            for k, v in raw.items()
+            if k not in ("building_definition", "buildingDefinition", "levels", "building")
+            and (not isinstance(v, (dict, list)) or k == "mep_highlights")
+        }
+
+    return summary or None
 
 
 def _extract_building_definition(
     execution: AgentExecution | None,
     project: Project,
 ) -> dict[str, Any] | None:
+    if project.building_definition_json:
+        stored = _parse_json_field(project.building_definition_json)
+        if isinstance(stored, dict) and is_building_definition_sufficient(stored):
+            return stored
+
     raw: dict[str, Any] = {}
     existing: dict[str, Any] | None = None
     if execution is not None and execution.output_json:
@@ -142,6 +368,73 @@ def _map_risk_item(risk: ProjectRisk) -> dict[str, Any]:
         "sourceAgent": risk.source_agent or "",
         "category": risk.category or "",
     }
+
+
+def _map_fallback_supply_risk(row: dict[str, Any], index: int) -> dict[str, Any]:
+    severity = str(row.get("severity") or "medium").title()
+    return {
+        "id": index,
+        "title": row.get("title") or "Unknown",
+        "severity": severity,
+        "detail": row.get("detail") or "",
+        "status": "open",
+        "sourceAgent": "SupplierAgent",
+        "category": "supply_chain",
+    }
+
+
+def _map_fallback_workforce_gap(row: dict[str, Any], index: int) -> dict[str, Any]:
+    severity = str(row.get("severity") or "medium").title()
+    return {
+        "id": index,
+        "title": row.get("role") or "Unknown",
+        "severity": severity,
+        "detail": row.get("shortage") or "",
+        "status": "open",
+        "sourceAgent": "CrewAgent",
+        "category": "workforce",
+    }
+
+
+def _latest_execution_by_agent(
+    executions: list[AgentExecution] | None,
+    agent_name: str,
+) -> AgentExecution | None:
+    latest: AgentExecution | None = None
+    for execution in executions or []:
+        if execution.agent_name != agent_name or not execution.output_json:
+            continue
+        if latest is None or (execution.execution_id or 0) > (latest.execution_id or 0):
+            latest = execution
+    return latest
+
+
+def _fallback_supply_chain_risks(
+    executions: list[AgentExecution] | None,
+) -> list[dict[str, Any]]:
+    execution = _latest_execution_by_agent(executions, "SupplierAgent")
+    if execution is None:
+        return []
+    raw = _parse_json_field(execution.output_json)
+    if not isinstance(raw, dict):
+        return []
+    normalized = normalize_supplier_agent(raw)
+    rows = normalize_supply_chain_risk_rows(normalized.get("supply_chain_risks"))
+    return [_map_fallback_supply_risk(row, index) for index, row in enumerate(rows, start=1)]
+
+
+def _fallback_workforce_gaps(
+    executions: list[AgentExecution] | None,
+) -> list[dict[str, Any]]:
+    execution = _latest_execution_by_agent(executions, "CrewAgent")
+    if execution is None:
+        return []
+    raw = _parse_json_field(execution.output_json)
+    if not isinstance(raw, dict):
+        return []
+    normalized = normalize_crew_agent(raw)
+    rows = normalize_workforce_gap_rows(normalized.get("workforce_gaps"))
+    return [_map_fallback_workforce_gap(row, index) for index, row in enumerate(rows, start=1)]
 
 
 def _as_list(value: Any) -> list[Any]:
@@ -437,6 +730,10 @@ def map_project_intelligence(
     workforce_gaps = [
         _map_risk_item(r) for r in risk_list if (r.category or "") == "workforce"
     ]
+    if not supply_chain_risks:
+        supply_chain_risks = _fallback_supply_chain_risks(executions)
+    if not workforce_gaps:
+        workforce_gaps = _fallback_workforce_gaps(executions)
 
     blueprint_summary = _extract_blueprint_summary(blueprint_execution)
     building_definition = _extract_building_definition(blueprint_execution, project)
@@ -463,73 +760,7 @@ def map_project_intelligence(
                 }
             )
 
-    mapped_materials = []
-    supplier_rows = suppliers or []
-    supplier_candidates = [
-        (
-            getattr(row, "supplier_record_id", None) or getattr(row, "id", None),
-            getattr(row, "material_name", None) or "",
-        )
-        for row in supplier_rows
-    ]
-    supplier_names = [
-        name for _, name in supplier_candidates if name and str(name).strip()
-    ]
-
-    for mat in materials:
-        if isinstance(mat, dict):
-            unit_cost = (
-                mat.get("unit_cost")
-                or mat.get("unit_price")
-                or mat.get("price")
-            )
-            total_cost = mat.get("total_cost")
-            material_name = (
-                mat.get("material_name") or mat.get("name") or "Material"
-            )
-            supplier_record_id = None
-            norm_name = normalize_material_label(str(material_name))
-            for record_id, supplier_material in supplier_candidates:
-                if not supplier_material:
-                    continue
-                if normalize_material_label(str(supplier_material)) == norm_name:
-                    supplier_record_id = record_id
-                    break
-            if supplier_record_id is None and supplier_names:
-                match = best_material_match(str(material_name), supplier_names)
-                if match:
-                    for record_id, supplier_material in supplier_candidates:
-                        if supplier_material == match[0]:
-                            supplier_record_id = record_id
-                            break
-
-            row_payload: dict[str, Any] = {
-                "name": material_name,
-                "materialName": material_name,
-                "category": mat.get("category")
-                or mat.get("material_category")
-                or mat.get("type")
-                or "General",
-                "quantity": mat.get("quantity"),
-                "unit": mat.get("unit") or "",
-                "unitCost": _to_float(unit_cost),
-                "totalCost": _to_float(total_cost),
-            }
-            if supplier_record_id is not None:
-                row_payload["supplierRecordId"] = supplier_record_id
-            mapped_materials.append(row_payload)
-        elif isinstance(mat, str):
-            mapped_materials.append(
-                {
-                    "name": mat,
-                    "materialName": mat,
-                    "category": "General",
-                    "quantity": None,
-                    "unit": "",
-                    "unitCost": None,
-                    "totalCost": None,
-                }
-            )
+    mapped_materials = _map_materials_with_suppliers(materials, suppliers or [])
 
     return {
         "name": project.project_name,
@@ -556,6 +787,9 @@ def map_project_intelligence(
         "workforceGaps": workforce_gaps,
         "blueprintSummary": blueprint_summary,
         "buildingDefinition": building_definition,
+        "zoningAssessment": _parse_json_field(project.zoning_data_json) or {},
+        "budgetAnalysis": _parse_json_field(project.budget_data_json) or {},
+        "safetyAssessment": _parse_json_field(project.safety_data_json) or {},
         "readiness": readiness,
         "recommendations": _extract_recommendations(executions),
     }

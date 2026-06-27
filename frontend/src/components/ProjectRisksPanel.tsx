@@ -33,7 +33,7 @@ function RiskList({
       {items.length === 0 ? (
         <p className="text-xs text-stone-500">None identified.</p>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
           {items.map((risk) => (
             <div
               key={risk.id}

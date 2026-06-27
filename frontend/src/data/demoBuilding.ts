@@ -286,10 +286,44 @@ export const DEMO_BUILDING_DEFINITION: BuildingDefinition = {
   },
 };
 
+/** Twin Tower Residences — HTML reference (G+6, 30.8×12 m site) */
+export const TWIN_TOWER_DEMO: BuildingDefinition = {
+  building: {
+    type: "residential_tower",
+    stories: 7,
+    totalHeight_m: 3.6 + 6 * 3.2,
+    footprint: { width_m: 30.8, depth_m: 12 },
+    construction_type: "Type III-A over Type I Podium",
+    roof_type: "penthouse",
+    footprint_shape: "twin_tower",
+    cladding_material: "stone_white",
+  },
+  levels: Array.from({ length: 7 }, (_, i) => ({
+    level: i,
+    name: i === 0 ? "Ground Floor" : i === 6 ? "Penthouse" : `Level ${i + 1}`,
+    height_m: i === 0 ? 3.6 : 3.2,
+    floorplate: { width_m: 14, depth_m: 12 },
+    rooms: [],
+    walls: [],
+    stairs: [],
+  })),
+  facade: {
+    balconies: true,
+    balcony_depth_m: 1.6,
+    railing_height_m: 1.1,
+    window_pattern: "grid",
+    material: "cast_stone",
+  },
+};
+
 /** Available demo building variants for the selector */
-export type DemoVariant = "residential_tower" | "office_tower" | "mixed_use";
+export type DemoVariant = "residential_tower" | "twin_tower" | "office_tower" | "mixed_use";
 
 export function getDemoVariant(variant: DemoVariant): BuildingDefinition {
+  if (variant === "twin_tower") {
+    return TWIN_TOWER_DEMO;
+  }
+
   if (variant === "office_tower") {
     return {
       ...DEMO_BUILDING_DEFINITION,
@@ -339,14 +373,32 @@ export function getDemoVariant(variant: DemoVariant): BuildingDefinition {
         totalHeight_m: 9 * 3.5,
         footprint: { width_m: 32, depth_m: 20 },
       },
-      levels: DEMO_BUILDING_DEFINITION.levels.slice(0, 9).map((lvl, i) => ({
-        ...lvl,
+      levels: Array.from({ length: 9 }, (_, i) => ({
         level: i,
         name: i === 0 ? "Retail / Ground" : i <= 2 ? `Commercial Floor ${i}` : `Residential Floor ${i - 2}`,
         height_m: 3.5,
         floorplate: { width_m: 32, depth_m: 20 },
+        rooms: [
+          {
+            id: `mu_l${i}_room`,
+            name: i <= 2 ? "Commercial Space" : "Apartment Unit",
+            type: i === 0 ? "retail" : i <= 2 ? "office" : "living",
+            height_m: 3.5,
+            polygon: [
+              { x: 1, y: 1 }, { x: 31, y: 1 },
+              { x: 31, y: 19 }, { x: 1, y: 19 },
+            ],
+          },
+        ],
+        walls: [
+          { id: `mu_l${i}_front`, start: { x: 0, y: 0 }, end: { x: 32, y: 0 }, thickness_m: 0.25, type: "exterior" as WallType, material: "brick", openings: Array.from({ length: 4 }, (_, j) => ({ id: `mu_fw${j}`, type: "window" as const, offset_m: 3 + j * 7, width_m: 3, height_m: 2.2, sill_m: 0.6 })) },
+          { id: `mu_l${i}_right`, start: { x: 32, y: 0 }, end: { x: 32, y: 20 }, thickness_m: 0.25, type: "exterior" as WallType, material: "brick", openings: Array.from({ length: 2 }, (_, j) => ({ id: `mu_rw${j}`, type: "window" as const, offset_m: 3 + j * 8, width_m: 3, height_m: 2.2, sill_m: 0.6 })) },
+          { id: `mu_l${i}_rear`, start: { x: 32, y: 20 }, end: { x: 0, y: 20 }, thickness_m: 0.25, type: "exterior" as WallType, material: "brick", openings: Array.from({ length: 4 }, (_, j) => ({ id: `mu_bw${j}`, type: "window" as const, offset_m: 3 + j * 7, width_m: 3, height_m: 2.2, sill_m: 0.6 })) },
+          { id: `mu_l${i}_left`, start: { x: 0, y: 20 }, end: { x: 0, y: 0 }, thickness_m: 0.25, type: "exterior" as WallType, material: "brick", openings: Array.from({ length: 2 }, (_, j) => ({ id: `mu_lw${j}`, type: "window" as const, offset_m: 3 + j * 8, width_m: 3, height_m: 2.2, sill_m: 0.6 })) },
+        ],
+        stairs: [{ id: `mu_l${i}_stair`, position: { x: 26, y: 10 }, width_m: 2.2, depth_m: 4.5, direction: "both" as const }],
       })),
-      facade: { balconies: true, balcony_depth_m: 1.2, railing_height_m: 1.1, window_pattern: "punched", material: "mixed_panel" },
+      facade: { balconies: true, balcony_depth_m: 1.5, railing_height_m: 1.1, window_pattern: "punched", material: "brick" },
     };
   }
 

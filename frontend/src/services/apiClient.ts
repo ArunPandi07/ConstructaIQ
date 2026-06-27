@@ -22,6 +22,8 @@ const DEFAULT_TIMEOUT = 30_000
 const getToken = (): string | null =>
   localStorage.getItem('buildmind_token')
 
+export { getToken }
+
 // ── Core fetch wrapper ────────────────────────────────────────
 
 interface FetchOptions extends RequestInit {
@@ -131,6 +133,34 @@ class ApiClient {
       headers: this.buildHeaders(),
     })
     return this.handleResponse<T>(res)
+  }
+
+  async fetchBlob(path: string): Promise<Blob> {
+    const headers: Record<string, string> = {
+      'X-Client': 'BuildMind-Web/1.0',
+      Accept: 'application/pdf,*/*',
+    }
+    const token = getToken()
+    if (token) headers['Authorization'] = `Bearer ${token}`
+
+    const res = await fetchWithTimeout(`${this.baseUrl}${path}`, { headers })
+    if (!res.ok) {
+      let body: unknown
+      try {
+        body = await res.json()
+      } catch {
+        body = undefined
+      }
+      const message =
+        typeof body === 'object' &&
+        body !== null &&
+        'message' in body &&
+        typeof (body as { message?: unknown }).message === 'string'
+          ? (body as { message: string }).message
+          : `Request failed (${res.status})`
+      throw new ApiError(message, res.status, body)
+    }
+    return res.blob()
   }
 }
 

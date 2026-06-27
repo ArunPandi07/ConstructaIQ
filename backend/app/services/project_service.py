@@ -30,7 +30,6 @@ from app.schemas.project_responses import (
     ProjectListItem,
 )
 from app.services.analyze_job_service import AnalyzeJob, analyze_job_service
-from app.services.blob_storage_service import blob_storage_service
 from app.services.logging_service import get_logger
 from app.services.response_mapper import map_permit_status, map_project_intelligence
 
@@ -40,6 +39,15 @@ _ACTIVE_STATUSES = frozenset({"active", "live"})
 _COMPLETE_STATUSES = frozenset({"complete", "completed", "success"})
 _RELATED_ROW_LIMIT = 1000
 _DASHBOARD_PROJECT_LIMIT = 100
+
+
+def _guess_content_type(filename: str | None, upload_content_type: str | None) -> str:
+    if upload_content_type and upload_content_type != "application/octet-stream":
+        return upload_content_type
+    lower = (filename or "").lower()
+    if lower.endswith(".pdf"):
+        return "application/pdf"
+    return "application/octet-stream"
 
 
 async def _get_project_or_404(session: AsyncSession, project_id: int):
@@ -87,19 +95,15 @@ async def upload_project_documents(
 
     async def _store(doc_type: str, upload: UploadFile) -> None:
         content = await upload.read()
-        blob_url = None
-        if blob_storage_service.is_enabled:
-            blob_result = await blob_storage_service.upload_document(
-                project_name, upload.filename or f"{doc_type}.pdf", content
-            )
-            blob_url = blob_result.blob_path
-
+        filename = upload.filename or f"{doc_type}.pdf"
         document = await doc_repo.create(
             DocumentCreate(
                 project_id=project.project_id,
                 document_type=doc_type,
-                file_name=upload.filename,
-                blob_url=blob_url,
+                file_name=filename,
+                file_content=content,
+                content_type=_guess_content_type(filename, upload.content_type),
+                file_size_bytes=len(content),
             )
         )
         documents.append(document)
@@ -521,9 +525,91 @@ async def get_project_crew(session: AsyncSession, project_id: int):
     return await CrewPlanRepository(session).list_by_project(project_id)
 
 
-async def get_project_agents(session: AsyncSession, project_id: int):
+async def count_pipeline_runs(session: AsyncSession, project_id: int) -> int:
+    from sqlalchemy import func, select
+
+    from app.db.models.analyze_job import ProjectAnalyzeJob
+
+    job_stmt = select(func.count(ProjectAnalyzeJob.job_id)).where(
+        ProjectAnalyzeJob.project_id == project_id
+    )
+    job_count = (await session.execute(job_stmt)).scalar_one() or 0
+
+    run_stmt = select(func.count(func.distinct(AgentExecution.run_id))).where(
+        AgentExecution.project_id == project_id,
+        AgentExecution.run_id.isnot(None),
+    )
+    distinct_count = (await session.execute(run_stmt)).scalar_one() or 0
+
+    return max(job_count, distinct_count)
+
+
+async def get_pipeline_runs(session: AsyncSession, project_id: int):
+    from sqlalchemy import func, select
+
+    from app.db.models.analyze_job import ProjectAnalyzeJob
+    from app.schemas.project_responses import PipelineRunSummary
+
     await _get_project_or_404(session, project_id)
-    return await AgentExecutionRepository(session).list_by_project(project_id)
+
+    stmt = (
+        select(
+            ProjectAnalyzeJob.job_id,
+            ProjectAnalyzeJob.status,
+            ProjectAnalyzeJob.overall_pct,
+            ProjectAnalyzeJob.created_at,
+            ProjectAnalyzeJob.updated_at,
+            ProjectAnalyzeJob.error_message,
+            func.count(AgentExecution.execution_id).label("agent_count"),
+            func.coalesce(func.sum(AgentExecution.duration_seconds), 0).label(
+                "total_duration_seconds"
+            ),
+        )
+        .outerjoin(
+            AgentExecution,
+            AgentExecution.run_id == ProjectAnalyzeJob.job_id,
+        )
+        .where(ProjectAnalyzeJob.project_id == project_id)
+        .group_by(
+            ProjectAnalyzeJob.job_id,
+            ProjectAnalyzeJob.status,
+            ProjectAnalyzeJob.overall_pct,
+            ProjectAnalyzeJob.created_at,
+            ProjectAnalyzeJob.updated_at,
+            ProjectAnalyzeJob.error_message,
+        )
+        .order_by(ProjectAnalyzeJob.created_at.desc())
+    )
+    rows = (await session.execute(stmt)).all()
+    return [
+        PipelineRunSummary(
+            job_id=row.job_id,
+            status=row.status,
+            overall_pct=row.overall_pct or 0,
+            created_at=row.created_at,
+            updated_at=row.updated_at,
+            agent_count=int(row.agent_count or 0),
+            total_duration_seconds=int(row.total_duration_seconds or 0),
+            error_message=row.error_message,
+        )
+        for row in rows
+    ]
+
+
+async def get_project_agents(
+    session: AsyncSession,
+    project_id: int,
+    *,
+    run_id: str | None = None,
+):
+    await _get_project_or_404(session, project_id)
+    repo = AgentExecutionRepository(session)
+    if run_id:
+        return await repo.list_by_project_and_run(project_id, run_id)
+    return await repo.list_by_project(project_id)
+
+
+
 
 
 async def start_analyze_job(
@@ -541,27 +627,17 @@ async def start_analyze_job(
     contract_filename = None
     blueprint_bytes = None
     blueprint_filename = None
-    existing_blob_paths: dict[str, str] = {}
-    skip_blob_upload = False
+    for doc in documents:
+        if not doc.file_content:
+            continue
+        if doc.document_type == "contract":
+            contract_bytes = doc.file_content
+            contract_filename = doc.file_name or "contract.pdf"
+        elif doc.document_type == "blueprint":
+            blueprint_bytes = doc.file_content
+            blueprint_filename = doc.file_name or "blueprint.pdf"
 
-    if blob_storage_service.is_enabled:
-        for doc in documents:
-            if doc.document_type == "contract" and doc.blob_url:
-                contract_bytes, contract_filename = (
-                    await blob_storage_service.download_document(doc.blob_url),
-                    doc.file_name,
-                )
-                existing_blob_paths["contract"] = doc.blob_url
-                skip_blob_upload = True
-            elif doc.document_type == "blueprint" and doc.blob_url:
-                blueprint_bytes, blueprint_filename = (
-                    await blob_storage_service.download_document(doc.blob_url),
-                    doc.file_name,
-                )
-                existing_blob_paths["blueprint"] = doc.blob_url
-                skip_blob_upload = True
-
-    job = analyze_job_service.create_job(
+    job = await analyze_job_service.create_job(
         project_id,
         triggering_user_id=triggering_user_id,
         send_report_email=send_report_email,
@@ -574,17 +650,15 @@ async def start_analyze_job(
         contract_filename=contract_filename,
         blueprint_bytes=blueprint_bytes,
         blueprint_filename=blueprint_filename,
-        skip_blob_upload=skip_blob_upload,
-        existing_blob_paths=existing_blob_paths or None,
     )
     return job
 
 
-def get_analyze_job_status(project_id: int, job_id: str | None = None) -> AnalyzeJob:
+async def get_analyze_job_status(project_id: int, job_id: str | None = None) -> AnalyzeJob:
     job = (
-        analyze_job_service.get_job(job_id)
+        await analyze_job_service.get_job(job_id)
         if job_id
-        else analyze_job_service.get_latest_job_for_project(project_id)
+        else await analyze_job_service.get_latest_job_for_project(project_id)
     )
     if job is None or job.project_id != project_id:
         raise HTTPException(

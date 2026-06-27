@@ -40,7 +40,24 @@ class ProjectSummaryResponse(BaseModel):
 
 class ProjectAgentsResponse(BaseModel):
     project_id: int
+    pipeline_run_count: int = 0
     agents: list[AgentExecutionListItem]
+
+
+class PipelineRunSummary(BaseModel):
+    job_id: str
+    status: str
+    overall_pct: int = 0
+    created_at: datetime
+    updated_at: datetime
+    agent_count: int = 0
+    total_duration_seconds: int = 0
+    error_message: Optional[str] = None
+
+
+class ProjectPipelineRunsResponse(BaseModel):
+    project_id: int
+    runs: list[PipelineRunSummary]
 
 
 class ProjectSuppliersResponse(BaseModel):

@@ -33,3 +33,12 @@ export async function updateProfile(data: {
   const response = await apiClient.put<User>('/auth/me', data)
   return response.data
 }
+
+export async function register(data: {
+  email: string
+  password: string
+  full_name: string
+}): Promise<User> {
+  const response = await apiClient.post<User>('/auth/register', data)
+  return response.data
+}

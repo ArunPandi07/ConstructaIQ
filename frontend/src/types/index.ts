@@ -298,6 +298,9 @@ export interface ProjectIntelligenceData {
   workforceGaps?:    ProjectRiskItem[]
   blueprintSummary?: BlueprintSummaryData | null
   buildingDefinition?: import("./building").BuildingDefinition | null
+  zoningAssessment?: Record<string, unknown> | null
+  budgetAnalysis?: Record<string, unknown> | null
+  safetyAssessment?: Record<string, unknown> | null
   readiness?:        ReadinessMetrics
   recommendations?:  Recommendation[]
 }
@@ -506,7 +509,29 @@ export interface ProjectCreatePayload {
 
 export interface ProjectUploadResponse {
   project_id: number
-  documents: Array<{ document_id?: number; file_name?: string; document_type?: string }>
+  documents: Array<{
+    document_id?: number
+    file_name?: string
+    document_type?: string
+    has_file?: boolean
+    file_size_bytes?: number | null
+  }>
+}
+
+export interface ProjectDocument {
+  document_id: number
+  project_id: number
+  document_type?: string | null
+  file_name?: string | null
+  content_type?: string | null
+  file_size_bytes?: number | null
+  created_at: string
+  has_file: boolean
+}
+
+export interface ProjectDocumentsResponse {
+  project_id: number
+  documents: ProjectDocument[]
 }
 
 export interface AnalyzeJobResponse {
@@ -551,7 +576,7 @@ export interface AnalyzePipelineResult {
   supplierAnalysis?: Record<string, unknown>
   crewAnalysis?: Record<string, unknown>
   persistenceSummary?: PersistenceSummary
-  stored_documents?: Record<string, string>
+  stored_document_ids?: Record<string, number>
 }
 
 export interface ProjectSummaryResponse {
@@ -587,6 +612,7 @@ export interface AgentExecutionRead {
   project_id: number
   agent_name?: string | null
   agent_version?: string | null
+  run_id?: string | null
   status?: string | null
   started_at?: string | null
   completed_at?: string | null
@@ -597,7 +623,24 @@ export interface AgentExecutionRead {
   created_at?: string
 }
 
+export interface PipelineRunSummary {
+  job_id: string
+  status: string
+  overall_pct: number
+  created_at: string
+  updated_at: string
+  agent_count: number
+  total_duration_seconds: number
+  error_message?: string | null
+}
+
+export interface ProjectPipelineRunsResponse {
+  project_id: number
+  runs: PipelineRunSummary[]
+}
+
 export interface ProjectAgentsResponse {
   project_id: number
+  pipeline_run_count: number
   agents: AgentExecutionRead[]
 }

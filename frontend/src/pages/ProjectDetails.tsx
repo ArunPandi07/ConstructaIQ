@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, lazy, Suspense } from "react";
-import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { useParams, useNavigate, useLocation, Link, useSearchParams } from "react-router-dom";
 import {
   Building2,
   HardHat,
@@ -8,9 +8,10 @@ import {
   ArrowLeft,
   MapPin,
   CalendarDays,
+  Ruler,
 } from "lucide-react";
 import { useAppContext } from "../context/AppContext";
-import { useProjectAgents, useProjectIntelligence } from "../hooks/usePageData";
+import { useProjectAgents, useProjectIntelligence, clearIntelligenceCache, clearAgentsCache } from "../hooks/usePageData";
 import {
   getProject,
   getProjectCrew,
@@ -18,29 +19,38 @@ import {
   isBackendProjectId,
   mapBackendProjectToUI,
   PIPELINE_AGENT_NAMES,
+  startAnalyze,
+  pollAnalyzeUntilComplete,
 } from "../services/projectApi";
-const Blueprint3DTab = lazy(() => import("../components/Blueprint3DTab"));
-const BuildingPreviewCarousel = lazy(() => import("../components/BuildingPreviewCarousel"));
-const BuildingSnapshotCapture = lazy(() => import("../components/building3d/BuildingSnapshotCapture"));
-import BlueprintSummaryPanel from "../components/BlueprintSummaryPanel";
+import type { AnalyzeJobStatus } from "../types";
+const BlueprintSummaryPanel = lazy(() => import("../components/BlueprintSummaryPanel"));
+
+import { RingSpinner } from "../components/Loader";
 import BudgetBreakdownPanel from "../components/BudgetBreakdownPanel";
+import BudgetAnalysisPanel from "../components/BudgetAnalysisPanel";
+import ZoningPanel from "../components/ZoningPanel";
+import SafetyPanel from "../components/SafetyPanel";
+import ProjectDocumentsPanel from "../components/ProjectDocumentsPanel";
+import ReportDeliveriesPanel from "../components/ReportDeliveriesPanel";
 import CrewPlanGantt from "../components/CrewPlanGantt";
+import CrewRosterPanel from "../components/CrewRosterPanel";
 import InspectionChecklist from "../components/InspectionChecklist";
 import MaterialsPanel from "../components/MaterialsPanel";
 import ProjectRisksPanel from "../components/ProjectRisksPanel";
 import RecommendationsPanel from "../components/RecommendationsPanel";
 import SchedulePanel from "../components/SchedulePanel";
+import { Building3DViewer } from "../components/building3d";
 import type { CrewPlanRead, Project, ProjectSupplierRow } from "../types";
 import {
   countCompletedAgents,
   latestByAgent,
 } from "../utils/agentHelpers";
-import { useBuildingSnapshots } from "../hooks/useBuildingSnapshots";
 
 export default function ProjectDetails() {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const { projects, uploadJustCompleted, setActiveProjectId } = useAppContext();
   const backPath =
     location.state?.from === "dashboard" ? "/dashboard" : "/projects";
@@ -50,11 +60,13 @@ export default function ProjectDetails() {
     data: intelligence,
     loading: intelligenceLoading,
     error: intelligenceError,
+    refetch: refetchIntelligence,
   } = useProjectIntelligence(projectId ?? "");
   const {
     data: agentExecutions,
     loading: agentsLoading,
     error: agentsError,
+    refetch: refetchAgents,
   } = useProjectAgents(projectId ?? "");
 
   const [selectedProj, setSelectedProj] = useState<Project | null>(null);
@@ -64,21 +76,65 @@ export default function ProjectDetails() {
   const [suppliers, setSuppliers] = useState<ProjectSupplierRow[]>([]);
   const [crewPlans, setCrewPlans] = useState<CrewPlanRead[]>([]);
   type TabId =
-    | "overview"
     | "budget"
+    | "documents"
     | "schedule"
     | "materials"
     | "inspections"
     | "risks"
     | "recommendations"
     | "blueprint"
-    | "3d_view";
-  const [activeTab, setActiveTab] = useState<TabId>("overview");
+    | "crew"
+    | "zoning"
+    | "safety"
+    | "reports";
+  const [activeTab, setActiveTab] = useState<TabId>("budget");
+  const [tabLoading, setTabLoading] = useState(false);
   const [activatedTabs, setActivatedTabs] = useState<Set<TabId>>(
-    () => new Set(["overview"] as TabId[]),
+    () => new Set(["budget"] as TabId[]),
   );
+  const [isReRunning, setIsReRunning] = useState(false);
+  const [reRunMessage, setReRunMessage] = useState<{
+    tone: "success" | "warning" | "error";
+    text: string;
+  } | null>(null);
+
+  function reportDeliveryMessage(status: AnalyzeJobStatus): {
+    tone: "success" | "warning" | "error";
+    text: string;
+  } {
+    if (status.report_delivery_status === "sent") {
+      return {
+        tone: "success",
+        text: "Analysis complete. Intelligence report emailed successfully.",
+      };
+    }
+    if (status.report_delivery_status === "failed") {
+      return {
+        tone: "error",
+        text:
+          status.report_delivery_error ??
+          "Analysis complete, but the report email failed to send.",
+      };
+    }
+    if (status.report_delivery_status === "skipped") {
+      return {
+        tone: "warning",
+        text:
+          status.report_delivery_error ??
+          "Analysis complete. Report email was skipped.",
+      };
+    }
+    return {
+      tone: "success",
+      text: "Analysis complete.",
+    };
+  }
 
   function handleTabChange(tabId: TabId) {
+    if (tabId === activeTab) return;
+    setTabLoading(true);
+    setTimeout(() => setTabLoading(false), 180);
     setActiveTab(tabId);
     setActivatedTabs((prev) => {
       if (prev.has(tabId)) return prev;
@@ -86,27 +142,34 @@ export default function ProjectDetails() {
     });
   }
 
-  const deferSnapshotCapture = activeTab === "3d_view";
-  const {
-    shots: snapshotShots,
-    status: snapshotStatus,
-    progress: snapshotProgress,
-    shouldCapture,
-    regenerate: regenerateSnapshots,
-    onCaptureComplete,
-    onCaptureProgress,
-    onCaptureError,
-  } = useBuildingSnapshots({
-    projectId,
-    buildingDefinition: intelligence?.buildingDefinition,
-    deferCapture: deferSnapshotCapture,
-  });
-
   useEffect(() => {
     if (projectId && isBackendProjectId(projectId)) {
       setActiveProjectId(projectId);
     }
   }, [projectId, setActiveProjectId]);
+
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab === "documents") {
+      setActiveTab("documents");
+      setActivatedTabs((prev) => new Set([...prev, "documents"]));
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (!projectId || !isBackendProjectId(projectId)) return;
+    if (searchParams.get("refresh") !== "1" && !uploadJustCompleted) return;
+    clearIntelligenceCache(projectId);
+    clearAgentsCache(projectId);
+    void refetchIntelligence();
+    void refetchAgents();
+  }, [
+    projectId,
+    searchParams,
+    uploadJustCompleted,
+    refetchIntelligence,
+    refetchAgents,
+  ]);
 
   useEffect(() => {
     if (project) setSelectedProj(project);
@@ -123,7 +186,7 @@ export default function ProjectDetails() {
   }, [projectId, project]);
 
   useEffect(() => {
-    if (!activatedTabs.has("materials")) return;
+    if (!activatedTabs.has("materials") && !activatedTabs.has("schedule")) return;
     if (!projectId || !isBackendProjectId(projectId)) return;
     getProjectSuppliers(Number(projectId))
       .then((res) => {
@@ -191,30 +254,23 @@ export default function ProjectDetails() {
     permits: readiness?.permitsPct ?? readiness?.permitReadinessPct ?? 0,
     crewPlan: readiness?.crewPlanPct ?? readiness?.workforceReadinessPct ?? 0,
   };
-  const permitsCount = permitList.length;
 
-  const agentMetrics = [
-    { label: "Contract", icon: "📜", val: readiness?.agentCompletionPct ?? 0 },
-    { label: "Blueprint", icon: "📐", val: readiness?.agentCompletionPct ?? 0 },
-    { label: "Permits", icon: "🏛️", val: readiness?.permitReadinessPct ?? 0 },
-    { label: "Timeline", icon: "🗓️", val: readiness?.phaseProgressPct ?? 0 },
-    { label: "Suppliers", icon: "🚚", val: readiness?.procurementReadinessPct ?? 0 },
-    { label: "Crew Ops", icon: "👷", val: readiness?.workforceReadinessPct ?? 0 },
-  ];
+  const pendingPermits = permitList.filter((p) => p.status !== "Approved");
 
   const detailTabs = [
-    { id: "overview" as const, label: "Overview" },
     { id: "budget" as const, label: "Budget" },
+    { id: "documents" as const, label: "Documents" },
+    { id: "zoning" as const, label: "Zoning" },
+    { id: "safety" as const, label: "Safety" },
     { id: "schedule" as const, label: "Schedule" },
     { id: "materials" as const, label: "Materials" },
     { id: "inspections" as const, label: "Inspections" },
     { id: "risks" as const, label: "Risks" },
     { id: "recommendations" as const, label: "Recommendations" },
     { id: "blueprint" as const, label: "Blueprint" },
-    { id: "3d_view" as const, label: "3D View" },
+    { id: "crew" as const, label: "Crew Roster" },
+    { id: "reports" as const, label: "Reports" },
   ];
-
-  const pendingPermits = permitList.filter((p) => p.status !== "Approved");
 
   const handleSelectProjectDetails = (p: Project) => {
     setSelectedProj(p);
@@ -374,30 +430,99 @@ export default function ProjectDetails() {
         </div>
 
         {/* 3D BUILDING PREVIEW CAROUSEL */}
-        <div className="glass-card p-6 flex flex-col xl:col-span-8 w-full min-h-[380px]">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-sm font-bold text-stone-900 tracking-tight flex items-center gap-2">
-              <Building2 className="w-4 h-4 text-[#F5C518]" />
-              3D Building Previews
+        {/* STATIC BLUEPRINT SPECIFICATION DETAIL CARD */}
+        <div className="glass-card p-6 flex flex-col xl:col-span-8 w-full min-h-[380px] bg-stone-950 text-stone-100 border border-stone-800 relative overflow-hidden">
+          {/* Blueprint Grid Lines Pattern */}
+          <div 
+            className="absolute inset-0 opacity-10 pointer-events-none"
+            style={{
+              backgroundImage: "linear-gradient(rgba(245, 197, 24, 0.2) 1px, transparent 1px), linear-gradient(90deg, rgba(245, 197, 24, 0.2) 1px, transparent 1px)",
+              backgroundSize: "20px 20px"
+            }}
+          ></div>
+
+          <div className="relative z-10 flex justify-between items-center mb-4 border-b border-stone-800 pb-3">
+            <h3 className="text-sm font-black uppercase tracking-wider text-[#F5C518] flex items-center gap-2">
+              <Ruler className="w-4 h-4" />
+              Blueprint Schematics & Specifications
             </h3>
-            {snapshotStatus === "ready" && snapshotShots.length > 0 && (
-              <span className="text-[9px] bg-stone-100 text-stone-500 font-bold px-2 py-0.5 rounded-md font-mono uppercase">
-                {snapshotShots.length} views
-              </span>
-            )}
+            <span className="text-[9px] bg-[#F5C518]/25 text-[#F5C518] border border-[#F5C518]/30 font-bold px-2.5 py-1 rounded-md uppercase font-mono tracking-wider">
+              Draft Status: Extracted
+            </span>
           </div>
-          <Suspense fallback={<div className="h-64 rounded-2xl skeleton" />}>
-            <BuildingPreviewCarousel
-              shots={snapshotShots}
-              status={snapshotStatus}
-              progress={snapshotProgress}
-              embedded
-              onOpen3DTab={() => handleTabChange("3d_view")}
-              onRegenerate={regenerateSnapshots}
-            />
-          </Suspense>
+
+          <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 gap-6 my-auto">
+            {/* Dimensions Section */}
+            <div className="space-y-4">
+              <div className="border border-stone-800 rounded-xl p-4 bg-stone-900/50">
+                <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-3">Dimensional Blueprint Data</p>
+                <div className="space-y-3 font-mono text-xs">
+                  <div className="flex justify-between border-b border-stone-800/60 pb-1.5">
+                    <span className="text-stone-500">Gross Floor Area:</span>
+                    <span className="font-bold text-[#F5C518]">{intelligence?.squareFootage ? Number(intelligence.squareFootage).toLocaleString() : "-"} SF</span>
+                  </div>
+                  <div className="flex justify-between border-b border-stone-800/60 pb-1.5">
+                    <span className="text-stone-500">Total Height:</span>
+                    <span className="font-bold text-[#F5C518]">{intelligence?.buildingDefinition?.building?.totalHeight_m ?? "-"} m</span>
+                  </div>
+                  <div className="flex justify-between border-b border-stone-800/60 pb-1.5">
+                    <span className="text-stone-500">Floor count:</span>
+                    <span className="font-bold text-[#F5C518]">{intelligence?.floors ?? intelligence?.buildingDefinition?.building?.stories ?? "-"} stories</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-stone-500">Est. Footprint:</span>
+                    <span className="font-bold text-[#F5C518]">
+                      {intelligence?.buildingDefinition?.building?.footprint?.width_m ?? "?"}m × {intelligence?.buildingDefinition?.building?.footprint?.depth_m ?? "?"}m
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Facade & Structure Section */}
+            <div className="space-y-4">
+              <div className="border border-stone-800 rounded-xl p-4 bg-stone-900/50">
+                <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-3">Materials & Structural Rules</p>
+                <div className="space-y-3 font-mono text-xs">
+                  <div className="flex justify-between border-b border-stone-800/60 pb-1.5">
+                    <span className="text-stone-500">Primary Cladding:</span>
+                    <span className="font-bold text-[#F5C518] uppercase">{intelligence?.buildingDefinition?.facade?.material ?? "Concrete"}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-stone-800/60 pb-1.5">
+                    <span className="text-stone-500">Window Pattern:</span>
+                    <span className="font-bold text-[#F5C518] uppercase">{intelligence?.buildingDefinition?.facade?.window_pattern ?? "Grid"}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-stone-800/60 pb-1.5">
+                    <span className="text-stone-500">Balcony Structures:</span>
+                    <span className="font-bold text-[#F5C518]">{intelligence?.buildingDefinition?.facade?.balconies ? "INTEGRATED" : "NONE"}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-stone-500">Roof Profile:</span>
+                    <span className="font-bold text-[#F5C518] uppercase">{intelligence?.buildingDefinition?.building?.roof_type ?? "Flat"}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="relative z-10 mt-4 border-t border-stone-800 pt-3 flex justify-between items-center text-[10px] text-stone-500 font-mono">
+            <span>CAD-READY COORDINATE ARRAYS GENERATED</span>
+            <span>SHEET ID: C-101 (STRUCTURAL SCHEMA)</span>
+          </div>
         </div>
       </div>
+
+      {/* ── 3D BUILDING VIEWER ─────────────────────────────────── */}
+      {intelligence?.buildingDefinition ? (
+        <div className="col-span-12 rounded-2xl overflow-hidden border border-stone-800/50 shadow-2xl relative w-full" style={{ height: '500px' }}>
+          <Building3DViewer buildingDefinition={intelligence.buildingDefinition} />
+        </div>
+      ) : (
+        <div className="col-span-12 rounded-2xl bg-stone-950/50 border border-stone-800/30 h-[500px] flex flex-col items-center justify-center gap-3">
+          <span className="text-4xl">🏗️</span>
+          <p className="text-stone-500 text-sm">3D model will appear after blueprint analysis</p>
+        </div>
+      )}
 
       {/* ROW 2 — compliance + project schedules (equal full-width columns) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full">
@@ -540,175 +665,95 @@ export default function ProjectDetails() {
         </div>
       </div>
 
-      {/* ACCORDION DETAILED SPECIFICATION BLOCKS */}
-      {/* <div className="glass-card p-6 relative">
-        <h3 className="text-base font-extrabold text-stone-900 tracking-tight mb-4 flex items-center gap-2">
-          <Layers className="w-5 h-5 text-[#F5C518]" />
-          Detailed Site Specific Analytics & Agent Audits
-        </h3>
-        <div className="space-y-3">
-          <div className="border border-stone-200 rounded-2xl overflow-hidden transition-all duration-300">
-            <button
-              onClick={() => toggleSection("contract")}
-              className="w-full bg-stone-50 hover:bg-stone-100/70 p-4 flex justify-between items-center text-left transition"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-[#f0f2f5] border border-stone-200/80 flex items-center justify-center text-base">
-                  📜
-                </div>
-                <div>
-                  <span className="text-xs text-stone-400 uppercase font-bold tracking-widest block text-[9px]">
-                    Autonomous Report
-                  </span>
-                  <span className="text-xs font-bold text-stone-800">
-                    📜 Contract Summary Analysis
-                  </span>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="bg-stone-200/60 text-stone-700 text-[9px] font-mono font-bold px-2 py-0.5 rounded">
-                  ContractAgent v3
-                </span>
-                {expandedSections.contract ? (
-                  <ChevronUp className="w-4 h-4 text-stone-400" />
-                ) : (
-                  <ChevronDown className="w-4 h-4 text-stone-400" />
-                )}
-              </div>
-            </button>
-            {expandedSections.contract && (
-              <div className="p-5 bg-white text-xs text-stone-600 border-t border-stone-100 leading-relaxed space-y-2">
-                <p className="font-semibold text-stone-800">
-                  📋 Injected Agent Specification Insights:
-                </p>
-                <p>{telemetry.contractSummaryText}</p>
-                <div className="bg-stone-50 border border-stone-200/60 rounded-xl p-3 mt-3 flex justify-between items-center">
-                  <span className="font-semibold text-stone-700">
-                    Contract Verification Score
-                  </span>
-                  <span className="font-mono text-[#E2B30D] font-bold text-sm bg-white border border-stone-200 px-2.5 py-0.5 rounded-lg">
-                    {contractScore} / 100
-                  </span>
-                </div>
-              </div>
+      {/* AGENT EXECUTION AUDITS — link to AI Insights */}
+      <div className="glass-card p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h3 className="text-base font-extrabold text-stone-900 tracking-tight flex items-center gap-2">
+            <Bot className="w-5 h-5 text-[#F5C518]" />
+            Agent Execution Audits
+          </h3>
+          <p className="text-sm text-stone-500 mt-1">
+            Full pipeline audit, agent output, and chat live on AI Insights.
+            {completedAgentCount > 0 && (
+              <span className="text-stone-400">
+                {" "}
+                · {completedAgentCount}/{PIPELINE_AGENT_NAMES.length} agents complete
+              </span>
             )}
-          </div>
-
-          <div className="border border-stone-200 rounded-2xl overflow-hidden transition-all duration-300">
-            <button
-              onClick={() => toggleSection("blueprint")}
-              className="w-full bg-stone-50 hover:bg-stone-100/70 p-4 flex justify-between items-center text-left transition"
+          </p>
+          {reRunMessage && (
+            <p
+              className={`text-xs mt-2 ${
+                reRunMessage.tone === "success"
+                  ? "text-emerald-700"
+                  : reRunMessage.tone === "warning"
+                    ? "text-amber-700"
+                    : "text-red-600"
+              }`}
             >
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-[#f0f2f5] border border-stone-200/80 flex items-center justify-center text-base">
-                  📐
-                </div>
-                <div>
-                  <span className="text-xs text-stone-400 uppercase font-bold tracking-widest block text-[9px]">
-                    Autonomously Extracted
-                  </span>
-                  <span className="text-xs font-bold text-stone-800">
-                    📐 Blueprint Review & Load Checks
-                  </span>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="bg-stone-200/60 text-stone-700 text-[9px] font-mono font-bold px-2 py-0.5 rounded">
-                  BlueprintAgent v2.4
-                </span>
-                {expandedSections.blueprint ? (
-                  <ChevronUp className="w-4 h-4 text-stone-400" />
-                ) : (
-                  <ChevronDown className="w-4 h-4 text-stone-400" />
-                )}
-              </div>
-            </button>
-            {expandedSections.blueprint && (
-              <div className="p-5 bg-white text-xs text-stone-600 border-t border-stone-100 leading-relaxed space-y-2">
-                <p className="font-semibold text-stone-800">
-                  📐 Building Footprint Analysis Results:
-                </p>
-                <p>{telemetry.blueprintAnalysisText}</p>
-                <div className="bg-stone-50 border border-stone-200/60 rounded-xl p-3 mt-3 flex justify-between items-center">
-                  <span className="font-semibold text-stone-700">
-                    Clearances Compliance Rating
-                  </span>
-                  <span className="font-mono text-[#E2B30D] font-bold text-sm bg-white border border-stone-200 px-2.5 py-0.5 rounded-lg">
-                    {blueprintScore} / 100
-                  </span>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="border border-stone-200 rounded-2xl overflow-hidden transition-all duration-300">
-            <button
-              onClick={() => toggleSection("permits")}
-              className="w-full bg-stone-50 hover:bg-stone-100/70 p-4 flex justify-between items-center text-left transition"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-[#f0f2f5] border border-stone-200/80 flex items-center justify-center text-base">
-                  🏛️
-                </div>
-                <div>
-                  <span className="text-xs text-stone-400 uppercase font-bold tracking-widest block text-[9px]">
-                    Permits & Filings
-                  </span>
-                  <span className="text-xs font-bold text-stone-800">
-                    🏛️ Permit Logs & Applications
-                  </span>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <span
-                  className="status-badge text-[9.5px] font-black"
-                  style={{
-                    backgroundColor: "#f0f2f5",
-                    color: "#E2B30D",
-                    border: "1px solid #e5e7eb",
-                  }}
-                >
-                  {permitsCount} Pending Alerts
-                </span>
-                {expandedSections.permits ? (
-                  <ChevronUp className="w-4 h-4 text-stone-400" />
-                ) : (
-                  <ChevronDown className="w-4 h-4 text-stone-400" />
-                )}
-              </div>
-            </button>
-            {expandedSections.permits && (
-              <div className="p-5 bg-white text-xs text-stone-600 border-t border-stone-100 leading-relaxed space-y-2">
-                <p className="font-semibold text-stone-800">
-                  🏛️ Active Building Licensing Queue:
-                </p>
-                <p>{telemetry.permitStatusText}</p>
-                <div className="grid grid-cols-2 gap-3 mt-3 font-mono">
-                  <div className="bg-stone-50 border border-stone-200/60 rounded-xl p-3 text-center text-xs">
-                    <span className="text-[9px] text-stone-400 block font-bold uppercase">
-                      Approved
-                    </span>
-                    <span className="font-extrabold text-stone-800">
-                      {permitList.filter((p) => p.status === "Approved").length}
-                    </span>
-                  </div>
-                  <div className="bg-stone-50 border border-stone-200/60 rounded-xl p-3 text-center text-xs">
-                    <span className="text-[9px] text-stone-400 block font-bold uppercase">
-                      Pending review
-                    </span>
-                    <span className="font-extrabold text-[#E2B30D]">
-                      {pendingPermits.length}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+              {reRunMessage.text}
+            </p>
+          )}
         </div>
-      </div> */}
+        <div className="flex flex-wrap gap-2.5">
+          <button
+            onClick={async () => {
+              if (!projectId || isReRunning) return;
+              setReRunMessage(null);
+              setIsReRunning(true);
+              try {
+                clearIntelligenceCache(projectId);
+                clearAgentsCache(projectId);
+                const job = await startAnalyze(Number(projectId), {
+                  sendReportEmail: true,
+                });
+                let deliveryStatus: AnalyzeJobStatus | null = null;
+                await pollAnalyzeUntilComplete(Number(projectId), job.job_id, {
+                  onComplete: (status) => {
+                    deliveryStatus = status;
+                  },
+                });
+                if (deliveryStatus) {
+                  navigate("/ai-insights", {
+                    state: {
+                      analyzeMessage: reportDeliveryMessage(deliveryStatus),
+                    },
+                  });
+                } else {
+                  navigate("/ai-insights");
+                }
+              } catch (err) {
+                console.error("Failed to start analyze job:", err);
+                setReRunMessage({
+                  tone: "error",
+                  text: "Failed to complete re-analysis. Please try again.",
+                });
+              } finally {
+                setIsReRunning(false);
+              }
+            }}
+            disabled={isReRunning}
+            style={{ cursor: isReRunning ? "wait" : "pointer" }}
+            className="inline-flex items-center justify-center gap-1.5 shrink-0 text-xs font-bold text-stone-700 bg-white hover:bg-stone-50 border border-stone-200 rounded-xl px-4 py-2.5 transition-colors disabled:opacity-60"
+          >
+            <Bot className="w-4 h-4 text-[#F5C518]" />
+            {isReRunning ? "Re-running analysis…" : "Re-run Analysis"}
+          </button>
+          <Link
+            to="/ai-insights"
+            className="inline-flex items-center justify-center gap-1.5 shrink-0 text-xs font-bold text-stone-900 bg-[#F5C518] hover:bg-[#E2B30D] border border-[#F5C518]/40 rounded-xl px-4 py-2.5 transition-colors"
+          >
+            <Bot className="w-4 h-4" />
+            Open AI Insights
+          </Link>
+        </div>
+      </div>
 
       {/* DETAIL TABS */}
       <div className="glass-card p-4">
+        <h3 className="text-xs font-bold uppercase tracking-widest text-stone-400 mb-3">
+          Project Intelligence
+        </h3>
         <div className="flex flex-wrap gap-2 border-b border-stone-100 pb-3 mb-4">
           {detailTabs.map((tab) => (
             <button
@@ -725,61 +770,78 @@ export default function ProjectDetails() {
             </button>
           ))}
         </div>
-        {activeTab === "budget" && intelligence && (
-          <BudgetBreakdownPanel
-            intelligence={intelligence}
-            supplierRows={suppliers}
-          />
-        )}
-        {activeTab === "schedule" && intelligence && (
-          <SchedulePanel intelligence={intelligence} />
-        )}
-        {activeTab === "materials" && (
-          <MaterialsPanel
-            materials={intelligence?.materials ?? []}
-            supplierRows={suppliers}
-          />
-        )}
-        {activeTab === "inspections" && (
-          <InspectionChecklist inspections={intelligence?.inspections ?? []} />
-        )}
-        {activeTab === "risks" && (
-          <ProjectRisksPanel
-            supplyChainRisks={intelligence?.supplyChainRisks ?? []}
-            workforceGaps={intelligence?.workforceGaps ?? []}
-          />
-        )}
-        {activeTab === "recommendations" && (
-          <RecommendationsPanel
-            recommendations={intelligence?.recommendations ?? []}
-            agentExecutions={executionList}
-          />
-        )}
-        {activeTab === "blueprint" && intelligence && (
-          <BlueprintSummaryPanel
-            summary={intelligence.blueprintSummary}
-            floors={intelligence.floors}
-            squareFootage={intelligence.squareFootage}
-            complexity={intelligence.complexity}
-          />
-        )}
-        {activeTab === "3d_view" && intelligence && (
-          <Suspense fallback={<div className="flex items-center justify-center h-64 text-stone-400 text-sm">Loading 3D view…</div>}>
-            <Blueprint3DTab
-              summary={intelligence.blueprintSummary}
-              buildingDefinition={intelligence.buildingDefinition}
-              floors={intelligence.floors}
-              squareFootage={intelligence.squareFootage}
-              complexity={intelligence.complexity}
-            />
-          </Suspense>
-        )}
-        {activeTab === "overview" && (
-          <p className="text-sm text-stone-500">
-            Use the tabs above for budget, schedule, materials, risks, and the
-            interactive 3D viewer. Building previews are shown at the top of this
-            page.
-          </p>
+        {tabLoading ? (
+          <div className="flex items-center justify-center py-10">
+            <RingSpinner size={48} />
+          </div>
+        ) : (
+          <>
+            {activeTab === "budget" && (
+              <div className="space-y-8">
+                {intelligence && (
+                  <BudgetBreakdownPanel
+                    intelligence={intelligence}
+                    supplierRows={suppliers}
+                  />
+                )}
+                <BudgetAnalysisPanel data={intelligence?.budgetAnalysis} />
+              </div>
+            )}
+            {activeTab === "documents" && projectId && (
+              <ProjectDocumentsPanel projectId={projectId} />
+            )}
+            {activeTab === "zoning" && (
+              <ZoningPanel data={intelligence?.zoningAssessment} />
+            )}
+            {activeTab === "safety" && (
+              <SafetyPanel data={intelligence?.safetyAssessment} />
+            )}
+            {activeTab === "reports" && projectId && (
+              <ReportDeliveriesPanel projectId={projectId} />
+            )}
+            {activeTab === "schedule" && intelligence && (
+              <SchedulePanel intelligence={intelligence} supplierRows={suppliers} />
+            )}
+            {activeTab === "materials" && (
+              <MaterialsPanel
+                materials={intelligence?.materials ?? []}
+                supplierRows={suppliers}
+              />
+            )}
+            {activeTab === "inspections" && (
+              <InspectionChecklist inspections={intelligence?.inspections ?? []} />
+            )}
+            {activeTab === "risks" && (
+              <ProjectRisksPanel
+                supplyChainRisks={intelligence?.supplyChainRisks ?? []}
+                workforceGaps={intelligence?.workforceGaps ?? []}
+              />
+            )}
+            {activeTab === "crew" && selectedProj && (
+              <CrewRosterPanel projectId={selectedProj.id} />
+            )}
+            {activeTab === "recommendations" && (
+              <RecommendationsPanel
+                recommendations={intelligence?.recommendations ?? []}
+                agentExecutions={executionList}
+              />
+            )}
+            {activeTab === "blueprint" && (
+              <Suspense fallback={
+                <div className="flex items-center justify-center py-10">
+                  <RingSpinner size={48} />
+                </div>
+              }>
+                <BlueprintSummaryPanel
+                  summary={intelligence?.blueprintSummary ?? null}
+                  buildingDefinition={intelligence?.buildingDefinition ?? null}
+                  floors={intelligence?.floors ?? 0}
+                  squareFootage={intelligence?.squareFootage ?? "—"}
+                  complexity={intelligence?.complexity ?? "—"}
+                />
+              </Suspense>
+            )}
+          </>
         )}
       </div>
 
@@ -826,120 +888,6 @@ export default function ProjectDetails() {
             </div>
           )}
         </div>
-      )}
-
-      {/* FOCUSED AGENT ACTIVITIES — bottom of page */}
-      <div className="glass-card p-6 flex flex-col justify-between w-full min-h-[320px]">
-        <div className="flex-1 flex flex-col">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-sm font-bold text-stone-900 tracking-tight flex items-center gap-2">
-              <Bot className="w-4 h-4 text-[#F5C518]" />
-              Focused Agent Activities
-            </h3>
-            <span className="text-[9px] bg-stone-100 text-stone-500 font-bold px-2 py-0.5 rounded-md font-mono uppercase">
-              {completedAgentCount}/{PIPELINE_AGENT_NAMES.length} complete
-            </span>
-          </div>
-          <div className="grid grid-cols-6 gap-3 flex-1 min-h-[200px] items-end pt-4 pb-2 border-b border-stone-100">
-            {agentMetrics.map((agent) => (
-              <div
-                key={agent.label}
-                className="flex flex-col items-center h-full justify-end group/bar relative min-w-0"
-              >
-                <div className="absolute -top-7 hidden group-hover/bar:block bg-[#1B1B1C] text-white text-[9px] px-1.5 py-0.5 rounded-sm whitespace-nowrap z-30 shadow-md">
-                  {agent.label}: {agent.val}%
-                </div>
-                <div className="w-full bg-stone-100 rounded-t-lg h-[160px] flex items-end overflow-hidden">
-                  <div
-                    className="bg-[#F5C518] hover:bg-[#E2B30D] w-full rounded-t-lg transition-all duration-1000 relative"
-                    style={{ height: `${Math.max(agent.val, 4)}%` }}
-                  />
-                </div>
-                <span className="text-[10px] mt-2 font-bold text-stone-500 truncate w-full text-center">
-                  {agent.label}
-                </span>
-                <span className="text-base -mt-0.5">{agent.icon}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="grid grid-cols-3 gap-3 text-center pt-4 w-full">
-          <div className="bg-stone-50 p-3 rounded-xl">
-            <p className="text-[9px] text-stone-400 font-medium uppercase tracking-wide">
-              Site Scores Avg
-            </p>
-            <p className="text-sm font-black text-stone-900 mt-0.5">
-              {overallReadiness}%
-            </p>
-          </div>
-          <div className="bg-stone-50 p-3 rounded-xl">
-            <p className="text-[9px] text-stone-400 font-medium uppercase tracking-wide">
-              Agent Loops
-            </p>
-            <p className="text-sm font-black text-stone-900 mt-0.5">
-              {completedAgentCount} / {PIPELINE_AGENT_NAMES.length}
-            </p>
-          </div>
-          <div className="bg-stone-50 p-3 rounded-xl">
-            <p className="text-[9px] text-stone-400 font-medium uppercase tracking-wide">
-              Permits Filed
-            </p>
-            <p className="text-sm font-black text-rose-600 mt-0.5">
-              {permitsCount}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* AI USAGE SUMMARY */}
-      {/* <div className="glass-card p-6 w-full">
-        <h3 className="text-base font-extrabold text-stone-900 tracking-tight mb-4">
-          AI Usage Summary
-        </h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div>
-            <p className="text-[10px] text-stone-400 uppercase font-bold">
-              Total runs
-            </p>
-            <p className="text-2xl font-black text-stone-900 mt-1">
-              {agentUsage.totalRuns}
-            </p>
-          </div>
-          <div>
-            <p className="text-[10px] text-stone-400 uppercase font-bold">
-              Avg duration
-            </p>
-            <p className="text-2xl font-black text-stone-900 mt-1">
-              {agentUsage.avgDuration}s
-            </p>
-          </div>
-          <div>
-            <p className="text-[10px] text-stone-400 uppercase font-bold">
-              Tokens used
-            </p>
-            <p className="text-2xl font-black text-stone-900 mt-1">
-              {agentUsage.totalTokens.toLocaleString()}
-            </p>
-          </div>
-          <div>
-            <p className="text-[10px] text-stone-400 uppercase font-bold">
-              Agents complete
-            </p>
-            <p className="text-2xl font-black text-stone-900 mt-1">
-              {completedAgentCount}/{PIPELINE_AGENT_NAMES.length}
-            </p>
-          </div>
-        </div>
-      </div> */}
-      {shouldCapture && intelligence?.buildingDefinition && (
-        <Suspense fallback={null}>
-          <BuildingSnapshotCapture
-            definition={intelligence.buildingDefinition}
-            onProgress={onCaptureProgress}
-            onComplete={onCaptureComplete}
-            onError={onCaptureError}
-          />
-        </Suspense>
       )}
     </div>
   );

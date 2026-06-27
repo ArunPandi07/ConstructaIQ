@@ -7,7 +7,7 @@ import { fetchRiskIntelligence } from "../services/api";
 import { fetchRecoveryStrategies } from "../services/api";
 import { analyzeChangeImpact } from "../services/api";
 import { buildAgentInsightsData } from "../services/api";
-import { getProjectAgents, isBackendProjectId } from "../services/projectApi";
+import { getProjectAgents, getProjectPipelineRuns, isBackendProjectId } from "../services/projectApi";
 import type { RecoveryCenterData } from "../services/api";
 import type {
   AgentExecutionRead,
@@ -16,6 +16,7 @@ import type {
   RiskIntelligenceData,
   ChangeImpactData,
   AgentInsightsData,
+  PipelineRunSummary,
 } from "../types";
 
 // ─────────────────────────────────────────────────────────────
@@ -99,7 +100,12 @@ export function useChangeImpact(projectId: string) {
 
 /** Agent insights — agent cards + timeline + raw executions (single fetch) */
 export function useAgentInsights(projectId: string) {
-  return useAsync<{ insights: AgentInsightsData; executions: AgentExecutionRead[] }>(
+  return useAsync<{
+    insights: AgentInsightsData;
+    executions: AgentExecutionRead[];
+    pipelineRunCount: number;
+    pipelineRuns: PipelineRunSummary[];
+  }>(
     async () => {
       if (!isBackendProjectId(projectId)) {
         return {
@@ -115,14 +121,21 @@ export function useAgentInsights(projectId: string) {
               },
             },
             executions: [],
+            pipelineRunCount: 0,
+            pipelineRuns: [],
           },
         };
       }
-      const agentsRes = await getProjectAgents(Number(projectId));
+      const [agentsRes, runsRes] = await Promise.all([
+        getProjectAgents(Number(projectId)),
+        getProjectPipelineRuns(Number(projectId)),
+      ]);
       return {
         data: {
           insights: buildAgentInsightsData(agentsRes.agents),
           executions: agentsRes.agents,
+          pipelineRunCount: agentsRes.pipeline_run_count,
+          pipelineRuns: runsRes.runs,
         },
       };
     },

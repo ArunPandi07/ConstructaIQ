@@ -12,9 +12,10 @@ from app.api.auth import router as auth_router
 from app.api.catalogs import router as catalogs_router
 from app.api.dashboard import router as dashboard_router
 from app.api.projects import router as projects_router
+from app.api.settings import router as settings_router
+from app.api.websockets import router as websockets_router
 
 logger = get_logger("MainApp")
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -22,10 +23,9 @@ async def lifespan(app: FastAPI):
     yield
     await dispose_db()
 
-
 app = FastAPI(
     title="ConstructaIQ Enterprise API",
-    description="A multi-agent construction risk diagnostics engine powered by FastAPI and Azure AI Foundry Agents.",
+    description="A multi-agent construction risk diagnostics engine powered by FastAPI and a LangGraph-orchestrated LLM pipeline.",
     version="1.0.0",
     lifespan=lifespan,
 )
@@ -46,6 +46,11 @@ for api_prefix in ("/api", "/api/v1"):
     app.include_router(dashboard_router, prefix=api_prefix)
     app.include_router(analyze_router, prefix=api_prefix)
     app.include_router(catalogs_router, prefix=api_prefix)
+    app.include_router(settings_router, prefix=api_prefix)
+
+# Mount WS router globally
+app.include_router(websockets_router)
+
 
 
 @app.get("/healthz", tags=["Infrastructure"])

@@ -20,6 +20,9 @@ PIPELINE_STEPS = [
     "BlueprintAgent",
     "PermitAgent",
     "ScheduleAgent",
+    "ZoningAgent",
+    "BudgetAgent",
+    "SafetyAlertAgent",
     "SupplierAgent",
     "CrewAgent",
 ]
@@ -56,7 +59,71 @@ class AnalyzeJobService:
     def __init__(self) -> None:
         self._jobs: dict[str, AnalyzeJob] = {}
 
-    def create_job(
+    def _job_from_db(self, db_job) -> AnalyzeJob:
+        steps = [
+            {
+                "id": step.lower(),
+                "name": step,
+                "description": f"Running {step}",
+                "duration": 0,
+                "status": "complete" if db_job.status == "complete" else "pending",
+            }
+            for step in PIPELINE_STEPS
+        ]
+        job = AnalyzeJob(
+            job_id=db_job.job_id,
+            project_id=db_job.project_id,
+            status=db_job.status,
+            agent_steps=steps,
+            triggering_user_id=getattr(db_job, "triggering_user_id", None),
+            send_report_email=bool(getattr(db_job, "send_report_email", False)),
+        )
+        job.overall_pct = db_job.overall_pct
+        job.error = db_job.error_message
+        job.report_delivery_status = getattr(db_job, "report_delivery_status", None)
+        job.report_delivery_error = getattr(db_job, "report_delivery_error", None)
+        return job
+
+    async def _save_job_async(self, job: AnalyzeJob) -> None:
+        try:
+            factory = _get_session_factory()
+            async with factory() as session:
+                from app.db.models.analyze_job import ProjectAnalyzeJob
+                from sqlalchemy import select
+                stmt = select(ProjectAnalyzeJob).where(ProjectAnalyzeJob.job_id == job.job_id)
+                res = await session.execute(stmt)
+                db_job = res.scalar_one_or_none()
+                if not db_job:
+                    db_job = ProjectAnalyzeJob(
+                        job_id=job.job_id,
+                        project_id=job.project_id,
+                        status=job.status,
+                        overall_pct=job.overall_pct,
+                        triggering_user_id=job.triggering_user_id,
+                        send_report_email=job.send_report_email,
+                        report_delivery_status=job.report_delivery_status,
+                        report_delivery_error=job.report_delivery_error,
+                    )
+                    session.add(db_job)
+                else:
+                    db_job.status = job.status
+                    db_job.overall_pct = job.overall_pct
+                    db_job.error_message = job.error
+                    db_job.triggering_user_id = job.triggering_user_id
+                    db_job.send_report_email = job.send_report_email
+                    db_job.report_delivery_status = job.report_delivery_status
+                    db_job.report_delivery_error = job.report_delivery_error
+                await session.commit()
+        except Exception as exc:
+            logger.warning(
+                "Failed to save analyze job to DB (project_id=%s job_id=%s): %s: %s",
+                job.project_id,
+                job.job_id,
+                type(exc).__name__,
+                exc,
+            )
+
+    async def create_job(
         self,
         project_id: int,
         *,
@@ -83,30 +150,75 @@ class AnalyzeJobService:
             send_report_email=send_report_email,
         )
         self._jobs[job_id] = job
+        await self._save_job_async(job)
         return job
 
-    def get_job(self, job_id: str) -> AnalyzeJob | None:
-        return self._jobs.get(job_id)
+    async def get_job(self, job_id: str) -> AnalyzeJob | None:
+        if job_id in self._jobs:
+            return self._jobs[job_id]
+        
+        try:
+            factory = _get_session_factory()
+            async with factory() as session:
+                from app.db.models.analyze_job import ProjectAnalyzeJob
+                from sqlalchemy import select
+                stmt = select(ProjectAnalyzeJob).where(ProjectAnalyzeJob.job_id == job_id)
+                res = await session.execute(stmt)
+                db_job = res.scalar_one_or_none()
+                if db_job:
+                    return self._job_from_db(db_job)
+        except Exception as e:
+            logger.error("Failed to query analyze job from DB: %s", e)
+            
+        return None
 
-    def get_latest_job_for_project(self, project_id: int) -> AnalyzeJob | None:
+    async def get_latest_job_for_project(self, project_id: int) -> AnalyzeJob | None:
         jobs = [j for j in self._jobs.values() if j.project_id == project_id]
-        if not jobs:
-            return None
-        return max(jobs, key=lambda j: j.created_at)
+        if jobs:
+            return max(jobs, key=lambda j: j.created_at)
+        
+        try:
+            factory = _get_session_factory()
+            async with factory() as session:
+                from app.db.models.analyze_job import ProjectAnalyzeJob
+                from sqlalchemy import select
+                stmt = select(ProjectAnalyzeJob).where(ProjectAnalyzeJob.project_id == project_id).order_by(ProjectAnalyzeJob.created_at.desc()).limit(1)
+                res = await session.execute(stmt)
+                db_job = res.scalar_one_or_none()
+                if db_job:
+                    return self._job_from_db(db_job)
+        except Exception as e:
+            logger.error("Failed to query analyze job from DB: %s", e)
+            
+        return None
 
     def _update_progress(self, job: AnalyzeJob, step_name: str) -> None:
-        job.progress_step = step_name
+        NODE_MAP = {
+            "contract_node": "ContractAgent",
+            "blueprint_node": "BlueprintAgent",
+            "permit_node": "PermitAgent",
+            "schedule_node": "ScheduleAgent",
+            "zoning_node": "ZoningAgent",
+            "budget_node": "BudgetAgent",
+            "safety_node": "SafetyAlertAgent",
+            "supplier_node": "SupplierAgent",
+            "crew_node": "CrewAgent",
+        }
+        mapped_name = NODE_MAP.get(step_name, step_name)
+        job.progress_step = mapped_name
         job.status = "running"
-        if step_name in PIPELINE_STEPS:
-            idx = PIPELINE_STEPS.index(step_name)
-            job.overall_pct = int(((idx + 1) / len(PIPELINE_STEPS)) * 100)
+        if mapped_name in PIPELINE_STEPS:
+            idx = PIPELINE_STEPS.index(mapped_name)
+            job.overall_pct = int(((idx + 2) / (len(PIPELINE_STEPS) + 1)) * 100)
             for i, step in enumerate(job.agent_steps):
                 if i < idx:
                     step["status"] = "complete"
-                elif step["name"] == step_name:
+                elif step["name"] == mapped_name:
                     step["status"] = "running"
                 else:
                     step["status"] = "pending"
+        import asyncio
+        asyncio.create_task(self._save_job_async(job))
 
     async def run_job(
         self,
@@ -118,10 +230,9 @@ class AnalyzeJobService:
         contract_filename: str | None = None,
         blueprint_bytes: bytes | None = None,
         blueprint_filename: str | None = None,
-        skip_blob_upload: bool = False,
-        existing_blob_paths: dict[str, str] | None = None,
     ) -> None:
         job.status = "running"
+        await self._save_job_async(job)
         progress_callback: Callable[[str], None] = lambda step: self._update_progress(
             job, step
         )
@@ -142,8 +253,7 @@ class AnalyzeJobService:
                         session=session,
                         progress_callback=progress_callback,
                         execution_log=execution_log,
-                        skip_blob_upload=skip_blob_upload,
-                        existing_blob_paths=existing_blob_paths,
+                        job_id=job.job_id,
                     )
                 else:
                     if not description:
@@ -157,6 +267,7 @@ class AnalyzeJobService:
                         session=session,
                         progress_callback=progress_callback,
                         execution_log=execution_log,
+                        job_id=job.job_id,
                     )
 
                 job.result = result
@@ -177,6 +288,7 @@ class AnalyzeJobService:
                                 job.project_id,
                                 job.triggering_user_id,
                                 job.job_id,
+                                skip_rate_limit=True,
                             )
                         job.report_delivery_status = delivery.status
                         if delivery.error_message and delivery.status != "sent":
@@ -207,10 +319,12 @@ class AnalyzeJobService:
                     job.report_delivery_status = "skipped"
 
                 job.status = "complete"
+                await self._save_job_async(job)
         except Exception as exc:
             logger.exception("Analyze job %s failed", job.job_id)
             job.status = "error"
             job.error = str(exc)
+            await self._save_job_async(job)
 
     def enqueue(
         self,

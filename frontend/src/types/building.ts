@@ -5,7 +5,7 @@ export type BuildingType =
   | "mixed_use"
   | "warehouse";
 
-export type BuildingViewMode = "exterior" | "interior" | "exploded" | "section";
+export type BuildingViewMode = "exterior";
 
 export type QualityTier = "low" | "medium" | "high";
 
@@ -70,7 +70,10 @@ export interface BuildingMeta {
   totalHeight_m: number;
   footprint: Footprint;
   construction_type?: string | null;
-  roof_type: "flat" | "pitched" | "sawtooth";
+  roof_type: "flat" | "pitched" | "sawtooth" | "pergola" | "penthouse";
+  footprint_shape?: "rectangular" | "l_shape" | "u_shape" | "twin_tower";
+  cladding_material?: "stone_white" | "stone_dark" | "glass" | "concrete";
+  primary_color?: string;
 }
 
 export interface FacadeDefinition {
@@ -79,6 +82,13 @@ export interface FacadeDefinition {
   railing_height_m: number;
   window_pattern: "grid" | "strip" | "punched" | "industrial";
   material: string;
+  face_materials?: {
+    front?: string;
+    back?: string;
+    left?: string;
+    right?: string;
+  };
+  balcony_faces?: string[];
 }
 
 export interface BuildingDefinition {

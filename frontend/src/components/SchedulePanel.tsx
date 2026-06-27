@@ -1,10 +1,18 @@
 import { useEffect, useId, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { CalendarDays, GitBranch, Package } from "lucide-react";
-import type { ProjectIntelligenceData } from "../types";
+import type { ProjectIntelligenceData, ProjectSupplierRow } from "../types";
+import {
+  findSupplier,
+  formatMoney,
+  formatQuantity,
+  materialName,
+  resolveMaterialCost,
+} from "../utils/materialMatching";
 
 interface Props {
   intelligence: ProjectIntelligenceData;
+  supplierRows?: ProjectSupplierRow[];
 }
 
 function nodeId(value: string, index: number): string {
@@ -92,7 +100,7 @@ function DependencyGraph({ graph }: { graph: string }) {
   );
 }
 
-export default function SchedulePanel({ intelligence }: Props) {
+export default function SchedulePanel({ intelligence, supplierRows = [] }: Props) {
   const [dependencyView, setDependencyView] = useState<"list" | "graph">("list");
   const phases = useMemo(() => intelligence.phases ?? [], [intelligence.phases]);
   const dependencies = useMemo(
@@ -222,17 +230,28 @@ export default function SchedulePanel({ intelligence }: Props) {
             <p className="text-xs text-stone-500">No materials list in schedule.</p>
           ) : (
             <ul className="space-y-2 text-xs max-h-48 overflow-y-auto">
-              {materials.map((mat, i) => (
-                <li
-                  key={i}
-                  className="flex justify-between border-b border-stone-100 py-2"
-                >
-                  <span className="font-semibold text-stone-800">{mat.name}</span>
-                  <span className="text-stone-500 font-mono">
-                    {mat.quantity != null ? `${mat.quantity} ${mat.unit ?? ""}` : "—"}
-                  </span>
-                </li>
-              ))}
+              {materials.map((mat, i) => {
+                const supplier = findSupplier(mat, supplierRows);
+                const quantityLabel = formatQuantity(mat, supplier);
+                const cost = resolveMaterialCost(mat, supplier);
+                return (
+                  <li
+                    key={i}
+                    className="flex justify-between gap-3 border-b border-stone-100 py-2"
+                  >
+                    <span className="font-semibold text-stone-800 min-w-0 truncate">
+                      {materialName(mat)}
+                    </span>
+                    <span className="text-stone-500 font-mono text-right shrink-0">
+                      {quantityLabel !== "-"
+                        ? quantityLabel
+                        : cost != null
+                          ? formatMoney(cost)
+                          : "—"}
+                    </span>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>

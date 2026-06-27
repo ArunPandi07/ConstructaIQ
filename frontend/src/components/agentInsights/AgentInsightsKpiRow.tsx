@@ -6,6 +6,7 @@ interface Props {
   totalDurationSeconds: number;
   lastRun: string | null;
   errorCount: number;
+  pipelineRunCount: number;
 }
 
 export default function AgentInsightsKpiRow({
@@ -13,13 +14,22 @@ export default function AgentInsightsKpiRow({
   totalDurationSeconds,
   lastRun,
   errorCount,
+  pipelineRunCount,
 }: Props) {
   const completionPct = Math.round(
     (completedCount / PIPELINE_AGENT_NAMES.length) * 100,
   );
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="glass-card p-4">
+        <div className="flex items-center gap-2 mb-2 text-stone-400 text-xs">
+          <CheckCircle2 size={13} />
+          Pipeline runs
+        </div>
+        <div className="text-xl font-bold text-stone-900">{pipelineRunCount}</div>
+        <p className="text-[10px] text-stone-500 mt-1">Historical runs for project</p>
+      </div>
       <div className="glass-card p-4">
         <div className="flex items-center gap-2 mb-2 text-stone-400 text-xs">
           <CheckCircle2 size={13} />

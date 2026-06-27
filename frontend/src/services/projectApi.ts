@@ -9,10 +9,12 @@ import type {
   ProjectAgentsResponse,
   ProjectCrewResponse,
   ProjectListItem,
+  ProjectPipelineRunsResponse,
   ProjectSummaryResponse,
   ProjectSuppliersResponse,
   ProjectUploadResponse,
   UploadSessionResponse,
+  ProjectDocumentsResponse,
 } from '../types'
 import { apiClient } from './apiClient'
 
@@ -118,6 +120,22 @@ export async function getProject(projectId: number): Promise<BackendProjectRead>
   return unwrapData(res)
 }
 
+export async function getProjectDocuments(
+  projectId: number,
+): Promise<ProjectDocumentsResponse> {
+  const res = await apiClient.get<ProjectDocumentsResponse>(
+    `/projects/${projectId}/documents`,
+  )
+  return unwrapData(res)
+}
+
+export async function fetchProjectDocumentBlob(
+  projectId: number,
+  documentId: number,
+): Promise<Blob> {
+  return apiClient.fetchBlob(`/projects/${projectId}/documents/${documentId}/file`)
+}
+
 export async function getProjectSummary(
   projectId: number,
 ): Promise<ProjectSummaryResponse> {
@@ -145,9 +163,21 @@ export async function getProjectCrew(
 
 export async function getProjectAgents(
   projectId: number,
+  runId?: string,
 ): Promise<ProjectAgentsResponse> {
+  const params = runId ? { run_id: runId } : undefined
   const res = await apiClient.get<ProjectAgentsResponse>(
     `/projects/${projectId}/agents`,
+    params,
+  )
+  return unwrapData(res)
+}
+
+export async function getProjectPipelineRuns(
+  projectId: number,
+): Promise<ProjectPipelineRunsResponse> {
+  const res = await apiClient.get<ProjectPipelineRunsResponse>(
+    `/projects/${projectId}/pipeline-runs`,
   )
   return unwrapData(res)
 }
@@ -159,6 +189,9 @@ export const PIPELINE_AGENT_NAMES = [
   'ScheduleAgent',
   'SupplierAgent',
   'CrewAgent',
+  'ZoningAgent',
+  'BudgetAgent',
+  'SafetyAlertAgent',
 ] as const
 
 export interface PollAnalyzeOptions {
@@ -201,7 +234,7 @@ export async function pollAnalyzeUntilComplete(
   throw new Error('Analyze job timed out while polling status.')
 }
 
-const PIPELINE_AGENT_TOTAL = 6
+const PIPELINE_AGENT_TOTAL = 9
 
 export function mapBackendStatusToUI(
   status: string | null | undefined,
@@ -268,4 +301,40 @@ export function mapBackendProjectToUI(
 
 export function mapProjectListToUI(items: ProjectListItem[]): Project[] {
   return items.map((item) => mapBackendProjectToUI(item))
+}
+
+export interface CallAgentRequest {
+  agent_name: string;
+  version?: string;
+  text: string;
+}
+
+export interface CallAgentResponse {
+  agent_name: string;
+  version: string;
+  output: any;
+}
+
+export async function callAgentDirectly(payload: CallAgentRequest): Promise<CallAgentResponse> {
+  const res = await apiClient.post<CallAgentResponse>('/projects/call-agent', payload);
+  return unwrapData(res);
+}
+
+export interface ReportDeliveryRead {
+  delivery_id: number
+  project_id: number
+  user_id: number
+  job_id?: string | null
+  status: string
+  recipient_email: string
+  subject?: string | null
+  provider_message_id?: string | null
+  error_message?: string | null
+  sent_at?: string | null
+  created_at: string
+}
+
+export async function getReportDeliveries(projectId: number): Promise<ReportDeliveryRead[]> {
+  const res = await apiClient.get<ReportDeliveryRead[]>(`/projects/${projectId}/report/deliveries`)
+  return unwrapData(res)
 }

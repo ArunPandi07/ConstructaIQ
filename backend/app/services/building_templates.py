@@ -32,6 +32,15 @@ def _text(*values: Any) -> str:
     return " ".join(str(v or "").lower() for v in values)
 
 
+def _is_twin_tower_project(project_summary: dict[str, Any], blueprint: dict[str, Any]) -> bool:
+    source = _text(
+        project_summary.get("project_type"),
+        project_summary.get("scope"),
+        blueprint.get("project_name"),
+    )
+    return "twin" in source and "tower" in source
+
+
 def _building_type(project_summary: dict[str, Any], blueprint: dict[str, Any]) -> str:
     source = _text(
         project_summary.get("project_type"),
@@ -40,12 +49,20 @@ def _building_type(project_summary: dict[str, Any], blueprint: dict[str, Any]) -
     )
     if any(token in source for token in ("hospital", "health", "medical")):
         return "hospital"
-    if any(token in source for token in ("warehouse", "logistics", "industrial", "cross-dock")):
+    if any(token in source for token in ("warehouse", "logistics", "industrial", "cross-dock", "data center")):
         return "warehouse"
     if "mixed" in source or ("retail" in source and "residential" in source):
         return "mixed_use"
-    if any(token in source for token in ("residential", "multi-family", "apartment", "tower")):
+    if any(
+        token in source
+        for token in ("residential", "multi-family", "apartment", "condominium", "condo")
+    ):
         return "residential_tower"
+    if any(
+        token in source
+        for token in ("office", "commercial", "corporate", "research", "education", "laboratory", "tower")
+    ):
+        return "office_tower"
     return "office_tower"
 
 
@@ -409,14 +426,43 @@ def _facade(building_type: str) -> dict[str, Any]:
             "railing_height_m": 1.1,
             "window_pattern": "industrial",
             "material": "metal_panel",
+            "face_materials": {
+                "front": "metal_panel",
+                "back": "metal_panel",
+                "left": "metal_panel",
+                "right": "metal_panel",
+            },
+            "balcony_faces": [],
         }
-    if building_type in {"residential_tower", "mixed_use"}:
+    if building_type == "mixed_use":
         return {
             "balconies": True,
             "balcony_depth_m": 1.5,
             "railing_height_m": 1.1,
             "window_pattern": "grid",
             "material": "concrete_with_glass",
+            "face_materials": {
+                "front": "brick",
+                "back": "concrete",
+                "left": "concrete",
+                "right": "concrete",
+            },
+            "balcony_faces": ["front", "back"],
+        }
+    if building_type == "residential_tower":
+        return {
+            "balconies": True,
+            "balcony_depth_m": 1.5,
+            "railing_height_m": 1.1,
+            "window_pattern": "grid",
+            "material": "concrete_with_glass",
+            "face_materials": {
+                "front": "concrete",
+                "back": "concrete",
+                "left": "concrete",
+                "right": "concrete",
+            },
+            "balcony_faces": ["front", "back"],
         }
     if building_type == "hospital":
         return {
@@ -425,6 +471,13 @@ def _facade(building_type: str) -> dict[str, Any]:
             "railing_height_m": 1.1,
             "window_pattern": "strip",
             "material": "concrete_with_glass",
+            "face_materials": {
+                "front": "glass",
+                "back": "concrete",
+                "left": "concrete",
+                "right": "concrete",
+            },
+            "balcony_faces": [],
         }
     return {
         "balconies": False,
@@ -432,6 +485,13 @@ def _facade(building_type: str) -> dict[str, Any]:
         "railing_height_m": 1.1,
         "window_pattern": "grid",
         "material": "curtain_wall",
+        "face_materials": {
+            "front": "curtain_wall",
+            "back": "concrete",
+            "left": "concrete",
+            "right": "concrete",
+        },
+        "balcony_faces": [],
     }
 
 
@@ -606,29 +666,53 @@ def generate_building_definition(
     footprint = _resolve_footprint(project_summary, blueprint, stories, str(building_type))
     width = footprint["width_m"]
     depth = footprint["depth_m"]
+    twin_tower = _is_twin_tower_project(project_summary, blueprint)
     facade_def = _facade(str(building_type))
+    if twin_tower:
+        facade_def = {
+            **facade_def,
+            "balconies": True,
+            "balcony_depth_m": 1.6,
+            "material": "cast_stone",
+            "face_materials": {
+                "front": "cast_stone",
+                "back": "cast_stone",
+                "left": "cast_stone",
+                "right": "cast_stone",
+            },
+            "balcony_faces": ["front", "back"],
+        }
+
     base_height = 8.5 if building_type == "warehouse" else 4.0
-    if building_type == "hospital":
+    if twin_tower:
+        base_height = 3.6
+    elif building_type == "hospital":
         base_height = 4.4
-    if building_type == "mixed_use":
+    elif building_type == "mixed_use":
         base_height = 4.2
+
+    level_width = 14.0 if twin_tower else width
+    level_depth = depth if twin_tower else depth
 
     levels: list[dict[str, Any]] = []
     for level in range(stories):
-        height = 5.2 if building_type == "mixed_use" and level < 3 else base_height
+        if twin_tower:
+            height = base_height if level == 0 else 3.2
+        else:
+            height = 5.2 if building_type == "mixed_use" and level < 3 else base_height
         rooms, partitions, stairs = _rooms_and_partitions(
-            str(building_type), level, width, depth, height
+            str(building_type), level, level_width, level_depth, height
         )
         levels.append(
             {
                 "level": level,
                 "name": "Ground Floor" if level == 0 else f"Level {level + 1}",
                 "height_m": round(height, 2),
-                "floorplate": {"width_m": width, "depth_m": depth},
+                "floorplate": {"width_m": level_width, "depth_m": level_depth},
                 "rooms": rooms,
                 "walls": _exterior_walls(
-                    width,
-                    depth,
+                    level_width,
+                    level_depth,
                     level,
                     str(building_type),
                     window_pattern=str(facade_def.get("window_pattern", "grid")),
@@ -638,15 +722,21 @@ def generate_building_definition(
         )
 
     total_height = round(sum(level["height_m"] for level in levels), 2)
+    building_meta: dict[str, Any] = {
+        "type": building_type,
+        "stories": stories,
+        "totalHeight_m": total_height,
+        "footprint": footprint,
+        "construction_type": blueprint.get("construction_type"),
+        "roof_type": "sawtooth" if building_type == "warehouse" else "flat",
+    }
+    if twin_tower:
+        building_meta["footprint_shape"] = "twin_tower"
+        building_meta["cladding_material"] = "stone_white"
+        building_meta["roof_type"] = "penthouse"
+
     return {
-        "building": {
-            "type": building_type,
-            "stories": stories,
-            "totalHeight_m": total_height,
-            "footprint": footprint,
-            "construction_type": blueprint.get("construction_type"),
-            "roof_type": "sawtooth" if building_type == "warehouse" else "flat",
-        },
+        "building": building_meta,
         "levels": levels,
         "facade": facade_def,
     }

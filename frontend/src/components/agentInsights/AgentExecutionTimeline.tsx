@@ -1,14 +1,26 @@
 import type { AgentExecutionRead } from "../../types";
+import { PIPELINE_AGENT_NAMES } from "../../services/projectApi";
 import { agentIcon } from "../../utils/agentHelpers";
 
 interface Props {
   executions: AgentExecutionRead[];
 }
 
+function pipelineOrderIndex(agentName: string | null | undefined): number {
+  if (!agentName) return Number.MAX_SAFE_INTEGER;
+  const index = PIPELINE_AGENT_NAMES.indexOf(
+    agentName as (typeof PIPELINE_AGENT_NAMES)[number],
+  );
+  return index === -1 ? Number.MAX_SAFE_INTEGER : index;
+}
+
 export default function AgentExecutionTimeline({ executions }: Props) {
   const sorted = [...executions]
     .filter((e) => e.completed_at || e.started_at)
     .sort((a, b) => {
+      const orderDiff =
+        pipelineOrderIndex(a.agent_name) - pipelineOrderIndex(b.agent_name);
+      if (orderDiff !== 0) return orderDiff;
       const ta = new Date(a.completed_at ?? a.started_at ?? 0).getTime();
       const tb = new Date(b.completed_at ?? b.started_at ?? 0).getTime();
       return tb - ta;

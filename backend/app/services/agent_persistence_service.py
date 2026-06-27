@@ -27,7 +27,13 @@ from app.schemas.project import ProjectUpdate
 from app.schemas.project_risk import ProjectRiskCreate
 from app.schemas.project_supplier import ProjectSupplierCreate
 from app.schemas.schedule import ScheduleCreate
-from app.services.agent_field_mapper import normalize_permit_agent
+from app.services.agent_field_mapper import (
+    normalize_crew_agent,
+    normalize_permit_agent,
+    normalize_supplier_agent,
+    normalize_supply_chain_risk_rows,
+    normalize_workforce_gap_rows,
+)
 from app.services.material_matcher import align_procurement_plan
 from app.services.logging_service import get_logger
 
@@ -202,12 +208,40 @@ async def _persist_project_risks(
     project_id: int,
     supplier_data: dict[str, Any],
     crew_data: dict[str, Any],
+    permit_data: dict[str, Any] | None = None,
 ) -> int:
     created = 0
-    for item in supplier_data.get("supply_chain_risks", []) or []:
-        if not isinstance(item, dict):
+    normalized_permit = normalize_permit_agent(permit_data or {})
+    for item in normalized_permit.get("compliance_risks", []) or []:
+        if isinstance(item, str):
+            title = item.strip()
+            detail = None
+            severity = "medium"
+        elif isinstance(item, dict):
+            title = item.get("risk") or item.get("title") or item.get("name")
+            detail = item.get("detail") or item.get("mitigation") or item.get("description")
+            severity = _normalize_severity(item.get("severity"))
+        else:
             continue
-        title = item.get("risk") or item.get("title") or item.get("name")
+        if not title:
+            continue
+        await risk_repo.create(
+            ProjectRiskCreate(
+                project_id=project_id,
+                source_agent="PermitAgent",
+                category="compliance",
+                title=str(title),
+                severity=severity,
+                detail=str(detail) if detail else None,
+                status="open",
+            )
+        )
+        created += 1
+
+    for item in normalize_supply_chain_risk_rows(
+        supplier_data.get("supply_chain_risks", []) or []
+    ):
+        title = item.get("title")
         if not title:
             continue
         await risk_repo.create(
@@ -217,30 +251,24 @@ async def _persist_project_risks(
                 category="supply_chain",
                 title=str(title),
                 severity=_normalize_severity(item.get("severity")),
-                detail=item.get("mitigation") or item.get("detail"),
+                detail=str(item["detail"]) if item.get("detail") else None,
                 status="open",
             )
         )
         created += 1
 
-    for item in crew_data.get("workforce_gaps", []) or []:
-        if not isinstance(item, dict):
-            continue
-        role = item.get("role") or item.get("title")
+    for item in normalize_workforce_gap_rows(crew_data.get("workforce_gaps", []) or []):
+        role = item.get("role")
         if not role:
             continue
-        shortage = item.get("shortage") or item.get("gap") or item.get("detail")
-        severity = (
-            "high" if shortage and "critical" in str(shortage).lower() else "medium"
-        )
         await risk_repo.create(
             ProjectRiskCreate(
                 project_id=project_id,
                 source_agent="CrewAgent",
                 category="workforce",
                 title=str(role),
-                severity=severity,
-                detail=str(shortage) if shortage else None,
+                severity=_normalize_severity(item.get("severity")),
+                detail=str(item["shortage"]) if item.get("shortage") else None,
                 status="open",
             )
         )
@@ -293,6 +321,16 @@ async def persist_supplier_and_crew_outputs(
     deleted_suppliers = await supplier_repo.delete_by_project(project_id)
     deleted_crew = await crew_repo.delete_by_project(project_id)
 
+    # Automatically synchronize crew allocations to ProjectCrewRoster
+    from app.db.models.project_crew_roster import ProjectCrewRoster
+    from app.db.models.crew_master import CrewMaster
+    from sqlalchemy import select, delete
+    await session.execute(delete(ProjectCrewRoster).where(ProjectCrewRoster.project_id == project_id))
+
+    res_cm = await session.execute(select(CrewMaster))
+    cm_list = res_cm.scalars().all()
+    cm_map = {cm.employee_name.lower().strip(): cm for cm in cm_list if cm.employee_name}
+
     procurement_plan = supplier_data.get("procurement_plan", []) or []
     if schedule_materials:
         procurement_plan = align_procurement_plan(
@@ -340,6 +378,7 @@ async def persist_supplier_and_crew_outputs(
         created_suppliers += 1
 
     created_crew = 0
+    seen_workers = set()
     for row in crew_data.get("crew_allocations", []) or []:
         if not isinstance(row, dict):
             continue
@@ -348,6 +387,8 @@ async def persist_supplier_and_crew_outputs(
         if not phase_name and not crew_name:
             logger.warning("Skipping crew allocation row with no phase or crew name")
             continue
+
+        crew_name = str(crew_name).strip()
 
         start_raw = row.get("start_date") or row.get("start_month")
         end_raw = row.get("end_date") or row.get("end_month")
@@ -372,6 +413,30 @@ async def persist_supplier_and_crew_outputs(
         )
         created_crew += 1
 
+        # Roster synchronization
+        if crew_name.lower() not in seen_workers:
+            seen_workers.add(crew_name.lower())
+            cm_obj = cm_map.get(crew_name.lower())
+            osha_verified = False
+            if cm_obj and cm_obj.certification and "osha" in cm_obj.certification.lower():
+                osha_verified = True
+            elif cm_obj:
+                osha_verified = True
+            
+            subcontractor = "Apex Builders" if cm_obj else "ConstructaIQ Partners"
+            title = row.get("skill_type") or row.get("skill") or (cm_obj.skill_type if cm_obj else "Journeyman")
+
+            session.add(
+                ProjectCrewRoster(
+                    project_id=project_id,
+                    worker_name=crew_name,
+                    subcontractor=subcontractor,
+                    title=title,
+                    osha_verified=osha_verified,
+                    is_mobilized=True
+                )
+            )
+
     return {
         "project_suppliers_created": created_suppliers,
         "crew_plans_created": created_crew,
@@ -386,6 +451,7 @@ async def persist_analysis_outputs(
     pipeline_result: dict[str, Any],
     *,
     execution_records: list[dict[str, Any]] | None = None,
+    run_id: str | None = None,
 ) -> dict[str, int]:
     """Replace-on-rerun persistence for all pipeline-derived tables."""
     project_repo = ProjectRepository(session)
@@ -399,8 +465,12 @@ async def persist_analysis_outputs(
     summary = pipeline_result.get("projectSummary") or {}
     permit_data = pipeline_result.get("permitAssessment") or {}
     plan_data = pipeline_result.get("projectPlan") or {}
-    supplier_data = pipeline_result.get("supplierAnalysis") or {}
-    crew_data = pipeline_result.get("crewAnalysis") or {}
+    supplier_data = normalize_supplier_agent(pipeline_result.get("supplierAnalysis") or {})
+    crew_data = normalize_crew_agent(pipeline_result.get("crewAnalysis") or {})
+    blueprint_summary = pipeline_result.get("blueprintSummary") or {}
+    zoning_data = pipeline_result.get("zoningAssessment") or {}
+    budget_data = pipeline_result.get("budgetAnalysis") or {}
+    safety_data = pipeline_result.get("safetyAssessment") or {}
 
     def _non_empty_str(val: Any) -> str | None:
         if isinstance(val, str) and val.strip():
@@ -437,6 +507,18 @@ async def persist_analysis_outputs(
         summary.get("complexity_level") or summary.get("complexity")
     ):
         update_payload["complexity_level"] = complexity
+
+    building_def = blueprint_summary.get("building_definition") or blueprint_summary.get(
+        "buildingDefinition"
+    )
+    if building_def:
+        update_payload["building_definition_json"] = _json_dumps(building_def)
+    if zoning_data:
+        update_payload["zoning_data_json"] = _json_dumps(zoning_data)
+    if budget_data:
+        update_payload["budget_data_json"] = _json_dumps(budget_data)
+    if safety_data:
+        update_payload["safety_data_json"] = _json_dumps(safety_data)
 
     update_payload["status"] = "active"
 
@@ -484,9 +566,23 @@ async def persist_analysis_outputs(
     if not top_materials and isinstance(phase_breakdown, list):
         for phase in phase_breakdown:
             if isinstance(phase, dict):
+                phase_name = phase.get("phase_name") or phase.get("name") or ""
+                wps = phase.get("work_packages") or phase.get("workPackages") or []
+                if isinstance(wps, list):
+                    for wp in wps:
+                        if isinstance(wp, dict):
+                            wp_mats = wp.get("materials") or wp.get("material_list") or []
+                            if isinstance(wp_mats, list):
+                                wp_name = wp.get("name") or phase_name
+                                for m in wp_mats:
+                                    if isinstance(m, str):
+                                        top_materials.append(
+                                            {"name": m, "category": wp_name}
+                                        )
+                                    elif isinstance(m, dict):
+                                        top_materials.append(m)
                 phase_mats = phase.get("materials", [])
                 if isinstance(phase_mats, list):
-                    phase_name = phase.get("phase_name") or phase.get("name") or ""
                     for m in phase_mats:
                         if isinstance(m, str):
                             top_materials.append(
@@ -528,6 +624,13 @@ async def persist_analysis_outputs(
             if cost is not None:
                 labor_cost += cost
 
+    cost_breakdown = budget_data.get("cost_breakdown") or {}
+    equipment_cost = None
+    contingency_cost = None
+    if isinstance(cost_breakdown, dict):
+        equipment_cost = _parse_decimal(cost_breakdown.get("equipment") or cost_breakdown.get("equipment_cost"))
+        contingency_cost = _parse_decimal(cost_breakdown.get("contingency") or cost_breakdown.get("contingency_cost"))
+
     total_budget = _parse_decimal(summary.get("budget"))
     await budget_repo.create(
         BudgetCreate(
@@ -535,6 +638,8 @@ async def persist_analysis_outputs(
             total_budget=total_budget,
             material_cost=material_cost if material_cost else None,
             labor_cost=labor_cost if labor_cost else None,
+            equipment_cost=equipment_cost if equipment_cost else None,
+            contingency_cost=contingency_cost if contingency_cost else None,
         )
     )
     created_budgets = 1
@@ -591,8 +696,33 @@ async def persist_analysis_outputs(
     risk_repo = ProjectRiskRepository(session)
     deleted_risks = await risk_repo.delete_by_project(project_id)
     created_risks = await _persist_project_risks(
-        risk_repo, project_id, supplier_data, crew_data
+        risk_repo, project_id, supplier_data, crew_data, permit_data
     )
+    if created_risks == 0:
+        raw_supplier = pipeline_result.get("supplierAnalysis") or {}
+        raw_crew = pipeline_result.get("crewAnalysis") or {}
+        has_risk_signals = any(
+            raw_supplier.get(key)
+            for key in (
+                "supply_chain_risks",
+                "supplyChainRisks",
+                "risks",
+                "procurement_risks",
+            )
+        ) or any(
+            raw_crew.get(key)
+            for key in (
+                "workforce_gaps",
+                "workforceGaps",
+                "skill_gaps",
+                "staffing_gaps",
+            )
+        )
+        if has_risk_signals:
+            logger.warning(
+                "Project %s: agent output contained risk signals but risks_created=0",
+                project_id,
+            )
 
     supplier_crew_summary = await persist_supplier_and_crew_outputs(
         session,
@@ -616,6 +746,7 @@ async def persist_analysis_outputs(
                 project_id=project_id,
                 agent_name=record.get("agent_name"),
                 agent_version=record.get("agent_version"),
+                run_id=run_id,
                 status=record.get("status") or "complete",
                 started_at=started,
                 completed_at=completed,

@@ -5,7 +5,9 @@ from typing import Any
 AGENT_CONTRACT = "ContractAgent"
 AGENT_BLUEPRINT = "BlueprintAgent"
 AGENT_PERMIT = "PermitAgent"
+AGENT_PLANNING = "ScheduleAgent"
 AGENT_SUPPLIER = "SupplierAgent"
+AGENT_CREW = "CrewAgent"
 
 PROCUREMENT_ROW_ALIASES: dict[str, tuple[str, ...]] = {
     "material_name": (
@@ -145,6 +147,54 @@ NESTED_PAYLOAD_KEYS: tuple[str, ...] = (
     "result",
     "output",
     "response",
+    "supplier_analysis",
+    "supplierAnalysis",
+    "crew_analysis",
+    "crewAnalysis",
+)
+
+SUPPLY_RISK_TITLE_KEYS: tuple[str, ...] = (
+    "risk",
+    "title",
+    "name",
+    "description",
+    "issue",
+    "material",
+    "risk_name",
+    "risk_description",
+    "supplier_name",
+)
+
+SUPPLY_RISK_DETAIL_KEYS: tuple[str, ...] = (
+    "mitigation",
+    "detail",
+    "impact",
+    "rationale",
+    "recommendation",
+    "notes",
+)
+
+WORKFORCE_ROLE_KEYS: tuple[str, ...] = (
+    "role",
+    "title",
+    "trade",
+    "skill",
+    "position",
+    "skill_type",
+    "crew_role",
+    "job_title",
+    "name",
+)
+
+WORKFORCE_SHORTAGE_KEYS: tuple[str, ...] = (
+    "shortage",
+    "gap",
+    "detail",
+    "description",
+    "impact",
+    "count_needed",
+    "headcount_gap",
+    "workers_needed",
 )
 
 
@@ -256,12 +306,12 @@ def _merge_normalized_fields(
 
 
 def normalize_contract_agent(data: dict[str, Any]) -> dict[str, Any]:
-    """Map ContractAgent Foundry keys to canonical snake_case."""
+    """Map ContractAgent output keys to canonical snake_case."""
     return _normalize_fields(data, CONTRACT_FIELD_ALIASES)
 
 
 def normalize_blueprint_agent(data: dict[str, Any]) -> dict[str, Any]:
-    """Map BlueprintAgent Foundry keys to canonical snake_case."""
+    """Map BlueprintAgent output keys to canonical snake_case."""
     flat = _flatten_agent_payload(data)
     result = _normalize_fields(data, BLUEPRINT_FIELD_ALIASES)
 
@@ -325,6 +375,80 @@ def _normalize_permit_item(
     return {k: v for k, v in row.items() if not _is_empty(v)}
 
 
+def _normalize_risk_severity(value: Any, *, default: str = "medium") -> str:
+    if isinstance(value, str) and value.strip():
+        return value.strip().lower()
+    return default
+
+
+def normalize_supply_chain_risk_rows(items: Any) -> list[dict[str, Any]]:
+    """Coerce SupplierAgent risk items to {title, detail, severity}."""
+    if items is None:
+        return []
+    if not isinstance(items, list):
+        items = [items]
+
+    rows: list[dict[str, Any]] = []
+    for item in items:
+        if isinstance(item, str):
+            text = item.strip()
+            if text:
+                rows.append({"title": text, "detail": None, "severity": "medium"})
+            continue
+        if not isinstance(item, dict):
+            continue
+
+        title = _first_present(item, *SUPPLY_RISK_TITLE_KEYS)
+        detail = _first_present(item, *SUPPLY_RISK_DETAIL_KEYS)
+        if _is_empty(title):
+            continue
+        title_str = str(title).strip()
+        if detail and str(detail).strip() == title_str:
+            detail = None
+        rows.append(
+            {
+                "title": title_str,
+                "detail": str(detail).strip() if detail else None,
+                "severity": _normalize_risk_severity(item.get("severity")),
+            }
+        )
+    return rows
+
+
+def normalize_workforce_gap_rows(items: Any) -> list[dict[str, Any]]:
+    """Coerce CrewAgent gap items to {role, shortage, severity}."""
+    if items is None:
+        return []
+    if not isinstance(items, list):
+        items = [items]
+
+    rows: list[dict[str, Any]] = []
+    for item in items:
+        if isinstance(item, str):
+            text = item.strip()
+            if text:
+                rows.append({"role": text, "shortage": None, "severity": "medium"})
+            continue
+        if not isinstance(item, dict):
+            continue
+
+        role = _first_present(item, *WORKFORCE_ROLE_KEYS)
+        if _is_empty(role):
+            continue
+        shortage = _first_present(item, *WORKFORCE_SHORTAGE_KEYS)
+        severity = _normalize_risk_severity(item.get("severity"))
+        if shortage and "critical" in str(shortage).lower() and severity == "medium":
+            severity = "high"
+        rows.append(
+            {
+                "role": str(role).strip(),
+                "shortage": str(shortage).strip() if shortage else None,
+                "severity": severity,
+            }
+        )
+    return rows
+
+
 def _normalize_procurement_row(row: Any) -> dict[str, Any] | None:
     if isinstance(row, str):
         text = row.strip()
@@ -367,13 +491,29 @@ def normalize_supplier_agent(data: dict[str, Any]) -> dict[str, Any]:
         if normalized_rows:
             result["procurement_plan"] = normalized_rows
 
-    for key in (
+    # supply_chain_risks — use _first_present for case-insensitive camelCase matching
+    supply_risks = _first_present(
+        flat,
         "supply_chain_risks",
+        "supplyChainRisks",
+        "supply_risks",
+        "supplyRisks",
+        "chain_risks",
+        "risks",
+        "procurement_risks",
+        "procurementRisks",
+    )
+    if not _is_empty(supply_risks):
+        normalized_risks = normalize_supply_chain_risk_rows(supply_risks)
+        if normalized_risks:
+            result["supply_chain_risks"] = normalized_risks
+
+    for key in (
         "recommended_suppliers",
         "supply_chain_recommendations",
         "procurement_recommendations",
     ):
-        value = flat.get(key)
+        value = _first_present(flat, key, "".join(w.capitalize() if i else w for i, w in enumerate(key.split("_"))))
         if not _is_empty(value):
             result[key] = value
 
@@ -385,14 +525,15 @@ def normalize_permit_agent(data: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(data, dict):
         return {}
 
+    flat = _flatten_agent_payload(data)
     approval_days = _first_present(
-        data, "approval_days", "estimated_approval_days", "total_approval_days"
+        flat, "approval_days", "estimated_approval_days", "total_approval_days"
     )
-    default_documents = data.get("required_documents")
+    default_documents = flat.get("required_documents")
 
     permits_raw = None
     for key in ("required_permits", "permits", "permit_list"):
-        value = data.get(key)
+        value = flat.get(key)
         if isinstance(value, list) and value:
             permits_raw = value
             break
@@ -414,10 +555,253 @@ def normalize_permit_agent(data: dict[str, Any]) -> dict[str, Any]:
     if approval_days is not None:
         result["approval_days"] = approval_days
     for key in ("compliance_risks", "required_documents"):
-        value = data.get(key)
+        value = flat.get(key)
         if not _is_empty(value):
             result[key] = value
 
+    return result
+
+
+SCHEDULE_MATERIAL_ROW_ALIASES: dict[str, tuple[str, ...]] = {
+    "material_name": PROCUREMENT_ROW_ALIASES["material_name"],
+    "quantity": PROCUREMENT_ROW_ALIASES["quantity"],
+    "unit": ("unit", "Unit", "uom", "UOM"),
+    "unit_price": PROCUREMENT_ROW_ALIASES["unit_price"],
+    "total_cost": PROCUREMENT_ROW_ALIASES["total_cost"],
+    "category": ("category", "material_category", "type", "Category"),
+}
+
+
+def normalize_schedule_material_row(row: Any) -> dict[str, Any] | None:
+    if isinstance(row, str):
+        text = row.strip()
+        return {"material_name": text, "name": text} if text else None
+    if not isinstance(row, dict):
+        return None
+
+    normalized: dict[str, Any] = {}
+    for canonical, aliases in SCHEDULE_MATERIAL_ROW_ALIASES.items():
+        value = _first_present(row, *aliases)
+        if not _is_empty(value):
+            normalized[canonical] = value
+
+    material_name = normalized.get("material_name")
+    if _is_empty(material_name):
+        return None
+
+    normalized["name"] = material_name
+    return normalized
+
+
+def normalize_schedule_agent(data: dict[str, Any]) -> dict[str, Any]:
+    """Normalize ScheduleAgent output keys to canonical snake_case."""
+    if not isinstance(data, dict):
+        return {}
+
+    flat = _flatten_agent_payload(data)
+    result = dict(flat)
+
+    # Phases — accept project_phases, projectPhases, schedule_phases, schedulePhases
+    if _is_empty(result.get("phases")) and _is_empty(result.get("project_phases")):
+        phases = _first_present(result, "projectPhases", "schedule_phases", "schedulePhases")
+        if phases:
+            result["phases"] = phases
+
+    # Duration — accept camelCase and various names
+    if _is_empty(result.get("estimated_duration_days")):
+        dur = _first_present(
+            result,
+            "total_duration_days",
+            "total_estimated_duration_days",
+            "totalDurationDays",
+            "duration_days",
+            "durationDays",
+            "estimated_duration",
+            "estimatedDuration",
+            "project_duration_days",
+        )
+        if dur is not None:
+            result["estimated_duration_days"] = dur
+
+    # Resolve phases list to extract nested materials, inspections, and dependencies
+    phases_list = result.get("project_phases") or result.get("phases") or []
+    wp_id_to_name = {}
+    if isinstance(phases_list, list):
+        for phase in phases_list:
+            if isinstance(phase, dict):
+                wps = phase.get("work_packages") or phase.get("workPackages") or []
+                if isinstance(wps, list):
+                    for wp in wps:
+                        if isinstance(wp, dict) and wp.get("id") and wp.get("name"):
+                            wp_id_to_name[wp["id"]] = wp["name"]
+
+    # Extract materials
+    top_materials = result.get("materials") or []
+    if not isinstance(top_materials, list):
+        top_materials = []
+    if isinstance(phases_list, list):
+        for phase in phases_list:
+            if isinstance(phase, dict):
+                phase_name = phase.get("phase_name") or phase.get("name") or "General"
+                wps = phase.get("work_packages") or phase.get("workPackages") or []
+                if isinstance(wps, list):
+                    for wp in wps:
+                        if isinstance(wp, dict):
+                            wp_mats = wp.get("materials") or wp.get("material_list") or []
+                            if isinstance(wp_mats, list):
+                                wp_name = wp.get("name") or phase_name
+                                for m in wp_mats:
+                                    if isinstance(m, str) and m.strip():
+                                        if not any(x.get("name") == m.strip() for x in top_materials if isinstance(x, dict)):
+                                            normalized = normalize_schedule_material_row(m.strip())
+                                            if normalized:
+                                                normalized.setdefault("category", wp_name)
+                                                top_materials.append(normalized)
+                                    elif isinstance(m, dict):
+                                        normalized = normalize_schedule_material_row(m)
+                                        if normalized:
+                                            normalized.setdefault("category", wp_name)
+                                            top_materials.append(normalized)
+                direct_mats = phase.get("materials") or []
+                if isinstance(direct_mats, list):
+                    for m in direct_mats:
+                        if isinstance(m, str) and m.strip():
+                            if not any(x.get("name") == m.strip() for x in top_materials if isinstance(x, dict)):
+                                normalized = normalize_schedule_material_row(m.strip())
+                                if normalized:
+                                    normalized.setdefault("category", phase_name)
+                                    top_materials.append(normalized)
+                        elif isinstance(m, dict):
+                            normalized = normalize_schedule_material_row(m)
+                            if normalized:
+                                normalized.setdefault("category", phase_name)
+                                top_materials.append(normalized)
+    normalized_top: list[dict[str, Any]] = []
+    for item in top_materials:
+        if isinstance(item, dict):
+            row = normalize_schedule_material_row(item)
+            if row:
+                if not row.get("category"):
+                    row.setdefault("category", "General")
+                normalized_top.append(row)
+        elif isinstance(item, str):
+            row = normalize_schedule_material_row(item)
+            if row:
+                row.setdefault("category", "General")
+                normalized_top.append(row)
+    result["materials"] = normalized_top
+
+    # Extract inspections
+    top_inspections = result.get("inspection_stages") or result.get("inspections") or []
+    if not isinstance(top_inspections, list):
+        top_inspections = []
+    if isinstance(phases_list, list):
+        for phase in phases_list:
+            if isinstance(phase, dict):
+                phase_name = phase.get("phase_name") or phase.get("name") or "General"
+                wps = phase.get("work_packages") or phase.get("workPackages") or []
+                if isinstance(wps, list):
+                    for wp in wps:
+                        if isinstance(wp, dict):
+                            wp_insps = wp.get("inspection_stages") or wp.get("inspections") or []
+                            if isinstance(wp_insps, list):
+                                wp_name = wp.get("name") or phase_name
+                                for insp in wp_insps:
+                                    if isinstance(insp, str) and insp.strip():
+                                        if not any(x.get("name") == insp.strip() for x in top_inspections if isinstance(x, dict)):
+                                            top_inspections.append({"name": insp.strip(), "phase_name": wp_name})
+                                    elif isinstance(insp, dict):
+                                        top_inspections.append(insp)
+                direct_insps = phase.get("inspections") or []
+                if isinstance(direct_insps, list):
+                    for insp in direct_insps:
+                        if isinstance(insp, str) and insp.strip():
+                            if not any(x.get("name") == insp.strip() for x in top_inspections if isinstance(x, dict)):
+                                top_inspections.append({"name": insp.strip(), "phase_name": phase_name})
+                        elif isinstance(insp, dict):
+                            top_inspections.append(insp)
+    result["inspection_stages"] = top_inspections
+
+    # Extract dependency graph
+    structured_deps = []
+    if isinstance(phases_list, list):
+        for phase in phases_list:
+            if isinstance(phase, dict):
+                wps = phase.get("work_packages") or phase.get("workPackages") or []
+                if isinstance(wps, list):
+                    for wp in wps:
+                        if isinstance(wp, dict) and wp.get("id") and wp.get("dependencies"):
+                            successor_name = wp.get("name")
+                            for pred_id in wp["dependencies"]:
+                                pred_name = wp_id_to_name.get(pred_id)
+                                if pred_name and successor_name:
+                                    structured_deps.append({
+                                        "predecessor": pred_name,
+                                        "successor": successor_name
+                                    })
+
+    # Parse textual top-level dependencies if structured list is empty
+    raw_deps = result.get("dependencies")
+    if isinstance(raw_deps, list):
+        for dep in raw_deps:
+            if isinstance(dep, str):
+                parsed = False
+                for separator in (" must be complete before ", " must precede ", " must be approved before ", " before ", " precede ", " -> ", "->"):
+                    if separator in dep:
+                        parts = dep.split(separator, 1)
+                        if len(parts) == 2:
+                            structured_deps.append(
+                                {
+                                    "predecessor": parts[0].strip(),
+                                    "successor": parts[1].strip(),
+                                }
+                            )
+                            parsed = True
+                            break
+                if not parsed:
+                    structured_deps.append({"predecessor": dep, "successor": ""})
+            elif isinstance(dep, dict):
+                structured_deps.append(dep)
+
+    result["dependencies"] = structured_deps
+    return result
+
+
+def normalize_crew_agent(data: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(data, dict):
+        return {}
+    flat = _flatten_agent_payload(data)
+    result = dict(flat)
+    if _is_empty(result.get("crew_allocations")):
+        allocs = _first_present(
+            result,
+            "crew_plan",
+            "crewAllocations",
+            "team_assignments",
+            "teamAssignments",
+            "allocations",
+            "crew_assignments",
+            "crewAssignments",
+        )
+        if allocs:
+            result["crew_allocations"] = allocs
+    if _is_empty(result.get("workforce_gaps")):
+        gaps = _first_present(
+            result,
+            "workforceGaps",
+            "workforce_gap",
+            "workforceGap",
+            "skill_gaps",
+            "skillGaps",
+            "staffing_gaps",
+            "staffingGaps",
+            "labor_gaps",
+            "laborGaps",
+        )
+        if gaps:
+            result["workforce_gaps"] = normalize_workforce_gap_rows(gaps)
+    elif not _is_empty(result.get("workforce_gaps")):
+        result["workforce_gaps"] = normalize_workforce_gap_rows(result["workforce_gaps"])
     return result
 
 
@@ -457,6 +841,10 @@ def normalize_agent_output(agent_name: str, data: dict[str, Any]) -> dict[str, A
         return normalize_blueprint_agent(data)
     if agent_name == AGENT_PERMIT:
         return normalize_permit_agent(data)
+    if agent_name == AGENT_PLANNING:
+        return normalize_schedule_agent(data)
     if agent_name == AGENT_SUPPLIER:
         return normalize_supplier_agent(data)
+    if agent_name == AGENT_CREW:
+        return normalize_crew_agent(data)
     return data if isinstance(data, dict) else {}

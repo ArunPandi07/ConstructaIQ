@@ -2,6 +2,13 @@ import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Link2, Package, Truck } from "lucide-react";
 import type { ProjectSupplierRow, ScheduleMaterial } from "../types";
+import {
+  findSupplier,
+  formatMoney,
+  formatQuantity,
+  materialName,
+  resolveMaterialCost,
+} from "../utils/materialMatching";
 
 interface MaterialWithSupplier {
   material: ScheduleMaterial;
@@ -11,160 +18,6 @@ interface MaterialWithSupplier {
 interface Props {
   materials: ScheduleMaterial[];
   supplierRows: ProjectSupplierRow[];
-}
-
-const STOP_WORDS = new Set([
-  "a",
-  "an",
-  "the",
-  "and",
-  "or",
-  "with",
-  "for",
-  "of",
-  "in",
-  "on",
-  "to",
-  "by",
-  "per",
-]);
-
-const MATERIAL_KEYWORDS = new Set([
-  "concrete",
-  "steel",
-  "rebar",
-  "reinforced",
-  "structural",
-  "ready",
-  "mix",
-  "high",
-  "strength",
-  "curtain",
-  "wall",
-  "glazing",
-  "glass",
-  "elevator",
-  "aluminum",
-  "timber",
-  "wood",
-  "masonry",
-  "brick",
-  "gypsum",
-  "insulation",
-  "roofing",
-  "membrane",
-  "copper",
-  "stainless",
-  "precast",
-  "aggregate",
-  "cement",
-  "mortar",
-  "pipe",
-  "pvc",
-  "duct",
-  "hvac",
-  "plumbing",
-  "cable",
-  "wiring",
-  "drywall",
-  "shingle",
-  "asphalt",
-  "stone",
-  "granite",
-  "marble",
-  "tile",
-  "ceramic",
-  "framing",
-  "beam",
-  "column",
-  "truss",
-  "deck",
-  "slab",
-  "foundation",
-  "footing",
-  "psi",
-  "core",
-  "walls",
-]);
-
-const MIN_MATCH_SCORE = 0.45;
-
-function materialName(material: ScheduleMaterial): string {
-  return material.materialName ?? material.name ?? "Material";
-}
-
-function normalize(value: unknown): string {
-  return String(value ?? "")
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ");
-}
-
-function materialTokens(text: string): Set<string> {
-  const tokens = normalize(text).split(/\s+/).filter(Boolean);
-  return new Set(
-    tokens.filter((token) => !STOP_WORDS.has(token) && !/^\d+$/.test(token)),
-  );
-}
-
-function scoreMaterialMatch(a: string, b: string): number {
-  if (!a || !b) return 0;
-  if (normalize(a) === normalize(b)) return 1;
-
-  const tokensA = materialTokens(a);
-  const tokensB = materialTokens(b);
-  if (tokensA.size === 0 || tokensB.size === 0) return 0;
-
-  const intersection = [...tokensA].filter((token) => tokensB.has(token));
-  if (intersection.length === 0) return 0;
-
-  const overlap =
-    intersection.length / Math.max(tokensA.size, tokensB.size);
-  const keywordBonus = intersection.reduce(
-    (sum, token) => sum + (MATERIAL_KEYWORDS.has(token) ? 0.05 : 0),
-    0,
-  );
-  return Math.min(1, overlap + keywordBonus);
-}
-
-function findSupplier(
-  material: ScheduleMaterial,
-  supplierRows: ProjectSupplierRow[],
-): ProjectSupplierRow | undefined {
-  if (material.supplierRecordId != null) {
-    const byId = supplierRows.find(
-      (row) => row.supplier_record_id === material.supplierRecordId,
-    );
-    if (byId) return byId;
-  }
-
-  const target = materialName(material);
-  if (!target) return undefined;
-
-  let best: ProjectSupplierRow | undefined;
-  let bestScore = 0;
-
-  for (const supplier of supplierRows) {
-    const supplierMaterial = supplier.material_name ?? "";
-    const score = scoreMaterialMatch(target, supplierMaterial);
-    if (score >= MIN_MATCH_SCORE && score > bestScore) {
-      bestScore = score;
-      best = supplier;
-    }
-  }
-
-  return best;
-}
-
-function formatMoney(value: unknown): string {
-  if (value == null || value === "") return "-";
-  const num = Number(value);
-  return Number.isFinite(num) ? `$${num.toLocaleString()}` : String(value);
-}
-
-function formatQuantity(material: ScheduleMaterial): string {
-  if (material.quantity == null || material.quantity === "") return "-";
-  return `${material.quantity} ${material.unit ?? ""}`.trim();
 }
 
 export default function MaterialsPanel({ materials, supplierRows }: Props) {
@@ -237,24 +90,15 @@ export default function MaterialsPanel({ materials, supplierRows }: Props) {
 
       {Object.entries(grouped).map(([category, rows]) => (
         <div key={category} className="glass-card p-5">
-          <div className="flex items-center justify-between gap-3 mb-4">
-            <h3 className="text-sm font-bold text-stone-900 flex items-center gap-2">
-              <Package className="w-4 h-4 text-[#F5C518]" />
-              {category}
-            </h3>
-            <span className="text-[9px] uppercase font-mono text-stone-400">
-              {rows.length} item{rows.length === 1 ? "" : "s"}
-            </span>
-          </div>
-
+          <h3 className="text-sm font-bold text-stone-900 mb-3">{category}</h3>
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+            <table className="w-full text-xs">
               <thead>
-                <tr className="text-stone-400 border-b border-stone-100">
-                  <th className="pb-2">Material</th>
-                  <th className="pb-2">Quantity</th>
-                  <th className="pb-2">Supplier Match</th>
-                  <th className="pb-2 text-right">Cost</th>
+                <tr className="text-left text-[10px] uppercase tracking-wide text-stone-400 border-b border-stone-100">
+                  <th className="pb-2 font-bold">Material</th>
+                  <th className="pb-2 font-bold">Quantity</th>
+                  <th className="pb-2 font-bold">Supplier Match</th>
+                  <th className="pb-2 font-bold text-right">Cost</th>
                 </tr>
               </thead>
               <tbody>
@@ -283,7 +127,7 @@ export default function MaterialsPanel({ materials, supplierRows }: Props) {
                         )}
                       </td>
                       <td className="py-2.5 text-stone-600 font-mono">
-                        {formatQuantity(row.material)}
+                        {formatQuantity(row.material, row.supplier)}
                       </td>
                       <td className="py-2.5">
                         {row.supplier ? (
@@ -299,7 +143,7 @@ export default function MaterialsPanel({ materials, supplierRows }: Props) {
                         )}
                       </td>
                       <td className="py-2.5 text-right font-mono text-stone-700">
-                        {formatMoney(row.material.totalCost ?? row.supplier?.total_cost)}
+                        {formatMoney(resolveMaterialCost(row.material, row.supplier))}
                       </td>
                     </tr>
                   );

@@ -45,6 +45,10 @@ class Project(Base):
     created_by_user_id: Mapped[Optional[int]] = mapped_column(
         BigInteger, ForeignKey("users.user_id"), nullable=True, index=True
     )
+    building_definition_json: Mapped[Optional[str]] = mapped_column(Text)
+    zoning_data_json: Mapped[Optional[str]] = mapped_column(Text)
+    budget_data_json: Mapped[Optional[str]] = mapped_column(Text)
+    safety_data_json: Mapped[Optional[str]] = mapped_column(Text)
 
     documents: Mapped[list[Document]] = relationship(
         back_populates="project", cascade="all, delete-orphan"

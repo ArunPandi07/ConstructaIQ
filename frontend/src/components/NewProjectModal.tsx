@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import {
@@ -23,8 +23,12 @@ import {
   pollAnalyzeUntilComplete,
   startAnalyze,
   uploadProjectPdfs,
+  getAnalyzeStatus,
 } from "../services/projectApi";
 import { ApiError } from "../services/apiClient";
+import { useWebSocket } from "../context/WebSocketContext";
+import { clearDashboardCache } from "../services/dashboardCache";
+import { clearIntelligenceCache, clearAgentsCache } from "../hooks/usePageData";
 
 interface NewProjectModalProps {
   open: boolean;
@@ -126,6 +130,111 @@ export default function NewProjectModal({ open, onClose }: NewProjectModalProps)
   const [overallPct, setOverallPct] = useState<number | null>(null);
   const [completedProjectId, setCompletedProjectId] = useState<string | null>(null);
 
+  const [activeProjectIdForWs, setActiveProjectIdForWs] = useState<string | undefined>(undefined);
+  const { lastMessage, status: wsStatus } = useWebSocket("pipeline", activeProjectIdForWs);
+
+  const resolveAnalyzeRef = useRef<((result: any) => void) | null>(null);
+  const rejectAnalyzeRef = useRef<((error: any) => void) | null>(null);
+  const useWsRef = useRef<boolean>(true);
+  const fallbackPollingActive = useRef<boolean>(false);
+  const wsStatusRef = useRef(wsStatus);
+  const currentJobIdRef = useRef<string | null>(null);
+
+  const NODE_TO_AGENT: Record<string, string> = {
+    contract_node: "ContractAgent",
+    blueprint_node: "BlueprintAgent",
+    permit_node: "PermitAgent",
+    schedule_node: "ScheduleAgent",
+    zoning_node: "ZoningAgent",
+    budget_node: "BudgetAgent",
+    safety_node: "SafetyAlertAgent",
+    supplier_node: "SupplierAgent",
+    crew_node: "CrewAgent",
+  };
+
+  const AGENT_ORDER = [
+    "ContractAgent",
+    "BlueprintAgent",
+    "PermitAgent",
+    "ScheduleAgent",
+    "ZoningAgent",
+    "BudgetAgent",
+    "SafetyAlertAgent",
+    "SupplierAgent",
+    "CrewAgent",
+  ];
+
+  const startFallbackPolling = useCallback(async (projectId: number, jobId: string) => {
+    if (fallbackPollingActive.current) return;
+    fallbackPollingActive.current = true;
+    console.log("WebSocket connection failed or disconnected. Falling back to HTTP polling...");
+    try {
+      const result = await pollAnalyzeUntilComplete(projectId, jobId, {
+        onProgress: (status) => {
+          if (!useWsRef.current) {
+            setProgressStep(status.progress_step ?? null);
+            setOverallPct(status.overall_pct ?? null);
+          }
+        },
+        onComplete: (status) => {
+          if (!useWsRef.current) {
+            if (status.report_delivery_status === "sent") {
+              setDescribeError(null);
+            }
+          }
+        },
+      });
+      resolveAnalyzeRef.current?.(result);
+    } catch (err) {
+      rejectAnalyzeRef.current?.(err);
+    }
+  }, []);
+
+  // Update wsStatus ref and trigger fallback if disconnected
+  useEffect(() => {
+    wsStatusRef.current = wsStatus;
+    if (wsStatus === "disconnected" && activeProjectIdForWs) {
+      useWsRef.current = false;
+      if (currentJobIdRef.current) {
+        startFallbackPolling(Number(activeProjectIdForWs), currentJobIdRef.current);
+      }
+    }
+  }, [wsStatus, activeProjectIdForWs, startFallbackPolling]);
+
+  // Handle WebSocket messages
+  useEffect(() => {
+    if (!lastMessage || !activeProjectIdForWs) return;
+
+    useWsRef.current = true;
+
+    const { type, payload } = lastMessage;
+    if (type === "AGENT_UPDATE") {
+      const nodeName = payload.agent;
+      const mappedAgent = NODE_TO_AGENT[nodeName] || nodeName;
+      setProgressStep(mappedAgent);
+      
+      const idx = AGENT_ORDER.indexOf(mappedAgent);
+      if (idx !== -1) {
+        setOverallPct(Math.round(((idx + 1) / AGENT_ORDER.length) * 100));
+      }
+    } else if (type === "PIPELINE_COMPLETE") {
+      const projId = Number(activeProjectIdForWs);
+      const jobId = currentJobIdRef.current;
+      getAnalyzeStatus(projId, jobId || undefined)
+        .then((status) => {
+          if (status.result) {
+            resolveAnalyzeRef.current?.(status.result);
+          } else {
+            resolveAnalyzeRef.current?.({});
+          }
+        })
+        .catch((err) => {
+          console.error("Failed to get final status after PIPELINE_COMPLETE:", err);
+          resolveAnalyzeRef.current?.({});
+        });
+    }
+  }, [lastMessage, activeProjectIdForWs]);
+
   const contractRef = useRef<HTMLInputElement>(null);
   const blueprintRef = useRef<HTMLInputElement>(null);
 
@@ -192,30 +301,40 @@ export default function NewProjectModal({ open, onClose }: NewProjectModalProps)
       sendReportEmail: true,
     });
     setAnalyzeJobId(job.job_id);
+    currentJobIdRef.current = job.job_id;
     setProgressStep("ContractAgent");
     setOverallPct(0);
 
-    const result = await pollAnalyzeUntilComplete(projectId, job.job_id, {
-      onProgress: (status) => {
-        setProgressStep(status.progress_step ?? null);
-        setOverallPct(status.overall_pct ?? null);
-      },
-      onComplete: (status) => {
-        if (status.report_delivery_status === "sent") {
-          setDescribeError(null);
-        } else if (
-          status.report_delivery_status === "failed" &&
-          status.report_delivery_error
-        ) {
-          console.warn("Report email failed:", status.report_delivery_error);
-        } else if (
-          status.report_delivery_status === "skipped" &&
-          status.report_delivery_error
-        ) {
-          console.warn("Report email skipped:", status.report_delivery_error);
-        }
-      },
-    });
+    fallbackPollingActive.current = false;
+    useWsRef.current = true;
+
+    // Trigger WebSocket connection by updating state
+    setActiveProjectIdForWs(String(projectId));
+
+    let result: any;
+    try {
+      result = await new Promise((resolve, reject) => {
+        resolveAnalyzeRef.current = resolve;
+        rejectAnalyzeRef.current = reject;
+
+        // Fallback safety timeout
+        setTimeout(() => {
+          if (wsStatusRef.current !== "connected" && currentJobIdRef.current) {
+            useWsRef.current = false;
+            startFallbackPolling(projectId, currentJobIdRef.current);
+          }
+        }, 3500);
+      });
+    } finally {
+      setActiveProjectIdForWs(undefined);
+      resolveAnalyzeRef.current = null;
+      rejectAnalyzeRef.current = null;
+    }
+
+    // Invalidate caches upon successful completion
+    clearIntelligenceCache(String(projectId));
+    clearAgentsCache(String(projectId));
+    clearDashboardCache();
 
     setLatestAnalysisResult(result);
     setActiveProjectId(String(projectId));

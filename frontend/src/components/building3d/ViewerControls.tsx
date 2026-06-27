@@ -1,217 +1,128 @@
-import {
-  Box,
-  Building2,
-  Eye,
-  Layers3,
-  Ruler,
-  Scissors,
-  Undo2,
-} from "lucide-react";
-import type { BuildingDefinition, BuildingViewMode, QualityTier } from "../../types/building";
-import { findRoom, useBuildingStore } from "../../stores/buildingStore";
-import { polygonArea } from "./geometryUtils";
+import type { BuildingDefinition } from '../../types/building';
+import type { CameraView } from './cameraPresets';
 
-interface Props {
-  definition: BuildingDefinition;
-}
-
-const modes: Array<{ id: BuildingViewMode; label: string; icon: typeof Eye }> = [
-  { id: "exterior", label: "Exterior", icon: Building2 },
-  { id: "interior", label: "Interior", icon: Box },
-  { id: "exploded", label: "Exploded", icon: Layers3 },
-  { id: "section", label: "Section", icon: Scissors },
+const VIEW_OPTIONS: { id: CameraView; label: string }[] = [
+  { id: 'front', label: 'Front' },
+  { id: 'angle', label: 'Angle' },
+  { id: 'side', label: 'Side' },
+  { id: 'top', label: 'Top' },
 ];
 
-export default function ViewerControls({ definition }: Props) {
-  const activeLevel = useBuildingStore((state) => state.activeLevel);
-  const viewMode = useBuildingStore((state) => state.viewMode);
-  const selectedRoom = useBuildingStore((state) => state.selectedRoom);
-  const sectionPlaneY = useBuildingStore((state) => state.sectionPlaneY);
-  const measurementsVisible = useBuildingStore((state) => state.measurementsVisible);
-  const setActiveLevel = useBuildingStore((state) => state.setActiveLevel);
-  const setViewMode = useBuildingStore((state) => state.setViewMode);
-  const setSectionPlaneY = useBuildingStore((state) => state.setSectionPlaneY);
-  const setMeasurementsVisible = useBuildingStore((state) => state.setMeasurementsVisible);
-  const qualityTier = useBuildingStore((state) => state.qualityTier);
-  const autoQuality = useBuildingStore((state) => state.autoQuality);
-  const setQualityTier = useBuildingStore((state) => state.setQualityTier);
-  const setAutoQuality = useBuildingStore((state) => state.setAutoQuality);
-  const resetView = useBuildingStore((state) => state.resetView);
-  const active = definition.levels[activeLevel] ?? definition.levels[0];
-  const room = findRoom(definition, selectedRoom);
+interface ViewerControlsProps {
+  buildingDefinition: BuildingDefinition;
+  isDayMode: boolean;
+  onToggleDayNight: () => void;
+  activeView: CameraView;
+  onViewChange: (view: CameraView) => void;
+  autoRotate: boolean;
+  onToggleAutoRotate: () => void;
+}
+
+export function ViewerControls({
+  buildingDefinition,
+  isDayMode,
+  onToggleDayNight,
+  activeView,
+  onViewChange,
+  autoRotate,
+  onToggleAutoRotate,
+}: ViewerControlsProps) {
+  const { building } = buildingDefinition;
+  const hText = isDayMode ? 'text-stone-900' : 'text-stone-100';
+  const mText = isDayMode ? 'text-stone-600' : 'text-stone-400';
+  const bgClass = isDayMode ? 'bg-white/80' : 'bg-black/60';
+  const borderClass = isDayMode ? 'border-stone-200/50' : 'border-white/10';
+  const activeBtnClass = isDayMode
+    ? 'bg-[#F5C518] text-stone-900 border-[#F5C518]'
+    : 'bg-[#F5C518] text-stone-900 border-[#F5C518]';
+  const idleBtnClass = isDayMode
+    ? 'bg-stone-100 text-stone-700 border-stone-200 hover:bg-stone-200'
+    : 'bg-white/10 text-stone-200 border-white/10 hover:bg-white/20';
 
   return (
-    <aside className="glass-card p-5 h-full space-y-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-widest text-stone-400">
-            Blueprint-Derived Model
-          </p>
-          <h3 className="text-sm font-black text-stone-900 mt-1">
-            {definition.building.type.replace(/_/g, " ")}
-          </h3>
-        </div>
-        <button
-          type="button"
-          onClick={resetView}
-          className="rounded-lg bg-stone-100 p-2 text-stone-500 hover:bg-stone-200 hover:text-stone-800 transition"
-          aria-label="Reset building viewer"
-        >
-          <Undo2 className="w-3.5 h-3.5" />
-        </button>
+    <div className="absolute inset-0 pointer-events-none z-10 p-4 font-sans">
+      <div className={`absolute top-4 left-1/2 -translate-x-1/2 flex items-center gap-4 px-5 py-2 rounded-full backdrop-blur-md border ${bgClass} ${borderClass} pointer-events-auto shadow-sm`}>
+        <span className={`font-semibold text-sm ${hText}`}>
+          {building.type.replaceAll('_', ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
+        </span>
+        <span className={mText}>|</span>
+        <span className={`text-sm ${mText}`}>G + {building.stories - 1} Floors</span>
+        <span className={mText}>|</span>
+        <span className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 rounded-full px-2 py-0.5 text-xs font-medium">
+          Three.js
+        </span>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 text-xs">
-        <div className="rounded-xl bg-stone-50 border border-stone-100 p-3">
-          <p className="text-[9px] uppercase tracking-widest text-stone-400">Floors</p>
-          <p className="font-black text-stone-900">{definition.building.stories}</p>
-        </div>
-        <div className="rounded-xl bg-stone-50 border border-stone-100 p-3">
-          <p className="text-[9px] uppercase tracking-widest text-stone-400">Height</p>
-          <p className="font-black text-stone-900">
-            {Math.round(definition.building.totalHeight_m)}m
-          </p>
-        </div>
-        <div className="rounded-xl bg-stone-50 border border-stone-100 p-3 col-span-2">
-          <p className="text-[9px] uppercase tracking-widest text-stone-400">Footprint</p>
-          <p className="font-black text-stone-900">
-            {Math.round(definition.building.footprint.width_m)}m x{" "}
-            {Math.round(definition.building.footprint.depth_m)}m
-          </p>
-        </div>
-      </div>
-
-      <div>
-        <p className="text-[10px] font-bold uppercase tracking-widest text-stone-400 mb-2">
-          Render Quality
-        </p>
-        <div className="grid grid-cols-3 gap-2">
-          {(["low", "medium", "high"] as QualityTier[]).map((tier) => (
+      <div className={`absolute bottom-6 left-4 flex flex-wrap items-center gap-3 px-4 py-2 rounded-xl backdrop-blur-md border ${bgClass} ${borderClass} pointer-events-auto max-w-[calc(100%-2rem)]`}>
+        <span className={`text-xs font-semibold ${hText} shrink-0`}>⚙ Views</span>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {VIEW_OPTIONS.map((view) => (
             <button
-              key={tier}
+              key={view.id}
               type="button"
-              onClick={() => setQualityTier(tier)}
-              className={`rounded-lg px-2 py-1.5 text-[10px] font-bold uppercase transition ${
-                qualityTier === tier
-                  ? "bg-[#1a2035] text-white"
-                  : "bg-stone-100 text-stone-600 hover:bg-stone-200"
+              onClick={() => onViewChange(view.id)}
+              className={`px-2.5 py-1 rounded-md text-[11px] font-medium border transition-colors ${
+                activeView === view.id ? activeBtnClass : idleBtnClass
               }`}
             >
-              {tier}
+              {view.label}
             </button>
           ))}
         </div>
-        <label className="mt-2 flex items-center gap-2 text-[10px] text-stone-500">
-          <input
-            type="checkbox"
-            checked={autoQuality}
-            onChange={(event) => setAutoQuality(event.target.checked)}
-            className="accent-[#F5C518]"
-          />
-          Auto-adjust quality when FPS drops
-        </label>
-      </div>
-
-      <div>
-        <p className="text-[10px] font-bold uppercase tracking-widest text-stone-400 mb-2">
-          View Mode
-        </p>
-        <div className="grid grid-cols-2 gap-2">
-          {modes.map((mode) => {
-            const Icon = mode.icon;
-            return (
-              <button
-                key={mode.id}
-                type="button"
-                onClick={() => setViewMode(mode.id)}
-                className={`inline-flex items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold transition ${
-                  viewMode === mode.id
-                    ? "bg-[#1a2035] text-white"
-                    : "bg-stone-100 text-stone-600 hover:bg-stone-200"
-                }`}
-              >
-                <Icon className="w-3.5 h-3.5" />
-                {mode.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      <div>
-        <label className="text-[10px] font-bold uppercase tracking-widest text-stone-400 mb-2 block">
-          Active Floor
-        </label>
-        <select
-          value={activeLevel}
-          onChange={(event) => setActiveLevel(Number(event.target.value))}
-          className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs font-bold text-stone-800"
+        <span className={`hidden sm:inline ${mText}`}>|</span>
+        <button
+          type="button"
+          onClick={onToggleAutoRotate}
+          className={`px-2.5 py-1 rounded-md text-[11px] font-medium border transition-colors ${
+            autoRotate ? activeBtnClass : idleBtnClass
+          }`}
         >
-          {definition.levels.map((level) => (
-            <option key={level.level} value={level.level}>
-              {level.name}
-            </option>
-          ))}
-        </select>
+          Auto ⟳
+        </button>
       </div>
 
-      {viewMode === "section" && (
-        <div>
-          <label className="text-[10px] font-bold uppercase tracking-widest text-stone-400 mb-2 block">
-            Section Plane: {Math.round(sectionPlaneY)}m
-          </label>
-          <input
-            type="range"
-            min={0}
-            max={definition.building.totalHeight_m}
-            value={sectionPlaneY}
-            onChange={(event) => setSectionPlaneY(Number(event.target.value))}
-            className="w-full accent-[#F5C518]"
-          />
+      <div className={`absolute bottom-6 left-1/2 -translate-x-1/2 hidden lg:flex items-center gap-5 px-5 py-2 rounded-xl backdrop-blur-md border ${bgClass} ${borderClass} pointer-events-auto`}>
+        <div className={`flex items-center gap-2 text-xs ${mText}`}>
+          <kbd className={`px-2 py-0.5 rounded font-mono text-[10px] ${isDayMode ? 'bg-stone-200 text-stone-700' : 'bg-white/10 text-stone-300'}`}>Drag</kbd> Orbit
         </div>
-      )}
-
-      <button
-        type="button"
-        onClick={() => setMeasurementsVisible(!measurementsVisible)}
-        className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-stone-100 px-3 py-2 text-xs font-bold text-stone-700 hover:bg-stone-200 transition"
-      >
-        <Ruler className="w-3.5 h-3.5" />
-        {measurementsVisible ? "Hide Labels" : "Show Labels"}
-      </button>
-
-      <div className="rounded-xl border border-stone-100 bg-stone-50 p-3 text-xs">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-stone-400 mb-2">
-          {active?.name ?? "Active Level"}
-        </p>
-        <div className="space-y-1 text-stone-600">
-          <p>
-            Rooms: <span className="font-bold text-stone-900">{active?.rooms.length ?? 0}</span>
-          </p>
-          <p>
-            Walls: <span className="font-bold text-stone-900">{active?.walls.length ?? 0}</span>
-          </p>
-          <p>
-            Windows/Doors:{" "}
-            <span className="font-bold text-stone-900">
-              {active?.walls.reduce((sum, wall) => sum + (wall.openings?.length ?? 0), 0) ?? 0}
-            </span>
-          </p>
+        <div className={`flex items-center gap-2 text-xs ${mText}`}>
+          <kbd className={`px-2 py-0.5 rounded font-mono text-[10px] ${isDayMode ? 'bg-stone-200 text-stone-700' : 'bg-white/10 text-stone-300'}`}>Scroll</kbd> Zoom
+        </div>
+        <div className={`flex items-center gap-2 text-xs ${mText}`}>
+          <kbd className={`px-2 py-0.5 rounded font-mono text-[10px] ${isDayMode ? 'bg-stone-200 text-stone-700' : 'bg-white/10 text-stone-300'}`}>Right-Drag</kbd> Pan
         </div>
       </div>
 
-      {room && (
-        <div className="rounded-xl border border-[#F5C518]/30 bg-[#F5C518]/10 p-3 text-xs">
-          <p className="font-black text-stone-900">{room.name}</p>
-          <p className="text-stone-600 mt-1 capitalize">{room.type}</p>
-          <p className="text-stone-600 mt-1">
-            Area:{" "}
-            <span className="font-bold text-stone-900">
-              {Math.round(polygonArea(room.polygon))} m²
-            </span>
-          </p>
+      <div className={`absolute top-20 right-4 w-52 p-4 rounded-xl backdrop-blur-md border ${bgClass} ${borderClass} pointer-events-auto`}>
+        <div className="flex justify-between items-center mb-4">
+          <h3 className={`text-[10px] font-bold uppercase tracking-wider ${mText}`}>Building Specs</h3>
+          <button
+            onClick={onToggleDayNight}
+            className={`p-1.5 rounded-lg transition-colors ${isDayMode ? 'bg-stone-200 hover:bg-stone-300 text-amber-600' : 'bg-stone-800 hover:bg-stone-700 text-blue-400'}`}
+            title="Toggle Day/Night"
+          >
+            {isDayMode ? '☀️' : '🌙'}
+          </button>
         </div>
-      )}
-    </aside>
+
+        <div className="space-y-2">
+          <InfoRow label="Floors" value={`G + ${building.stories - 1}`} isDayMode={isDayMode} />
+          <InfoRow label="Height" value={`~${Math.round(building.totalHeight_m)} m`} isDayMode={isDayMode} />
+          <InfoRow label="Footprint" value={`${building.footprint.width_m} x ${building.footprint.depth_m} m`} isDayMode={isDayMode} />
+          <InfoRow label="Cladding" value={building.cladding_material?.split('_')[0] || 'N/A'} isDayMode={isDayMode} />
+          <InfoRow label="Balconies" value={buildingDefinition.facade.balconies ? 'Yes' : 'No'} isDayMode={isDayMode} />
+          <InfoRow label="Roof" value={building.roof_type} isDayMode={isDayMode} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function InfoRow({ label, value, isDayMode }: { label: string; value: string; isDayMode: boolean }) {
+  return (
+    <div className={`flex justify-between items-center py-1 border-b ${isDayMode ? 'border-stone-200/50' : 'border-white/5'} last:border-0`}>
+      <span className={`text-xs ${isDayMode ? 'text-stone-500' : 'text-stone-400'}`}>{label}</span>
+      <span className={`text-xs font-mono font-medium capitalize ${isDayMode ? 'text-blue-600' : 'text-emerald-400'}`}>{value}</span>
+    </div>
   );
 }

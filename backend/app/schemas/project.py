@@ -21,6 +21,10 @@ class ProjectCreate(BaseModel):
     floor_count: Optional[int] = None
     complexity_level: Optional[str] = None
     priority_score: Optional[int] = None
+    building_definition_json: Optional[str] = None
+    zoning_data_json: Optional[str] = None
+    budget_data_json: Optional[str] = None
+    safety_data_json: Optional[str] = None
 
 
 class ProjectUpdate(BaseModel):
@@ -39,6 +43,10 @@ class ProjectUpdate(BaseModel):
     floor_count: Optional[int] = None
     complexity_level: Optional[str] = None
     priority_score: Optional[int] = None
+    building_definition_json: Optional[str] = None
+    zoning_data_json: Optional[str] = None
+    budget_data_json: Optional[str] = None
+    safety_data_json: Optional[str] = None
 
 
 class ProjectRead(ProjectCreate):

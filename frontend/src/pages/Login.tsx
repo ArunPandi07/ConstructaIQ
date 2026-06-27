@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useAuth } from '../context/AuthContext'
 import { LogIn } from 'lucide-react'
@@ -90,6 +90,13 @@ export function Login() {
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
+
+        <p className="text-center text-sm text-stone-500 mt-6">
+          Need an account?{' '}
+          <Link to="/register" className="font-bold text-[#E2B30D] hover:underline">
+            Create account
+          </Link>
+        </p>
       </motion.div>
     </div>
   )

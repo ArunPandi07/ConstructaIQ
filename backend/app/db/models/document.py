@@ -6,7 +6,7 @@ from sqlalchemy import BigInteger, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
-from app.db.mysql_types import LongText
+from app.db.mysql_types import LongBlob, LongText
 from app.db.models.mixins import CreatedAtMixin
 
 if TYPE_CHECKING:
@@ -24,7 +24,11 @@ class Document(Base, CreatedAtMixin):
     )
     document_type: Mapped[Optional[str]] = mapped_column(String(100))
     file_name: Mapped[Optional[str]] = mapped_column(String(255))
-    blob_url: Mapped[Optional[str]] = mapped_column(String(2048))
+    file_content: Mapped[Optional[bytes]] = mapped_column(LongBlob)
+    content_type: Mapped[Optional[str]] = mapped_column(
+        String(100), default="application/pdf"
+    )
+    file_size_bytes: Mapped[Optional[int]] = mapped_column(BigInteger)
     extracted_text: Mapped[Optional[str]] = mapped_column(LongText)
     uploaded_by: Mapped[Optional[str]] = mapped_column(String(255))
 

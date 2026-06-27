@@ -46,6 +46,33 @@ export default function BudgetBreakdownPanel({ intelligence, supplierRows }: Pro
         </div>
       </div>
 
+      {(() => {
+        const variance = (intelligence.budgetAnalysis as Record<string, unknown> | null | undefined)
+          ?.commodity_variance;
+        if (!variance) return null;
+        return (
+        <div className="glass-card p-5 border-l-4 border-[#F5C518]">
+          <h3 className="text-sm font-bold text-stone-900 mb-2 flex items-center gap-2">
+            <TrendingUp className="w-4 h-4 text-[#F5C518]" />
+            AI Commodity Variance (BudgetAgent)
+          </h3>
+          <div className="text-xs text-stone-600 space-y-1">
+            {Array.isArray(variance) ? (
+              <ul className="list-disc pl-4">
+                {variance.map((v, i) => <li key={i}>{typeof v === 'object' ? JSON.stringify(v) : String(v)}</li>)}
+              </ul>
+            ) : typeof variance === "object" ? (
+              <pre className="whitespace-pre-wrap font-mono text-[10px] bg-stone-50 p-2 rounded border border-stone-200">
+                {JSON.stringify(variance, null, 2)}
+              </pre>
+            ) : (
+              <p>{String(variance)}</p>
+            )}
+          </div>
+        </div>
+        );
+      })()}
+
       {breakdown && (
         <div className="glass-card p-5">
           <h3 className="text-sm font-bold text-stone-900 mb-4">Budget Breakdown</h3>

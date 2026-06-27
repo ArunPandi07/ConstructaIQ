@@ -13,6 +13,10 @@ from app.db.models.supplier_master import SupplierMaster
 from app.db.models.supplier_material import SupplierMaterial
 from app.db.models.report_delivery import ReportDelivery
 from app.db.models.user import User
+from app.db.models.user_settings import UserSettings
+from app.db.models.project_crew_roster import ProjectCrewRoster
+from app.db.models.analyze_job import ProjectAnalyzeJob
+from app.db.models.chat_message import ChatMessage
 
 __all__ = [
     "AgentExecution",
@@ -30,4 +34,8 @@ __all__ = [
     "SupplierMaterial",
     "ReportDelivery",
     "User",
+    "UserSettings",
+    "ProjectCrewRoster",
+    "ProjectAnalyzeJob",
+    "ChatMessage",
 ]

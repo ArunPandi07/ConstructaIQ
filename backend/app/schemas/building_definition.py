@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Literal
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -75,7 +75,9 @@ class BuildingMeta(BaseModel):
     totalHeight_m: float = Field(gt=0)
     footprint: Footprint
     construction_type: str | None = None
-    roof_type: Literal["flat", "pitched", "sawtooth"] = "flat"
+    roof_type: Literal["flat", "pitched", "sawtooth", "penthouse"] = "flat"
+    footprint_shape: Optional[str] = None
+    cladding_material: Optional[str] = None
 
 
 class FacadeDefinition(BaseModel):
@@ -84,6 +86,8 @@ class FacadeDefinition(BaseModel):
     railing_height_m: float = Field(gt=0, default=1.1)
     window_pattern: Literal["grid", "strip", "punched", "industrial"] = "grid"
     material: str = "concrete_with_glass"
+    face_materials: dict[str, str] | None = None
+    balcony_faces: list[str] | None = None
 
 
 class BuildingDefinition(BaseModel):

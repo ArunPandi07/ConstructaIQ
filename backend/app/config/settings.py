@@ -9,18 +9,12 @@ class Settings(BaseSettings):
     PORT: int = 8000
     DEBUG: bool = True
 
-    # Azure Document Intelligence
-    AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT: Optional[str] = None
-    AZURE_DOCUMENT_INTELLIGENCE_KEY: Optional[str] = None
-
-    # Azure AI Foundry REST Endpoint
-    AZURE_AIFOUNDRY_ENDPOINT: Optional[str] = None
-    AZURE_AIFOUNDRY_KEY: Optional[str] = None
-
-    # Azure Blob Storage (optional — omit to use in-memory bytes for document extraction)
-    AZURE_STORAGE_CONNECTION_STRING: Optional[str] = None
-    AZURE_STORAGE_CONTAINER_NAME: str = "constructaiq-documents"
-    AZURE_STORAGE_SAS_EXPIRY_MINUTES: int = 60
+    # OpenAI-compatible LLM (required for agent pipeline)
+    LLM_BASE_URL: Optional[str] = None
+    LLM_MODEL: Optional[str] = None
+    LLM_API_KEY: Optional[str] = None
+    LLM_MAX_TOKENS: int = 40000
+    LLM_TEMPERATURE: float = 0.2
 
     # MySQL database (optional — app runs without DB when unset)
     DATABASE_URL: Optional[str] = None
@@ -45,14 +39,15 @@ class Settings(BaseSettings):
     FRONTEND_BASE_URL: str = "http://localhost:5173"
     REPORT_EMAIL_RATE_LIMIT_MINUTES: int = 60
 
+    # Project chat assistant
+    CHAT_MAX_MESSAGE_LENGTH: int = 2000
+    CHAT_RATE_LIMIT_MESSAGES: int = 30
+    CHAT_RATE_LIMIT_WINDOW_SECONDS: int = 300
+
     model_config = SettingsConfigDict(
         env_file=os.path.join(Path(__file__).resolve().parent.parent.parent, ".env"),
         env_file_encoding="utf-8",
         extra="ignore"
     )
-
-    @property
-    def use_blob_storage(self) -> bool:
-        return bool(self.AZURE_STORAGE_CONNECTION_STRING and self.AZURE_STORAGE_CONTAINER_NAME)
 
 settings = Settings()

@@ -21,3 +21,26 @@ class DocumentRepository(BaseRepository[Document]):
         )
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
+
+    async def get_by_id(self, project_id: int, document_id: int) -> Document | None:
+        stmt = select(Document).where(
+            Document.project_id == project_id,
+            Document.document_id == document_id,
+        )
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def get_by_type(
+        self, project_id: int, document_type: str
+    ) -> Document | None:
+        stmt = (
+            select(Document)
+            .where(
+                Document.project_id == project_id,
+                Document.document_type == document_type,
+            )
+            .order_by(Document.document_id.desc())
+            .limit(1)
+        )
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none()

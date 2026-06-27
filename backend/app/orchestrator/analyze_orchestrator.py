@@ -1,25 +1,28 @@
 import json
 from datetime import datetime, timezone
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, Optional, TypedDict
 
+from langgraph.graph import END, START, StateGraph
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.services.agent_field_mapper import (
     build_project_summary,
     normalize_blueprint_agent,
     normalize_contract_agent,
+    normalize_crew_agent,
     normalize_permit_agent,
+    normalize_schedule_agent,
     normalize_supplier_agent,
 )
 from app.services.agent_persistence_service import persist_analysis_outputs
-from app.services.blob_storage_service import blob_storage_service
 from app.services.building_templates import (
     generate_building_definition,
     is_building_definition_sufficient,
 )
-from app.services.document_intelligence import document_intelligence_service
-from app.services.foundry_service import foundry_service
+from app.services.document_extraction_service import document_extraction_service
+from app.services.llm_service import llm_service
 from app.services.logging_service import get_logger
+from app.services.document_service import update_document_extracted_text
 from app.services.master_catalog_service import load_catalogs
 from app.services.project_metadata_extractor import enrich_project_metadata
 
@@ -29,14 +32,38 @@ JSON_OUTPUT_SUFFIX = (
     "\n\nRespond with valid JSON only. No markdown, no prose, no code fences."
 )
 
-BLUEPRINT_BUILDING_DEFINITION_INSTRUCTIONS = """
+CONTRACT_AGENT_INSTRUCTIONS = """You are a Construction Contract Intelligence Agent.
 
-Also include a key named building_definition. It must be a structured JSON object
-for a lightweight 3D architectural viewer. Use metric units and derive values
-from drawing notes, dimensions, elevations, room labels, schedules, and sheet text.
-If exact geometry is not visible, provide architecturally plausible approximate
-coordinates that preserve the footprint, floor count, room types, cores, doors,
-windows, stairs, and facade pattern from the source drawings.
+Extract project name, client name, project type, location, start date, completion date,
+budget, duration, scope, and milestones from the contract.
+
+Return ONLY valid JSON. Do not generate explanations. Use null for missing fields.
+
+{
+  "project_name": "",
+  "client_name": "",
+  "budget": null,
+  "Projecttype": "",
+  "location": "",
+  "startdate": "",
+  "completiondate": "",
+  "duration_months": null,
+  "scope": "",
+  "Milestones": []
+}"""
+
+BLUEPRINT_BUILDING_DEFINITION_INSTRUCTIONS = """You are a Blueprint Geometry Extraction Agent.
+
+Convert blueprint documents into structured building geometry for a Three.js viewer.
+Story count, dimensions, and height must match the blueprint exactly.
+
+Generate floor geometry for every level including rooms, exterior/interior walls,
+windows, doors, stairs, elevator cores, balconies, facade, and roof data.
+
+Rules: no summaries, no markdown, no prose — return ONLY valid JSON.
+
+Include blueprint summary fields (construction_type, stories_above_grade, footprint,
+structural quantities when visible) AND a building_definition object for 3D rendering.
 
 building_definition schema:
 {
@@ -99,10 +126,89 @@ building_definition schema:
     "balcony_depth_m": number,
     "railing_height_m": number,
     "window_pattern": "grid | strip | punched | industrial",
-    "material": string
+    "material": string,
+    "face_materials": {"front": string, "back": string, "left": string, "right": string},
+    "balcony_faces": ["front"]
   }
 }
 """
+
+PERMIT_AGENT_INSTRUCTIONS = """You are a Construction Permit Intelligence Agent.
+
+Determine required permits, regulatory approvals, approval timelines, and compliance risks.
+
+Return ONLY JSON:
+{
+  "required_permits": [],
+  "approval_days": 0,
+  "compliance_risks": [],
+  "required_documents": []
+}"""
+
+SCHEDULE_AGENT_INSTRUCTIONS = """You are a Construction Schedule Intelligence Agent.
+
+Create a realistic project schedule with phases, work packages, dependencies, materials,
+crew requirements, and inspection stages.
+
+Return ONLY JSON including:
+- project_phases
+- work_packages (optional)
+- estimated_duration_days
+- materials (each item MUST include material_name, quantity, unit, and category)
+- crew_requirements
+- inspection_stages
+- dependencies
+
+Each materials[] entry must use this shape:
+{"material_name": "...", "quantity": <number>, "unit": "TON|CY|SF|LF|EA", "category": "..."}"""
+
+SUPPLIER_AGENT_INSTRUCTIONS = """You are a Construction Supplier Intelligence Agent.
+
+Match materials to the supplier catalog and produce a procurement plan.
+
+Return ONLY JSON including:
+- procurement_plan (material_name, supplier_name, quantity, unit_price, delivery_date, total_cost)
+- supply_chain_risks
+- recommended_suppliers"""
+
+CREW_AGENT_INSTRUCTIONS = """You are a Construction Workforce Planning Agent.
+
+Allocate crew from the catalog to project phases.
+
+Return ONLY JSON including:
+- crew_allocations (phase_name, crew_name, skill_type, labor_cost, start_date, end_date)
+- workforce_gaps
+- recommendations"""
+
+ZONING_AGENT_INSTRUCTIONS = """You are a Construction Zoning & Environmental Auditor.
+
+Analyze the project parameters and check against municipal zoning codes and environmental limits.
+
+Return ONLY JSON including:
+- zoning_compliance
+- environmental_impact
+- height_limits
+- recommendations"""
+
+BUDGET_AGENT_INSTRUCTIONS = """You are a Construction Budget Estimator.
+
+Analyze the project scope and extract commodity index variance metrics.
+
+Return ONLY JSON including:
+- estimated_budget
+- commodity_variance
+- cost_breakdown
+- recommendations"""
+
+SAFETY_AGENT_INSTRUCTIONS = """You are a Construction Safety Watchdog.
+
+Analyze the project scope, weather constraints, and crane operational limits.
+
+Return ONLY JSON including:
+- safety_risks
+- crane_stops
+- weather_constraints
+- recommendations"""
 
 AGENT_CONTRACT = "ContractAgent"
 AGENT_BLUEPRINT = "BlueprintAgent"
@@ -110,6 +216,9 @@ AGENT_PERMIT = "PermitAgent"
 AGENT_PLANNING = "ScheduleAgent"
 AGENT_SUPPLIER = "SupplierAgent"
 AGENT_CREW = "CrewAgent"
+AGENT_ZONING = "ZoningAgent"
+AGENT_BUDGET = "BudgetAgent"
+AGENT_SAFETY = "SafetyAlertAgent"
 
 CONTRACT_VERSION = "4"
 BLUEPRINT_VERSION = "5"
@@ -117,6 +226,9 @@ PERMIT_VERSION = "3"
 SCHEDULE_VERSION = "2"
 SUPPLIER_VERSION = "3"
 CREW_VERSION = "2"
+ZONING_VERSION = "1"
+BUDGET_VERSION = "1"
+SAFETY_VERSION = "1"
 
 AGENT_VERSIONS: dict[str, str] = {
     AGENT_CONTRACT: CONTRACT_VERSION,
@@ -125,6 +237,9 @@ AGENT_VERSIONS: dict[str, str] = {
     AGENT_PLANNING: SCHEDULE_VERSION,
     AGENT_SUPPLIER: SUPPLIER_VERSION,
     AGENT_CREW: CREW_VERSION,
+    AGENT_ZONING: ZONING_VERSION,
+    AGENT_BUDGET: BUDGET_VERSION,
+    AGENT_SAFETY: SAFETY_VERSION,
 }
 
 PIPELINE_AGENTS = frozenset(AGENT_VERSIONS.keys())
@@ -146,6 +261,28 @@ def resolve_call_agent_version(agent_name: str, version: str | None) -> str:
     if not version or version == "default":
         return _resolve_version(agent_name)
     return version
+
+
+def _coerce_blueprint_geometry(blueprint_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Wrap root-level building/levels/facade into building_definition when needed."""
+    if not isinstance(blueprint_data, dict):
+        return {}
+    if blueprint_data.get("building_definition") or blueprint_data.get("buildingDefinition"):
+        return blueprint_data
+    if "building" in blueprint_data and "levels" in blueprint_data:
+        geometry = {
+            "building": blueprint_data["building"],
+            "levels": blueprint_data["levels"],
+            "facade": blueprint_data.get("facade", {}),
+        }
+        summary = {
+            key: blueprint_data[key]
+            for key in blueprint_data
+            if key not in {"building", "levels", "facade"}
+        }
+        summary["building_definition"] = geometry
+        return summary
+    return blueprint_data
 
 
 def _ensure_building_definition(
@@ -275,7 +412,7 @@ def _finalize_blueprint_data(
     blueprint_text: str | None = None,
     description: str | None = None,
 ) -> Dict[str, Any]:
-    normalized_blueprint = normalize_blueprint_agent(blueprint_data)
+    normalized_blueprint = normalize_blueprint_agent(_coerce_blueprint_geometry(blueprint_data))
     enriched_contract, enriched_blueprint = enrich_project_metadata(
         contract_data,
         normalized_blueprint,
@@ -358,13 +495,13 @@ async def _call(
     execution_log: list[dict[str, Any]] | None = None,
     progress_callback: ProgressCallback | None = None,
 ) -> Dict[str, Any]:
-    """Call a single Foundry agent by name + version and return parsed JSON."""
+    """Call a single LLM agent by name + version and return parsed JSON."""
     if progress_callback:
         progress_callback(agent_name)
 
     started_at = datetime.now(timezone.utc)
     logger.info("[Agent] Calling %s v%s", agent_name, version)
-    raw = await foundry_service.call_agent_directly(
+    raw = await llm_service.call_agent_directly(
         text=prompt + JSON_OUTPUT_SUFFIX,
         agent_name=agent_name,
         version=version,
@@ -392,256 +529,147 @@ async def _call(
     return result
 
 
-async def run_pipeline_from_text(
-    project_name: str,
-    description: str,
-    project_id: Optional[int] = None,
-    session: Optional[AsyncSession] = None,
-    progress_callback: ProgressCallback | None = None,
-    execution_log: list[dict[str, Any]] | None = None,
-) -> Dict[str, Any]:
-    logger.info("[Mode 1 - Text] Starting pipeline for project: %s", project_name)
-
-    base_context = f"Project Name: {project_name}\nDescription: {description}"
-
-    contract_prompt = (
-        f"Extract project parameters from the following project description.\n\n"
-        f"{base_context}"
-    )
-    blueprint_prompt = (
-        f"Infer building and structural details from the following project description.\n\n"
-        f"{base_context}"
-        f"{BLUEPRINT_BUILDING_DEFINITION_INSTRUCTIONS}"
-    )
-    contract_data = await _call(
-        AGENT_CONTRACT,
-        _resolve_version(AGENT_CONTRACT),
-        contract_prompt,
-        execution_log=execution_log,
-        progress_callback=progress_callback,
-    )
-    contract_data = normalize_contract_agent(contract_data)
-    contract_data.setdefault("project_name", project_name)
-
-    blueprint_data = await _call(
-        AGENT_BLUEPRINT,
-        _resolve_version(AGENT_BLUEPRINT),
-        blueprint_prompt,
-        execution_log=execution_log,
-        progress_callback=progress_callback,
-    )
-    blueprint_data = _finalize_blueprint_data(
-        contract_data,
-        blueprint_data,
-        project_name,
-        description=description,
-    )
-
-    return await _run_downstream_agents(
-        project_name=project_name,
-        contract_data=contract_data,
-        blueprint_data=blueprint_data,
-        project_id=project_id,
-        session=session,
-        progress_callback=progress_callback,
-        execution_log=execution_log,
-    )
+class AgentState(TypedDict, total=False):
+    project_name: str
+    description: Optional[str]
+    contract_text: Optional[str]
+    blueprint_text: Optional[str]
+    project_id: Optional[int]
+    job_id: Optional[str]
+    session: Optional[Any]
+    progress_callback: Optional[Any]
+    execution_log: Optional[list[dict[str, Any]]]
+    contract_data: Dict[str, Any]
+    blueprint_data: Dict[str, Any]
+    permit_data: Dict[str, Any]
+    planning_data: Dict[str, Any]
+    supplier_data: Dict[str, Any]
+    crew_data: Dict[str, Any]
+    zoning_data: Dict[str, Any]
+    budget_data: Dict[str, Any]
+    safety_data: Dict[str, Any]
+    stored_document_ids: Dict[str, int]
+    final_result: Dict[str, Any]
 
 
-async def run_pipeline_from_documents(
-    project_name: str,
-    contract_bytes: Optional[bytes],
-    contract_filename: Optional[str],
-    blueprint_bytes: Optional[bytes],
-    blueprint_filename: Optional[str],
-    project_id: Optional[int] = None,
-    session: Optional[AsyncSession] = None,
-    progress_callback: ProgressCallback | None = None,
-    execution_log: list[dict[str, Any]] | None = None,
-    *,
-    skip_blob_upload: bool = False,
-    existing_blob_paths: Optional[Dict[str, str]] = None,
-) -> Dict[str, Any]:
-    logger.info("[Mode 2 - Documents] Starting pipeline for project: %s", project_name)
-
-    contract_text = ""
-    blueprint_text = ""
-    stored_documents: Dict[str, str] = dict(existing_blob_paths or {})
-
-    if contract_bytes and contract_filename:
-        logger.info("Extracting text from contract: %s", contract_filename)
-        if skip_blob_upload:
-            contract_text = await document_intelligence_service.extract_text_from_bytes(
-                contract_bytes, contract_filename
-            )
-        elif blob_storage_service.is_enabled:
-            blob_result = await blob_storage_service.upload_document(
-                project_name, contract_filename, contract_bytes
-            )
-            stored_documents["contract"] = blob_result.blob_path
-            contract_text = await document_intelligence_service.extract_text_from_blob(
-                blob_result.blob_url_with_sas, contract_filename
-            )
-        else:
-            contract_text = await document_intelligence_service.extract_text_from_bytes(
-                contract_bytes, contract_filename
-            )
-
-    if blueprint_bytes and blueprint_filename:
-        logger.info("Extracting text from blueprint: %s", blueprint_filename)
-        if skip_blob_upload:
-            blueprint_text = await document_intelligence_service.extract_text_from_bytes(
-                blueprint_bytes, blueprint_filename
-            )
-        elif blob_storage_service.is_enabled:
-            blob_result = await blob_storage_service.upload_document(
-                project_name, blueprint_filename, blueprint_bytes
-            )
-            stored_documents["blueprint"] = blob_result.blob_path
-            blueprint_text = await document_intelligence_service.extract_text_from_blob(
-                blob_result.blob_url_with_sas, blueprint_filename
-            )
-        else:
-            blueprint_text = await document_intelligence_service.extract_text_from_bytes(
-                blueprint_bytes, blueprint_filename
-            )
-
-    contract_call = None
-    blueprint_call = None
-    if contract_text:
-        contract_prompt = (
-            f"Project Name: {project_name}\n\n"
-            f"Extract parameters from this contract document:\n\n{contract_text}"
+async def contract_node(state: AgentState) -> Dict[str, Any]:
+    if state.get("contract_text"):
+        prompt = (
+            f"{CONTRACT_AGENT_INSTRUCTIONS}\n\n"
+            f"Project Name: {state['project_name']}\n\n"
+            f"Input Document:\n{state['contract_text']}"
         )
-        contract_call = _call(
-            AGENT_CONTRACT,
-            _resolve_version(AGENT_CONTRACT),
-            contract_prompt,
-            execution_log=execution_log,
-            progress_callback=progress_callback,
+    elif state.get("description"):
+        prompt = (
+            f"{CONTRACT_AGENT_INSTRUCTIONS}\n\n"
+            f"Project Name: {state['project_name']}\n\n"
+            f"Project Description:\n{state['description']}"
         )
     else:
         logger.info("No contract provided — using project name only for ContractAgent.")
-        contract_data = {"project_name": project_name}
+        return {"contract_data": {"project_name": state["project_name"]}}
 
-    if blueprint_text:
-        blueprint_prompt = (
-            f"Project Name: {project_name}\n\n"
-            f"Analyze blueprint specifications from this document:\n\n{blueprint_text}"
-            f"{BLUEPRINT_BUILDING_DEFINITION_INSTRUCTIONS}"
+    data = await _call(
+        AGENT_CONTRACT,
+        _resolve_version(AGENT_CONTRACT),
+        prompt,
+        execution_log=state.get("execution_log"),
+        progress_callback=state.get("progress_callback"),
+    )
+    data = normalize_contract_agent(data)
+    data.setdefault("project_name", state["project_name"])
+    return {"contract_data": data}
+
+
+async def blueprint_node(state: AgentState) -> Dict[str, Any]:
+    if state.get("blueprint_text"):
+        prompt = (
+            f"{BLUEPRINT_BUILDING_DEFINITION_INSTRUCTIONS}\n\n"
+            f"Project Name: {state['project_name']}\n\n"
+            f"Input Document:\n{state['blueprint_text']}"
         )
-        blueprint_call = _call(
-            AGENT_BLUEPRINT,
-            _resolve_version(AGENT_BLUEPRINT),
-            blueprint_prompt,
-            execution_log=execution_log,
-            progress_callback=progress_callback,
+    elif state.get("description"):
+        prompt = (
+            f"{BLUEPRINT_BUILDING_DEFINITION_INSTRUCTIONS}\n\n"
+            f"Project Name: {state['project_name']}\n\n"
+            f"Project Description:\n{state['description']}"
         )
     else:
         logger.info("No blueprint provided — using empty blueprint data.")
-        blueprint_data = {}
+        return {"blueprint_data": {}}
 
-    if contract_call and blueprint_call:
-        contract_data = await contract_call
-        contract_data = normalize_contract_agent(contract_data)
-        contract_data.setdefault("project_name", project_name)
-        blueprint_data = await blueprint_call
-        blueprint_data = _finalize_blueprint_data(
-            contract_data,
-            blueprint_data,
-            project_name,
-            contract_text=contract_text,
-            blueprint_text=blueprint_text,
-        )
-    elif contract_call:
-        contract_data = await contract_call
-        contract_data = normalize_contract_agent(contract_data)
-        contract_data.setdefault("project_name", project_name)
-        blueprint_data = _finalize_blueprint_data(
-            contract_data,
-            blueprint_data,
-            project_name,
-            contract_text=contract_text,
-        )
-    elif blueprint_call:
-        blueprint_data = await blueprint_call
-        contract_data = {"project_name": project_name}
-        blueprint_data = _finalize_blueprint_data(
-            contract_data,
-            blueprint_data,
-            project_name,
-            blueprint_text=blueprint_text,
-        )
-
-    result = await _run_downstream_agents(
-        project_name=project_name,
-        contract_data=contract_data,
-        blueprint_data=blueprint_data,
-        project_id=project_id,
-        session=session,
-        progress_callback=progress_callback,
-        execution_log=execution_log,
+    data = await _call(
+        AGENT_BLUEPRINT,
+        _resolve_version(AGENT_BLUEPRINT),
+        prompt,
+        execution_log=state.get("execution_log"),
+        progress_callback=state.get("progress_callback"),
     )
-    if stored_documents:
-        result["stored_documents"] = stored_documents
-    return result
+    return {"blueprint_data": data}
 
 
-async def _run_downstream_agents(
-    project_name: str,
-    contract_data: Dict[str, Any],
-    blueprint_data: Dict[str, Any],
-    project_id: Optional[int] = None,
-    session: Optional[AsyncSession] = None,
-    progress_callback: ProgressCallback | None = None,
-    execution_log: list[dict[str, Any]] | None = None,
-) -> Dict[str, Any]:
-    blueprint_for_agents = _slim_blueprint_for_agents(blueprint_data)
-    logger.info(
-        "Downstream agent blueprint payload: %d chars (full blueprint: %d chars)",
-        len(json.dumps(blueprint_for_agents)),
-        len(json.dumps(blueprint_data)),
+async def merge_node(state: AgentState) -> Dict[str, Any]:
+    c_data = dict(state.get("contract_data") or {})
+    b_data = dict(state.get("blueprint_data") or {})
+    _finalize_blueprint_data(
+        c_data,
+        b_data,
+        state["project_name"],
+        contract_text=state.get("contract_text"),
+        blueprint_text=state.get("blueprint_text"),
+        description=state.get("description"),
     )
+    return {"contract_data": c_data, "blueprint_data": b_data}
 
-    permit_prompt = (
-        f"Assess permit and regulatory requirements for this construction project.\n\n"
-        f"Contract Data:\n{json.dumps(contract_data, indent=2)}\n\n"
+
+async def permit_node(state: AgentState) -> Dict[str, Any]:
+    c_data = state["contract_data"]
+    b_data = state["blueprint_data"]
+    blueprint_for_agents = _slim_blueprint_for_agents(b_data)
+    prompt = (
+        f"{PERMIT_AGENT_INSTRUCTIONS}\n\n"
+        f"Contract Data:\n{json.dumps(c_data, indent=2)}\n\n"
         f"Blueprint Summary:\n{json.dumps(blueprint_for_agents, indent=2)}"
     )
-    permit_data = await _call(
+    data = await _call(
         AGENT_PERMIT,
         _resolve_version(AGENT_PERMIT),
-        permit_prompt,
-        execution_log=execution_log,
-        progress_callback=progress_callback,
+        prompt,
+        execution_log=state.get("execution_log"),
+        progress_callback=state.get("progress_callback"),
     )
-    permit_data = normalize_permit_agent(permit_data)
+    data = normalize_permit_agent(data)
     logger.info("[Pipeline] PermitAgent complete.")
+    return {"permit_data": data}
 
-    schedule_prompt = (
-        f"Generate a comprehensive project execution plan for this construction project.\n\n"
-        f"Your output must include:\n"
-        f"- project_phases: list of named phases with start/end timelines\n"
-        f"- estimated_duration_days: total estimated project duration in days\n"
-        f"- materials: list of required materials with quantities\n"
-        f"- crew_requirements: workforce breakdown by trade/role\n"
-        f"- inspection_stages: list of mandatory inspection checkpoints\n"
-        f"- dependencies: task or phase dependencies\n\n"
-        f"Contract Data:\n{json.dumps(contract_data, indent=2)}\n\n"
+
+async def schedule_node(state: AgentState) -> Dict[str, Any]:
+    c_data = state["contract_data"]
+    b_data = state["blueprint_data"]
+    blueprint_for_agents = _slim_blueprint_for_agents(b_data)
+    p_data = state.get("permit_data") or {}
+    prompt = (
+        f"{SCHEDULE_AGENT_INSTRUCTIONS}\n\n"
+        f"Contract Data:\n{json.dumps(c_data, indent=2)}\n\n"
         f"Blueprint Summary:\n{json.dumps(blueprint_for_agents, indent=2)}\n\n"
-        f"Permit Data:\n{json.dumps(permit_data, indent=2)}"
+        f"Permit Data:\n{json.dumps(p_data, indent=2)}"
     )
-    planning_data = await _call(
+    data = await _call(
         AGENT_PLANNING,
         _resolve_version(AGENT_PLANNING),
-        schedule_prompt,
-        execution_log=execution_log,
-        progress_callback=progress_callback,
+        prompt,
+        execution_log=state.get("execution_log"),
+        progress_callback=state.get("progress_callback"),
     )
+    data = normalize_schedule_agent(data)
     logger.info("[Pipeline] ScheduleAgent complete.")
+    return {"planning_data": data}
 
-    planning_for_agents = _slim_planning_for_agents(planning_data)
-    supplier_catalog, crew_catalog = await load_catalogs(session)
+
+async def supplier_node(state: AgentState) -> Dict[str, Any]:
+    planning_for_agents = _slim_planning_for_agents(state.get("planning_data") or {})
+    session = state.get("session")
+    supplier_catalog, _ = await load_catalogs(session)
 
     schedule_material_names = [
         m.get("material_name") or m.get("name")
@@ -656,61 +684,84 @@ async def _run_downstream_agents(
             + "\n"
         )
 
-    supplier_prompt = (
-        f"Match project material requirements to the available supplier catalog and "
-        f"produce a procurement plan.\n\n"
-        f"Your output must be valid JSON and include:\n"
-        f"- procurement_plan: list of objects with material_name, supplier_name, "
-        f"quantity, unit_price, delivery_date, total_cost\n"
-        f"- supply_chain_risks: list of supply chain risks with severity and mitigation\n"
-        f"- recommended_suppliers: list of preferred suppliers with rationale\n"
+    prompt = (
+        f"{SUPPLIER_AGENT_INSTRUCTIONS}\n\n"
         f"{material_name_hint}\n"
         f"Planning Data:\n{json.dumps(planning_for_agents, indent=2)}\n\n"
         f"Supplier Catalog:\n{json.dumps(supplier_catalog, indent=2)}"
     )
-    crew_prompt = (
-        f"Allocate crew members from the workforce catalog to project phases based on "
-        f"crew requirements.\n\n"
-        f"Your output must be valid JSON and include:\n"
-        f"- crew_allocations: list of objects with phase_name, crew_name, skill_type, "
-        f"labor_cost, start_date, end_date\n"
-        f"- workforce_gaps: list of unfilled roles or shortages\n"
-        f"- recommendations: actionable workforce recommendations\n\n"
+    data = await _call(
+        AGENT_SUPPLIER,
+        _resolve_version(AGENT_SUPPLIER),
+        prompt,
+        execution_log=state.get("execution_log"),
+        progress_callback=state.get("progress_callback"),
+    )
+    data = normalize_supplier_agent(data)
+    logger.info("[Pipeline] SupplierAgent complete.")
+    return {"supplier_data": data}
+
+
+async def crew_node(state: AgentState) -> Dict[str, Any]:
+    planning_for_agents = _slim_planning_for_agents(state.get("planning_data") or {})
+    session = state.get("session")
+    _, crew_catalog = await load_catalogs(session)
+
+    prompt = (
+        f"{CREW_AGENT_INSTRUCTIONS}\n\n"
         f"Planning Data:\n{json.dumps(planning_for_agents, indent=2)}\n\n"
         f"Crew Catalog:\n{json.dumps(crew_catalog, indent=2)}"
     )
-    supplier_data = await _call(
-        AGENT_SUPPLIER,
-        _resolve_version(AGENT_SUPPLIER),
-        supplier_prompt,
-        execution_log=execution_log,
-        progress_callback=progress_callback,
-    )
-    supplier_data = normalize_supplier_agent(supplier_data)
-    logger.info("[Pipeline] SupplierAgent complete.")
-
-    crew_data = await _call(
+    data = await _call(
         AGENT_CREW,
         _resolve_version(AGENT_CREW),
-        crew_prompt,
-        execution_log=execution_log,
-        progress_callback=progress_callback,
+        prompt,
+        execution_log=state.get("execution_log"),
+        progress_callback=state.get("progress_callback"),
     )
+    data = normalize_crew_agent(data)
     logger.info("[Pipeline] CrewAgent complete.")
-    logger.info("[Pipeline] Full pipeline finished for: %s", project_name)
+    return {"crew_data": data}
 
+
+async def zoning_node(state: AgentState) -> Dict[str, Any]:
+    prompt = f"{ZONING_AGENT_INSTRUCTIONS}\n\nProject Plan:\n{json.dumps(state.get('planning_data') or {}, indent=2)}"
+    data = await _call(AGENT_ZONING, _resolve_version(AGENT_ZONING), prompt, execution_log=state.get("execution_log"), progress_callback=state.get("progress_callback"))
+    logger.info("[Pipeline] ZoningAgent complete.")
+    return {"zoning_data": data}
+
+async def budget_node(state: AgentState) -> Dict[str, Any]:
+    prompt = f"{BUDGET_AGENT_INSTRUCTIONS}\n\nProject Plan:\n{json.dumps(state.get('planning_data') or {}, indent=2)}"
+    data = await _call(AGENT_BUDGET, _resolve_version(AGENT_BUDGET), prompt, execution_log=state.get("execution_log"), progress_callback=state.get("progress_callback"))
+    logger.info("[Pipeline] BudgetAgent complete.")
+    return {"budget_data": data}
+
+async def safety_node(state: AgentState) -> Dict[str, Any]:
+    prompt = f"{SAFETY_AGENT_INSTRUCTIONS}\n\nProject Plan:\n{json.dumps(state.get('planning_data') or {}, indent=2)}"
+    data = await _call(AGENT_SAFETY, _resolve_version(AGENT_SAFETY), prompt, execution_log=state.get("execution_log"), progress_callback=state.get("progress_callback"))
+    logger.info("[Pipeline] SafetyAlertAgent complete.")
+    return {"safety_data": data}
+
+async def final_node(state: AgentState) -> Dict[str, Any]:
     result: Dict[str, Any] = {
         "projectSummary": build_project_summary(
-            contract_data,
-            blueprint_data=blueprint_data,
-            fallback_project_name=project_name,
+            state["contract_data"],
+            blueprint_data=state["blueprint_data"],
+            fallback_project_name=state["project_name"],
         ),
-        "blueprintSummary": blueprint_data,
-        "permitAssessment": permit_data,
-        "projectPlan": planning_data,
-        "supplierAnalysis": supplier_data,
-        "crewAnalysis": crew_data,
+        "blueprintSummary": state["blueprint_data"],
+        "permitAssessment": state.get("permit_data") or {},
+        "projectPlan": state.get("planning_data") or {},
+        "supplierAnalysis": state.get("supplier_data") or {},
+        "crewAnalysis": state.get("crew_data") or {},
+        "zoningAssessment": state.get("zoning_data") or {},
+        "budgetAnalysis": state.get("budget_data") or {},
+        "safetyAssessment": state.get("safety_data") or {},
     }
+
+    project_id = state.get("project_id")
+    session = state.get("session")
+    execution_log = state.get("execution_log")
 
     if project_id is not None and session is not None:
         result["persistenceSummary"] = await persist_analysis_outputs(
@@ -718,6 +769,187 @@ async def _run_downstream_agents(
             project_id=project_id,
             pipeline_result=result,
             execution_records=execution_log,
+            run_id=state.get("job_id"),
         )
 
-    return result
+    if state.get("stored_document_ids"):
+        result["stored_document_ids"] = state["stored_document_ids"]
+
+    logger.info("[Pipeline] Full pipeline finished for: %s", state["project_name"])
+    return {"final_result": result}
+
+
+workflow = StateGraph(AgentState)
+workflow.add_node("contract_node", contract_node)
+workflow.add_node("blueprint_node", blueprint_node)
+workflow.add_node("merge_node", merge_node)
+workflow.add_node("permit_node", permit_node)
+workflow.add_node("schedule_node", schedule_node)
+workflow.add_node("zoning_node", zoning_node)
+workflow.add_node("budget_node", budget_node)
+workflow.add_node("safety_node", safety_node)
+workflow.add_node("supplier_node", supplier_node)
+workflow.add_node("crew_node", crew_node)
+workflow.add_node("final_node", final_node)
+
+workflow.add_edge(START, "contract_node")
+workflow.add_edge(START, "blueprint_node")
+workflow.add_edge("contract_node", "merge_node")
+workflow.add_edge("blueprint_node", "merge_node")
+workflow.add_edge("merge_node", "permit_node")
+workflow.add_edge("permit_node", "schedule_node")
+workflow.add_edge("schedule_node", "zoning_node")
+workflow.add_edge("zoning_node", "budget_node")
+workflow.add_edge("budget_node", "safety_node")
+workflow.add_edge("safety_node", "supplier_node")
+workflow.add_edge("supplier_node", "crew_node")
+workflow.add_edge("crew_node", "final_node")
+workflow.add_edge("final_node", END)
+
+pipeline_graph = workflow.compile()
+
+
+def _initial_pipeline_state(
+    *,
+    project_name: str,
+    description: Optional[str] = None,
+    contract_text: Optional[str] = None,
+    blueprint_text: Optional[str] = None,
+    project_id: Optional[int] = None,
+    job_id: Optional[str] = None,
+    session: Optional[AsyncSession] = None,
+    progress_callback: ProgressCallback | None = None,
+    execution_log: list[dict[str, Any]] | None = None,
+    stored_document_ids: Optional[Dict[str, int]] = None,
+) -> AgentState:
+    return AgentState(
+        project_name=project_name,
+        description=description,
+        contract_text=contract_text,
+        blueprint_text=blueprint_text,
+        project_id=project_id,
+        job_id=job_id,
+        session=session,
+        progress_callback=progress_callback,
+        execution_log=execution_log if execution_log is not None else [],
+        contract_data={},
+        blueprint_data={},
+        permit_data={},
+        planning_data={},
+        supplier_data={},
+        crew_data={},
+        stored_document_ids=stored_document_ids or {},
+        final_result={},
+    )
+
+
+async def run_pipeline_from_text(
+    project_name: str,
+    description: str,
+    project_id: Optional[int] = None,
+    job_id: Optional[str] = None,
+    session: Optional[AsyncSession] = None,
+    progress_callback: ProgressCallback | None = None,
+    execution_log: list[dict[str, Any]] | None = None,
+) -> Dict[str, Any]:
+    logger.info("[Mode 1 - Text] Starting LangGraph pipeline for project: %s", project_name)
+    initial_state = _initial_pipeline_state(
+        project_name=project_name,
+        description=description,
+        project_id=project_id,
+        job_id=job_id,
+        session=session,
+        progress_callback=progress_callback,
+        execution_log=execution_log,
+    )
+    from app.services.websocket_manager import manager
+    final_result = {}
+    async for output in pipeline_graph.astream(initial_state):
+        for node_name, state_update in output.items():
+            if progress_callback:
+                progress_callback(node_name)
+            await manager.broadcast({
+                "type": "AGENT_UPDATE",
+                "payload": {"agent": node_name, "status": "complete"}
+            }, "pipeline", str(project_id))
+            if "final_result" in state_update:
+                final_result = state_update["final_result"]
+                
+    await manager.broadcast({
+        "type": "PIPELINE_COMPLETE",
+        "payload": {"status": "success"}
+    }, "pipeline", str(project_id))
+    return final_result
+
+
+async def run_pipeline_from_documents(
+    project_name: str,
+    contract_bytes: Optional[bytes],
+    contract_filename: Optional[str],
+    blueprint_bytes: Optional[bytes],
+    blueprint_filename: Optional[str],
+    project_id: Optional[int] = None,
+    job_id: Optional[str] = None,
+    session: Optional[AsyncSession] = None,
+    progress_callback: ProgressCallback | None = None,
+    execution_log: list[dict[str, Any]] | None = None,
+) -> Dict[str, Any]:
+    logger.info("[Mode 2 - Documents] Starting LangGraph pipeline for project: %s", project_name)
+
+    contract_text: Optional[str] = None
+    blueprint_text: Optional[str] = None
+    stored_document_ids: Dict[str, int] = {}
+
+    if contract_bytes and contract_filename:
+        logger.info("Extracting text from contract: %s", contract_filename)
+        contract_text = await document_extraction_service.extract_text_from_bytes(
+            contract_bytes, contract_filename
+        )
+        if project_id is not None and session is not None and contract_text:
+            doc_id = await update_document_extracted_text(
+                session, project_id, "contract", contract_text
+            )
+            if doc_id is not None:
+                stored_document_ids["contract"] = doc_id
+
+    if blueprint_bytes and blueprint_filename:
+        logger.info("Extracting text from blueprint: %s", blueprint_filename)
+        blueprint_text = await document_extraction_service.extract_text_from_bytes(
+            blueprint_bytes, blueprint_filename
+        )
+        if project_id is not None and session is not None and blueprint_text:
+            doc_id = await update_document_extracted_text(
+                session, project_id, "blueprint", blueprint_text
+            )
+            if doc_id is not None:
+                stored_document_ids["blueprint"] = doc_id
+
+    initial_state = _initial_pipeline_state(
+        project_name=project_name,
+        contract_text=contract_text,
+        blueprint_text=blueprint_text,
+        project_id=project_id,
+        job_id=job_id,
+        session=session,
+        progress_callback=progress_callback,
+        execution_log=execution_log,
+        stored_document_ids=stored_document_ids,
+    )
+    from app.services.websocket_manager import manager
+    final_result = {}
+    async for output in pipeline_graph.astream(initial_state):
+        for node_name, state_update in output.items():
+            if progress_callback:
+                progress_callback(node_name)
+            await manager.broadcast({
+                "type": "AGENT_UPDATE",
+                "payload": {"agent": node_name, "status": "complete"}
+            }, "pipeline", str(project_id))
+            if "final_result" in state_update:
+                final_result = state_update["final_result"]
+                
+    await manager.broadcast({
+        "type": "PIPELINE_COMPLETE",
+        "payload": {"status": "success"}
+    }, "pipeline", str(project_id))
+    return final_result

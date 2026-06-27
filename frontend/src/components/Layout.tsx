@@ -1,4 +1,5 @@
 import { Outlet, NavLink, useLocation, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
 import {
   LayoutDashboard,
   Building2,
@@ -8,18 +9,22 @@ import {
   Plus,
   User as UserIcon,
   LogOut,
+  Settings as SettingsIcon,
+  Truck,
 } from "lucide-react";
-// import { NewProjectModal } from "./NewProjectModal";
+import NewProjectModal from "./NewProjectModal";
 import { useAppContext } from "../context/AppContext";
 import { useAuth } from "../context/AuthContext";
 import { useLoading } from "../context/LoadingContext";
+import { useWebSocket } from "../context/WebSocketContext";
 import { FullscreenLoader, LoadingBar } from "./Loader";
-import NewProjectModal from "./NewProjectModal";
 
 const navItems = [
   { path: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { path: "/projects", label: "Projects", icon: Building2 },
   { path: "/ai-insights", label: "AI Insights", icon: Bot },
+  { path: "/catalogs", label: "Catalogs", icon: Truck },
+  { path: "/settings", label: "Settings", icon: SettingsIcon },
 ];
 
 export default function Layout() {
@@ -61,6 +66,26 @@ export default function Layout() {
   };
 
   const { hasFullscreenLoader, routeTransition } = useLoading();
+  const { lastMessage } = useWebSocket("dashboard");
+  const [notifications, setNotifications] = useState<
+    Array<{ id: number; text: string }>
+  >([]);
+  const [showNotifications, setShowNotifications] = useState(false);
+
+  useEffect(() => {
+    if (!lastMessage) return;
+    const text =
+      typeof lastMessage.payload === "string"
+        ? lastMessage.payload
+        : lastMessage.payload?.message ??
+          lastMessage.payload?.detail ??
+          lastMessage.type ??
+          "Dashboard update received";
+    setNotifications((prev) => [
+      { id: Date.now(), text: String(text) },
+      ...prev,
+    ].slice(0, 8));
+  }, [lastMessage]);
 
   return (
     <>
@@ -111,13 +136,31 @@ export default function Layout() {
 
           {/* Right controls */}
           <div className="flex items-center gap-3">
-            <button
-              className="p-2.5 rounded-full hover:bg-stone-100 text-stone-500 transition relative shrink-0"
-              aria-label="Notifications"
-            >
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-600 rounded-full"></span>
-              <Bell className="w-5 h-5" />
-            </button>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowNotifications((v) => !v)}
+                className="p-2.5 rounded-full hover:bg-stone-100 text-stone-500 transition relative shrink-0"
+                aria-label="Notifications"
+              >
+                {notifications.length > 0 && (
+                  <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-600 rounded-full" />
+                )}
+                <Bell className="w-5 h-5" />
+              </button>
+              {showNotifications && notifications.length > 0 && (
+                <div className="absolute right-0 mt-2 w-72 bg-white border border-stone-200 rounded-xl shadow-lg z-50 p-2">
+                  {notifications.map((n) => (
+                    <div
+                      key={n.id}
+                      className="text-xs text-stone-700 px-3 py-2 border-b border-stone-100 last:border-0"
+                    >
+                      {n.text}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
             <button
               onClick={() => navigate("/profile")}
@@ -145,7 +188,7 @@ export default function Layout() {
                     : location.pathname
                 }
                 onChange={(e) => {
-                  window.location.href = e.target.value;
+                  navigate(e.target.value);
                 }}
                 className="bg-stone-100 hover:bg-stone-200 text-[#1A1A1A] text-xs font-bold px-3 py-2 rounded-xl focus:outline-hidden border border-stone-300"
               >

@@ -61,7 +61,7 @@ async def analyze_from_documents(
     """
     Mode 2: Document-based.
     Accepts an optional Contract PDF and optional Blueprint PDF.
-    Extracts text using Azure Document Intelligence, then runs the 6-agent pipeline.
+    Extracts text locally from PDFs, then runs the 6-agent pipeline.
     At least one document must be provided.
     """
     if not contract and not blueprint:
