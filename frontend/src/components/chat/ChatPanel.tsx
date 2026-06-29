@@ -409,11 +409,10 @@ export default function ChatPanel({
             className={`flex gap-3 ${msg.role === "user" ? "flex-row-reverse" : ""}`}
           >
             <div
-              className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
-                msg.role === "user"
-                  ? "bg-[#F5C518] text-stone-900"
-                  : "bg-stone-800 text-stone-100"
-              }`}
+              className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${msg.role === "user"
+                ? "bg-[#F5C518] text-stone-900"
+                : "bg-stone-800 text-stone-100"
+                }`}
             >
               {msg.role === "user" ? (
                 <User className="w-4 h-4" />
@@ -422,11 +421,10 @@ export default function ChatPanel({
               )}
             </div>
             <div
-              className={`group relative p-3 rounded-xl text-sm max-w-[85%] ${
-                msg.role === "user"
-                  ? "bg-[#F5C518]/10 border border-[#F5C518]/30 text-stone-900 whitespace-pre-wrap leading-relaxed"
-                  : "bg-white border border-stone-200 text-stone-800"
-              }`}
+              className={`group relative p-3 rounded-xl text-sm max-w-[85%] ${msg.role === "user"
+                ? "bg-[#F5C518]/10 border border-[#F5C518]/30 text-stone-900 whitespace-pre-wrap leading-relaxed"
+                : "bg-white border border-stone-200 text-stone-800"
+                }`}
             >
               {msg.role === "assistant" ? (
                 <ChatMarkdown content={msg.content} />
