@@ -42,6 +42,13 @@ const getWsBase = () => {
   return `${wsProtocol}//${urlObj.host}`;
 };
 
+const generateSessionId = () => {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+};
+
 export default function ChatPanel({
   projectId,
   projectName,
@@ -71,7 +78,7 @@ export default function ChatPanel({
   >("disconnected");
   const [reconnectAttempt, setReconnectAttempt] = useState(0);
 
-  const sessionIdRef = useRef(crypto.randomUUID());
+  const sessionIdRef = useRef(generateSessionId());
   const wsRef = useRef<WebSocket | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const streamingRef = useRef("");
