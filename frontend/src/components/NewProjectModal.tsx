@@ -211,25 +211,37 @@ export default function NewProjectModal({ open, onClose }: NewProjectModalProps)
     if (type === "AGENT_UPDATE") {
       const nodeName = payload.agent;
       const mappedAgent = NODE_TO_AGENT[nodeName] || nodeName;
-      setProgressStep(mappedAgent);
       
       const idx = AGENT_ORDER.indexOf(mappedAgent);
       if (idx !== -1) {
-        setOverallPct(Math.round(((idx + 1) / AGENT_ORDER.length) * 100));
+        setOverallPct((prev) => {
+          const nextPct = Math.round(((idx + 1) / AGENT_ORDER.length) * 100);
+          return prev === null || nextPct > prev ? nextPct : prev;
+        });
+        setProgressStep((prev) => {
+          const currentIdx = prev ? AGENT_ORDER.indexOf(prev) : -1;
+          const nextIdx = idx + 1;
+          if (nextIdx < AGENT_ORDER.length && nextIdx > currentIdx) {
+            return AGENT_ORDER[nextIdx];
+          }
+          return prev;
+        });
       }
-    } else if (type === "PIPELINE_COMPLETE") {
+    } else if (type === "PIPELINE_COMPLETE" || type === "PIPELINE_ERROR") {
       const projId = Number(activeProjectIdForWs);
       const jobId = currentJobIdRef.current;
       getAnalyzeStatus(projId, jobId || undefined)
         .then((status) => {
-          if (status.result) {
+          if (status.status === "error") {
+            rejectAnalyzeRef.current?.(new Error(status.error ?? "Pipeline failed"));
+          } else if (status.result) {
             resolveAnalyzeRef.current?.(status.result);
           } else {
             resolveAnalyzeRef.current?.({});
           }
         })
         .catch((err) => {
-          console.error("Failed to get final status after PIPELINE_COMPLETE:", err);
+          console.error("Failed to get final status:", err);
           resolveAnalyzeRef.current?.({});
         });
     }

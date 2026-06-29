@@ -325,6 +325,15 @@ class AnalyzeJobService:
             job.status = "error"
             job.error = str(exc)
             await self._save_job_async(job)
+            try:
+                from app.services.websocket_manager import manager
+                import asyncio
+                asyncio.create_task(manager.broadcast({
+                    "type": "PIPELINE_ERROR",
+                    "payload": {"error": str(exc)}
+                }, "pipeline", str(job.project_id)))
+            except Exception as b_exc:
+                logger.error("Failed to broadcast PIPELINE_ERROR: %s", b_exc)
 
     def enqueue(
         self,
