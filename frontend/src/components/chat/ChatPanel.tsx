@@ -43,9 +43,7 @@ const getWsBase = () => {
 };
 
 const generateSessionId = () => {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID();
-  }
+
   return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 };
 
@@ -108,7 +106,7 @@ export default function ChatPanel({
     streamingRef.current = "";
     setStreamingContent("");
     setIsStreaming(false);
-    sessionIdRef.current = crypto.randomUUID();
+    sessionIdRef.current = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
   }, [storageKey]);
 
   const connectWebSocket = useCallback(() => {
@@ -282,7 +280,7 @@ export default function ChatPanel({
     streamingRef.current = "";
     setStreamingContent("");
     setIsStreaming(false);
-    sessionIdRef.current = crypto.randomUUID();
+    sessionIdRef.current = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
     saveStoredMessages(storageKey, []);
 
     if (ws && ws.readyState === WebSocket.OPEN) {
